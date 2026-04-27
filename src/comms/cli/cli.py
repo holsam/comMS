@@ -18,8 +18,9 @@ from comms.cli.quantify import commsQuantify
 from comms.cli.report import commsReport
 from comms.cli.pipeline import commsPipeline
 from comms.cli.config import commsConfig
-from comms.cli.version import commsVersion
 from comms.cli.license import commsLicense
+from comms.cli.setup import toolSetup
+from comms.cli.version import commsVersion
 
 # -- Print startup splash
 initComms()
@@ -44,8 +45,9 @@ comms.add_typer(commsRescore)
 comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
 comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='Utilities')
-comms.add_typer(commsVersion)
 comms.add_typer(commsLicense)
+comms.add_typer(toolSetup)
+comms.add_typer(commsVersion)
 
 
 # ====================
