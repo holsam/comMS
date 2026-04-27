@@ -1,6 +1,6 @@
 [project]
 name = "comms"
-version = "0.2.2"
+version = "0.2.3"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -11,6 +11,7 @@ dependencies = [
     "pandas>=3.0.2",
     "platformdirs>=4.9.6",
     "rich>=15.0.0",
+    "tomli-w>=1.2.0",
     "typer>=0.24.1",
 ]
 
