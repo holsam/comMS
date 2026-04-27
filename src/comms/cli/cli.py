@@ -7,14 +7,22 @@ import logging, typer
 from typing import Annotated
 
 # -- Import internal utility functions
-# TODO
+from comms.utils.settings import initComms, lg
 
 # -- Import comMS commands
-# TODO - format:
-# from comms.cli.command import commsCommand
+from comms.cli.convert import commsConvert
+from comms.cli.index import commsIndex
+from comms.cli.search import commsSearch
+from comms.cli.rescore import commsRescore
+from comms.cli.quantify import commsQuantify
+from comms.cli.report import commsReport
+from comms.cli.pipeline import commsPipeline
+from comms.cli.config import commsConfig
+from comms.cli.version import commsVersion
+from comms.cli.license import commsLicense
 
 # -- Print startup splash
-# TODO: initComms()
+initComms()
 
 # -- Initialise root Typer class
 comms = typer.Typer(
@@ -28,9 +36,16 @@ comms = typer.Typer(
 
 
 # -- Register (sub)Typer classes for each command
-# TODO - format:
-#  comms.add_typer(Typer) <- standard
-#  comms.add_typer(Typer, name='command', help='help text', rich_help_panel='help panel') <- for commands with subcommands
+comms.add_typer(commsPipeline)
+comms.add_typer(commsConvert)
+comms.add_typer(commsIndex)
+comms.add_typer(commsSearch)
+comms.add_typer(commsRescore)
+comms.add_typer(commsQuantify)
+comms.add_typer(commsReport)
+comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='Utilities')
+comms.add_typer(commsVersion)
+comms.add_typer(commsLicense)
 
 
 # ====================
