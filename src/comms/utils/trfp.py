@@ -25,6 +25,7 @@ def convertRaw(
     output_format: int = 2,
     gzip: bool = True,
     metadata: int = 0,
+    log_path: Optional[Path] = None,
 ) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [str(exe_path),
@@ -42,8 +43,9 @@ def convertRaw(
             return False
         cmd = [mono] + cmd
     lg.debug(f"trfp | Running: {' '.join(cmd)}")
+    log_fh = open(log_path, 'a') if log_path else subprocess.DEVNULL
     try:
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        result = subprocess.run(cmd, stdout=log_fh, stderr=log_fh, check=False)
         if result.returncode != 0:
             lg.warning(f'trfp | ThermoRawFileParser exited with code {result.returncode} for {raw_file.name}.')
             return False
@@ -51,3 +53,6 @@ def convertRaw(
     except Exception as e:
         lg.error(f'trfp | Unexpected error converting {raw_file.name}: {e}')
         return False
+    finally:
+        if log_path:
+            log_fh.close()

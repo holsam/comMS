@@ -22,11 +22,14 @@ def runCrux(
     crux_bin: Path,
     subcommand: str,
     args: list,
+    log_path: Optional[Path] = None,
 ) -> bool:
     cmd = [str(crux_bin), subcommand] + [str(a) for a in args]
     lg.debug(f"crux | Running: {' '.join(cmd)}")
+
+    log_fh = open(log_path, 'a') if log_path else subprocess.DEVNULL
     try:
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        result = subprocess.run(cmd, stdout=log_fh, stderr=log_fh, check=False)
         if result.returncode != 0:
             lg.warning(f'crux | {subcommand} exited with code {result.returncode}.')
             return False
@@ -34,9 +37,12 @@ def runCrux(
     except Exception as e:
         lg.error(f'crux | Unexpected error running {subcommand}: {e}')
         return False
+    finally:
+        if log_path:
+            log_fh.close()
 
-# -- tideIndex: returns True if the tide peptide index was built successfully, False on failure
-def tideIndex(crux_bin, database, index_dir, config):
+# -- tideIndex: returns True if the Tide peptide index was built successfully, False on failure
+def tideIndex(crux_bin, database, index_dir, config, log_path=None):
     args = [
         '--verbosity', '40',
         '--memory-limit', '8',
@@ -54,19 +60,20 @@ def tideIndex(crux_bin, database, index_dir, config):
         str(database),
         'comms-combined',
     ]
-    return runCrux(crux_bin, 'tide-index', args)
+    return runCrux(crux_bin, 'tide-index', args, log_path)
 
 # -- paramMedic: returns True if param-medic completed successfully, False on failure
-def paramMedic(crux_bin, mzml_file, out_dir):
+def paramMedic(crux_bin, mzml_file, out_dir, log_path=None):
     args = [
         '--verbosity', '40',
         '--output-dir', str(out_dir),
         str(mzml_file),
     ]
-    return runCrux(crux_bin, 'param-medic', args)
+    return runCrux(crux_bin, 'param-medic', args, log_path)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precursor_tol=None, fragment_tol=None):
+def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config,
+               precursor_tol=None, fragment_tol=None, log_path=None):
     prec = precursor_tol or config['search']['precursor_tolerance_ppm']
     frag = fragment_tol or config['search']['fragment_tolerance_da']
     args = [
@@ -84,10 +91,10 @@ def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precur
         str(mzml_file),
         str(index_dir),
     ]
-    return runCrux(crux_bin, 'tide-search', args)
+    return runCrux(crux_bin, 'tide-search', args, log_path)
 
 # -- percolator: returns True if Percolator rescoring completed successfully, False on failure
-def percolator(crux_bin, target_psm_file, database, out_dir, fileroot, config):
+def percolator(crux_bin, target_psm_file, database, out_dir, fileroot, config, log_path=None):
     args = [
         '--verbosity', '40',
         '--protein', 'T',
@@ -100,10 +107,10 @@ def percolator(crux_bin, target_psm_file, database, out_dir, fileroot, config):
     ]
     if config['percolator']['picked_protein']:
         args = ['--picked-protein', str(database)] + args
-    return runCrux(crux_bin, 'percolator', args)
+    return runCrux(crux_bin, 'percolator', args, log_path)
 
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
-def spectralCounts(crux_bin, psm_file, database, out_dir, fileroot, config):
+def spectralCounts(crux_bin, psm_file, database, out_dir, fileroot, config, log_path=None):
     args = [
         '--verbosity', '40',
         '--measure', config['quantify']['measure'],
@@ -115,4 +122,4 @@ def spectralCounts(crux_bin, psm_file, database, out_dir, fileroot, config):
         '--fileroot', fileroot,
         str(psm_file),
     ]
-    return runCrux(crux_bin, 'spectral-counts', args)
+    return runCrux(crux_bin, 'spectral-counts', args, log_path)
