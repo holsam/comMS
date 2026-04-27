@@ -31,12 +31,12 @@ def checkUniqueFileName(
     counter suffix if a file with the same name already exists.
     '''
     naming = {
-        'convert':  f'{orig_name}.mzML.gz',
-        'index':    'comms-index',
-        'search':   f'{orig_name}.tide-search.target.txt',
-        'rescore':  f'{orig_name}.percolator.psms.txt',
+        'convert': f'{orig_name}.mzML.gz',
+        'index': 'comms-index',
+        'search': f'{orig_name}.tide-search.target.txt',
+        'rescore': f'{orig_name}.percolator.psms.txt',
         'quantify': f'{orig_name}.spectral-counts.txt',
-        'report':   f'comms-report.{fmt}' if fmt else 'comms-report.html',
+        'report': f'comms-report.{fmt}' if fmt else 'comms-report.html',
     }
     base_name = naming.get(command, f'comms-{command}-output')
     out_path = Path(out_dir, base_name)
