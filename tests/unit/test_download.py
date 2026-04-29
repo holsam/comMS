@@ -56,21 +56,12 @@ class TestResolveBinDir:
     def test_returns_path_object(self, tmp_path):
         assert isinstance(_resolve_bin_dir(override=tmp_path), Path)
 
-    def test_falls_back_to_config_when_no_override(self, monkeypatch):
+    def test_falls_back_to_repoBinDir_when_no_override(self):
         '''
-        When override is None, _resolve_bin_dir should read from config.
-        Monkeypatch config to inject a known path.
+        When override is None, _resolve_bin_dir should be <repo-root>/bin
         '''
-        import comms.utils.download as dl
-        monkeypatch.setitem(dl.config, 'tools', {'bin_dir': '/tmp/comms_bin'})
         result = _resolve_bin_dir(override=None)
-        assert str(result).endswith('comms_bin')
-
-    def test_raises_keyerror_when_no_override_and_no_config_key(self, monkeypatch):
-        import comms.utils.download as dl
-        monkeypatch.setitem(dl.config, 'tools', {})   # empty tools section
-        with pytest.raises(KeyError):
-            _resolve_bin_dir(override=None)
+        assert str(result).endswith('/bin')
 
 # -- Define tests for correctly constructing crux tarball URL
 class TestCruxUrlConstruction:
