@@ -4,7 +4,7 @@ comMS CLI subcommand for managing configuration files
 
 # -- Import external dependencies
 import typer
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import config as configFuncs
@@ -52,3 +52,19 @@ def reset(
 ):
     '''Overwrite the user config file with comMS built-in defaults'''
     configFuncs.config_reset(force=force)
+
+# -- Define config command: set
+@commsConfig.command(rich_help_panel='Config Commands')
+def set(
+    iodo: Annotated[
+        Optional[bool],
+        typer.Option(
+            '--iodo/--no-iodo',
+            help=('Add (--iodo) or remove (--no-iodo) static carbamidomethylation of cysteine as a static modification.'),
+        ),
+    ] = None,
+):
+    '''
+    Set values in user configuration file
+    '''
+    configFuncs.config_set(iodo=iodo)

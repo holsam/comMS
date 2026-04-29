@@ -3,7 +3,7 @@ comMS config functions
 '''
 
 # -- Import external dependencies
-import tomllib, tomli_w, typer
+import re, tomllib, tomli_w, typer
 from pathlib import Path
 from rich import print
 from rich.console import Console
@@ -12,6 +12,10 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.utils.settings import loadDefaultConfig, userConfigPath
+
+# -- Public constant: cysteine mod string added by iodoacetamide alkylation
+CARBAMIDOMETHYL_MOD = 'C+57.0215'   # static carbamidomethylation of Cys
+
 
 # -- config_init: creates a user config file with default settings in the OS config directory
 def config_init():
@@ -88,6 +92,39 @@ def config_reset(force: bool = False):
         raise typer.Exit(1)
     print(f'\n[bold green]SUCCESS:[/bold green] Config at [cyan]{config_path}[/cyan] reset to defaults.\n')
 
+
+# -- config_set: apply a named protocol flag to the user config
+def config_set(iodo: bool | None) -> None:
+    if iodo is None:
+        print('\n[bold yellow]WARNING:[/bold yellow] No flag supplied. '
+              'Use [bold]--iodo[/bold] or [bold]--no-iodo[/bold].\n')
+        raise typer.Exit(1)
+    config_path = userConfigPath()
+    # Auto-create from defaults if no user config exists yet
+    if not config_path.exists():
+        print(f'\n[dim]No user config found — creating one from defaults at [cyan]{config_path}[/cyan][/dim]')
+        _writeConfig(loadDefaultConfig())
+    try:
+        cfg = _loadUserConfig()
+    except Exception as e:
+        print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
+        raise typer.Exit(1)
+    original_mods = cfg.get('search', {}).get('mods_spec', '')
+    updated_mods  = _apply_protocol_flags(original_mods, iodo=iodo)
+    cfg.setdefault('search', {})['mods_spec'] = updated_mods
+    try:
+        _writeConfig(cfg)
+    except Exception as e:
+        print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
+        raise typer.Exit(1)
+    action = 'added to' if iodo else 'removed from'
+    if original_mods == updated_mods:
+        print(f'\n[dim]No change — [cyan]{CARBAMIDOMETHYL_MOD}[/cyan] was already {"present in" if iodo else "absent from"} mods_spec.[/dim]\n')
+    else:
+        print(f'\n[bold green]SUCCESS:[/bold green] [cyan]{CARBAMIDOMETHYL_MOD}[/cyan] {action} mods_spec.\n'
+              f'  Before: {original_mods or "(empty)"}\n'
+              f'  After: {updated_mods}\n')
+
 # -- Internal helpers
 # -- _loadUserConfig: returns the user config as a dict
 def _loadUserConfig() -> dict:
@@ -144,3 +181,18 @@ def _printTable(user_config: dict, default_config: dict):
         user_str = f'[yellow]{user_val}[/yellow]' if changed else str(user_val)
         table.add_row(key, user_str, str(default_val), status)
     console.print(table)
+
+# -- _apply_protocol_flags: returns string for mods_spec
+def _apply_protocol_flags(mods_spec: str, *, iodo: bool) -> str:
+    '''
+    Add or remove the carbamidomethylation Cys mod in a Tide mods_spec string.
+    '''
+    # Split on commas, discard empty strings from a blank mods_spec
+    entries = [e.strip() for e in mods_spec.split(',') if e.strip()]
+    # Remove any existing cysteine mod (pattern: optional digit(s), C, +/-, digits)
+    cys_pattern = re.compile(r'^\d*C[+\-]', re.IGNORECASE)
+    entries = [e for e in entries if not cys_pattern.match(e)]
+    if iodo:
+        # Prepend so cysteine mod appears first — purely cosmetic but consistent
+        entries = [f'1{CARBAMIDOMETHYL_MOD}'] + entries
+    return ','.join(entries)
