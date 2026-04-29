@@ -1,5 +1,5 @@
 '''
-Unit tests for src/comms/commands/config.py and src/comms/utils/settings.pys
+Unit tests for src/comms/commands/config.py and src/comms/utils/settings.py
 '''
 
 # -- Import external dependencies
