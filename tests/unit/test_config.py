@@ -7,7 +7,7 @@ import click, pytest, tomllib
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.settings import loadDefaultConfig, userConfigPath
+import comms.utils.settings as settings
 from comms.commands.config import CARBAMIDOMETHYL_MOD, _apply_protocol_flags, _flatten, _configCheck, _loadUserConfig, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
 
 # -- Define fixture for initialised user config file
@@ -23,29 +23,29 @@ def initialised_config(isolated_config_dir):
 # -- Define tests for default config file structure
 class TestLoadDefaultConfig:
     def test_returns_dict(self):
-        cfg = loadDefaultConfig()
+        cfg = settings.loadDefaultConfig()
         assert isinstance(cfg, dict)
 
     def test_contains_expected_top_level_sections(self):
-        cfg = loadDefaultConfig()
+        cfg = settings.loadDefaultConfig()
         for section in ('global', 'convert', 'search', 'percolator', 'quantify'):
             assert section in cfg, f'Missing top-level section: {section}'
 
     def test_search_section_has_required_keys(self):
-        search = loadDefaultConfig()['search']
+        search = settings.loadDefaultConfig()['search']
         for key in ('threads', 'precursor_tolerance_ppm', 'fragment_tolerance_da',
                     'missed_cleavages', 'score_function'):
             assert key in search, f'Missing search key: {key}'
 
     def test_values_have_correct_types(self):
-        cfg = loadDefaultConfig()
+        cfg = settings.loadDefaultConfig()
         assert isinstance(cfg['search']['threads'], int)
         assert isinstance(cfg['search']['precursor_tolerance_ppm'], float)
         assert isinstance(cfg['convert']['gzip'], bool)
 
     def test_default_mods_spec_does_not_contain_carbamidomethyl(self):
         '''Check carbamidomethylation is not in default config'''
-        mods = loadDefaultConfig()['search']['mods_spec']
+        mods = settings.loadDefaultConfig()['search']['mods_spec']
         assert CARBAMIDOMETHYL_MOD not in mods
 
 # -- Define tests for _flatten utility function
@@ -72,7 +72,7 @@ class TestFlatten:
         assert _flatten({}) == {}
 
     def test_default_config_flattens_without_error(self):
-        cfg = loadDefaultConfig()
+        cfg = settings.loadDefaultConfig()
         flat = _flatten(cfg)
         assert all('.' in k for k in flat if any(
             cfg.get(k.split('.')[0], None) and isinstance(cfg[k.split('.')[0]], dict)
@@ -104,7 +104,7 @@ class TestConfigCheck:
 # -- Define tests for writing and loading configuration files
 class TestWriteLoadConfig:
     def test_write_and_reload_preserves_content(self, isolated_config_dir):
-        defaults = loadDefaultConfig()
+        defaults = settings.loadDefaultConfig()
         _writeConfig(defaults)
         loaded = _loadUserConfig()
         assert loaded == defaults
@@ -117,15 +117,16 @@ class TestWriteLoadConfig:
 class TestConfigInit:
     def test_creates_config_file(self, isolated_config_dir):
         config_init()
-        assert userConfigPath().exists()
+        assert settings.userConfigPath().exists()
 
-    def test_created_file_is_valid_toml(self, initialised_config):
-        with userConfigPath().open('rb') as f:
+    def test_created_file_is_valid_toml(self, isolated_config_dir):
+        config_init()
+        with settings.userConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
     def test_does_not_overwrite_existing(self, initialised_config):
-        userConfigPath().write_text('[global]\nverbose = true\n')
+        settings.userConfigPath().write_text('[global]\nverbose = true\n')
         with pytest.raises(click.exceptions.Exit) as exc:
             config_init()
         assert exc.value.exit_code != 0
@@ -147,7 +148,7 @@ class TestConfigVerify:
 
     def test_missing_key_exits_nonzero(self, initialised_config):
         # Remove one required key by writing a truncated config
-        userConfigPath().write_text('[global]\nverbose = false\n')
+        settings.userConfigPath().write_text('[global]\nverbose = false\n')
         with pytest.raises(click.exceptions.Exit) as exc:
             config_verify()
         assert exc.value.exit_code != 0
@@ -162,22 +163,22 @@ class TestConfigVerify:
 class TestConfigReset:
     def test_reset_with_force_restores_defaults(self, initialised_config):
         # Corrupt the config
-        userConfigPath().write_text('[global]\nverbose = true\n')
+        settings.userConfigPath().write_text('[global]\nverbose = true\n')
         config_reset(force=True)
-        assert _loadUserConfig() == loadDefaultConfig()
+        assert _loadUserConfig() == settings.loadDefaultConfig()
 
     def test_reset_without_force_prompts(self, initialised_config, monkeypatch):
         # Simulate user declining the prompt
-        monkeypatch.setattr('click.confirm', lambda *a, **kw: False)
+        monkeypatch.setattr('typer.confirm', lambda *a, **kw: False)
         with pytest.raises(click.exceptions.Exit) as exc:
             config_reset(force=False)
         assert exc.value.exit_code in (0, None)
 
-    def test_reset_without_force_proceeds_on_confirm(self, initialised_config, monkeypatch):
-        userConfigPath().write_text('[global]\nverbose = true\n')
-        monkeypatch.setattr('click.confirm', lambda *a, **kw: True)
+    def test_reset_without_force_proceeds_on_confirm(self, isolated_config_dir, monkeypatch):
+        settings.userConfigPath().write_text('[global]\nverbose = true\n')
+        monkeypatch.setattr('typer.confirm', lambda *a, **kw: True)
         config_reset(force=False)
-        assert _loadUserConfig() == loadDefaultConfig()
+        assert _loadUserConfig() == settings.loadDefaultConfig()
 
 # Define tests for _apply_protocol_flags helper function
 class TestApplyProtocolFlags:
@@ -243,11 +244,11 @@ class TestConfigSet:
     def test_creates_config_if_absent(self, isolated_config_dir):
         '''config_set should auto-create the user config if none exists.'''
         config_set(iodo=True)
-        assert userConfigPath().exists()
+        assert settings.userConfigPath().exists()
 
     def test_created_config_is_valid_toml(self, isolated_config_dir):
         config_set(iodo=True)
-        with userConfigPath().open('rb') as f:
+        with settings.userConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
@@ -298,7 +299,7 @@ class TestConfigSet:
     def test_no_flag_exits_nonzero(self, isolated_config_dir):
         with pytest.raises(click.exceptions.Exit) as exc:
             config_set(iodo=None)
-        assert exc.value.code != 0
+        assert exc.value.exit_code != 0
 
     def test_all_other_config_keys_unchanged_after_set(self, initialised_config):
         '''config_set should only touch search.mods_spec.'''
