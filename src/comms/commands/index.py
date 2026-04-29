@@ -14,7 +14,7 @@ from comms.utils import paths as pathutil
 # -- run_index: builds a Tide peptide index from database and writes it to output
 def run_index(database: Path, output: Path):
     lg.debug('index | Locating Crux binary...')
-    bin_dir = Path(__file__).parents[4] / 'bin'
+    bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
         print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')

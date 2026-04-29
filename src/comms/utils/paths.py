@@ -6,6 +6,12 @@ comMS output path utility functions
 from pathlib import Path
 from typing import Optional
 
+
+# repoBinDir: returns Path to bin/ directory in repo root
+def repoBinDir() -> Path:
+    '''Returns the repo-root bin/ directory, resolved from this file's location.'''
+    return Path(__file__).parents[3] / 'bin'
+
 # generateOutputFileStructure: returns Path to expected output directory
 def generateOutputFileStructure(out_dir: Path, command: str) -> Path:
     '''

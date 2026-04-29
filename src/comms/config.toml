@@ -4,10 +4,6 @@
 verbose = false
 debug = false
 
-[tools]
-bin_dir = "~/.local/share/<tool>/bin"   # Linux/macOS
-# bin_dir = "%APPDATA%\\<tool>\\bin"    # Windows (for TRFP only)
-
 [convert]
 format = 2      # 2 = indexed mzML
 gzip = true

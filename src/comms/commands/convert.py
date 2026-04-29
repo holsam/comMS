@@ -15,7 +15,7 @@ from comms.utils import paths as pathutil
 def run_convert(input_dir: Path, output: Path, gzip: bool):
     lg.debug('convert | Locating ThermoRawFileParser...')
     import shutil
-    bin_dir = Path(__file__).parents[4] / 'bin'
+    bin_dir = pathutil.repoBinDir()
     exe_path = trfputil.findTRFP(bin_dir)
     if exe_path is None:
         print(f'[bold red]ERROR:[/bold red] ThermoRawFileParser.exe not found under {bin_dir}.')

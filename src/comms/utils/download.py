@@ -9,6 +9,7 @@ from typing import Optional
 from urllib.error import URLError
 
 # -- Import internal dependencies
+from comms.utils.paths import repoBinDir
 from comms.utils.settings import config, lg
 
 # -- Define constants
@@ -41,12 +42,7 @@ def _resolve_bin_dir(override: Optional[Path] = None) -> Path:
     '''
     if override is not None:
         return override
-    try:
-        return Path(config['tools']['bin_dir']).expanduser().resolve()
-    except KeyError:
-        raise KeyError(
-            "No 'bin_dir' key found under [tools] in config. Add tools.bin_dir to your config file, or pass bin_dir explicitly."
-        )
+    return repoBinDir()
 
 # -- _detect_platform: returns tuple encoding system and machine
 # =========================

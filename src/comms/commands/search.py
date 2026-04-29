@@ -16,7 +16,7 @@ from comms.utils import paths as pathutil
 # -- run_search: runs tide-search on all mzML files in input_dir and writes results to output
 def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool, threads: int):
     lg.debug('search | Locating Crux binary...')
-    bin_dir = Path(__file__).parents[4] / 'bin'
+    bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
         print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
