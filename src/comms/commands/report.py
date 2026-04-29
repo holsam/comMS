@@ -14,7 +14,7 @@ from comms.utils import paths as pathutil
 # -- run_report: return message saying report is not functional at this time
 def run_report(quantification: Path, sample_sheet: Path, output: Path, fmt: str):
     lg.warning(f'report | comms report functionality is not yet supported.')
-    raise SystemExit(0)
+    raise NotImplementedError()
 
 # -- run_report: renders the comMS Quarto report from quantification output and writes it to output
 # def run_report(quantification: Path, sample_sheet: Path, output: Path, fmt: str):
