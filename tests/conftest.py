@@ -3,9 +3,9 @@ Defines shared fixtures and binary-availability guards for testing
 '''
 
 # -- Import external dependencies
-import os, pytest, shutil
+import pytest
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Optional
 
 # -- Define root directories external dependencies
 TESTS_DIR = Path(__file__).parent
@@ -13,7 +13,7 @@ REPO_ROOT = TESTS_DIR.parent
 BIN_DIR = REPO_ROOT / 'bin'
 
 # -- Import internal dependencies
-from tests.fixtures.generate_fixtures import generate_all, PROTEINS, TARGET_PEPTIDES, write_fasta, write_mzml
+from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
 
 # -- Register custom pytest markers
 def pytest_configure(config: pytest.Config) -> None:
