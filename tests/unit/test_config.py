@@ -5,7 +5,6 @@ Unit tests for src/comms/commands/config.py and src/comms/utils/settings.py
 # -- Import external dependencies
 import click, pytest, tomllib
 from pathlib import Path
-from typer.testing import CliRunner
 
 # -- Import internal functions
 from comms.utils.settings import loadDefaultConfig, userConfigPath
