@@ -1,3 +1,6 @@
+# Binaries
+bin/
+
 # Local development environment files
 .local
 
