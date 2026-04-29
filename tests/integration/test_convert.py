@@ -8,7 +8,7 @@ from pathlib import Path
 
 # -- Import internal functions
 from comms.commands.convert import run_convert
-from tests.comms.integration.test_trfp import REAL_RAW_FIXTURE
+from tests.integration.test_trfp import REAL_RAW_FIXTURE
 
 # -- Define pytest mark
 pytestmark = pytest.mark.trfp
