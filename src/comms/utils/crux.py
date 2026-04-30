@@ -67,14 +67,16 @@ def paramMedic(crux_bin, mzml_file, out_dir):
     return runCrux(crux_bin, 'param-medic', args)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precursor_tol=None):
+def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precursor_tol=None, mz_bin_width=None):
     prec = precursor_tol or config['search']['precursor_tolerance_ppm']
+    bin_width = mz_bin_width  or config['search']['mz_bin_width']
     args = [
         '--verbosity', '40',
         '--num-threads', str(config['search']['threads']),
         '--spectrum-parser', 'pwiz',
         '--precursor-window', str(prec),
         '--precursor-window-type', 'ppm',
+        '--mz-bin-width', str(bin_width),
         '--score-function', config['search']['score_function'],
         '--min-peaks', str(config['search']['min_peaks']),
         '--missed-cleavages', str(config['search']['missed_cleavages']),

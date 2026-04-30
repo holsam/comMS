@@ -13,9 +13,12 @@ from typing import Annotated
 # -- Import internal functions
 from comms.utils.settings import loadDefaultConfig, userConfigPath
 
-# -- Public constant: cysteine mod string added by iodoacetamide alkylation
-CARBAMIDOMETHYL_MOD = 'C+57.0215'   # static carbamidomethylation of Cys
-
+# -- Define constants
+CARBAMIDOMETHYL_MOD = 'C+57.0215'    # static carbamidomethylation of Cys
+MZ_BIN_WIDTH_HIGH_RES = 0.02    # high-resolution instruments (default)
+MZ_BIN_WIDTH_LOW_RES = 1.0005079    # low-resolution instruments
+SCORE_FUNC_HIGH_RES = 'xcorr'    # high-resolution instruments (default)
+SCORE_FUNC_LOW_RES = 'combined-p-value'    # low-resolution instruments
 
 # -- config_init: creates a user config file with default settings in the OS config directory
 def config_init():
@@ -93,11 +96,10 @@ def config_reset(force: bool = False):
     print(f'\n[bold green]SUCCESS:[/bold green] Config at [cyan]{config_path}[/cyan] reset to defaults.\n')
 
 
-# -- config_set: apply a named protocol flag to the user config
-def config_set(iodo: bool | None) -> None:
-    if iodo is None:
-        print('\n[bold yellow]WARNING:[/bold yellow] No flag supplied. '
-              'Use [bold]--iodo[/bold] or [bold]--no-iodo[/bold].\n')
+# -- config_set: apply named protocol flags to the user config
+def config_set(iodo: bool | None, low_res: bool | None) -> None:
+    if iodo is None and low_res is None:
+        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold].\n')
         raise typer.Exit(1)
     config_path = userConfigPath()
     # Auto-create from defaults if no user config exists yet
@@ -109,21 +111,13 @@ def config_set(iodo: bool | None) -> None:
     except Exception as e:
         print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
         raise typer.Exit(1)
-    original_mods = cfg.get('search', {}).get('mods_spec', '')
-    updated_mods  = _apply_protocol_flags(original_mods, iodo=iodo)
-    cfg.setdefault('search', {})['mods_spec'] = updated_mods
+    cfg = _apply_protocol_flags(cfg, iodo=iodo, low_res=low_res)
     try:
         _writeConfig(cfg)
     except Exception as e:
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise typer.Exit(1)
-    action = 'added to' if iodo else 'removed from'
-    if original_mods == updated_mods:
-        print(f'\n[dim]No change — [cyan]{CARBAMIDOMETHYL_MOD}[/cyan] was already {"present in" if iodo else "absent from"} mods_spec.[/dim]\n')
-    else:
-        print(f'\n[bold green]SUCCESS:[/bold green] [cyan]{CARBAMIDOMETHYL_MOD}[/cyan] {action} mods_spec.\n'
-              f'  Before: {original_mods or "(empty)"}\n'
-              f'  After: {updated_mods}\n')
+    _printSetSummary(iodo=iodo, low_res=low_res)
 
 # -- Internal helpers
 # -- _loadUserConfig: returns the user config as a dict
@@ -182,10 +176,37 @@ def _printTable(user_config: dict, default_config: dict):
         table.add_row(key, user_str, str(default_val), status)
     console.print(table)
 
-# -- _apply_protocol_flags: returns string for mods_spec
-def _apply_protocol_flags(mods_spec: str, *, iodo: bool) -> str:
+# -- _apply_protocol_flags: returns dictionary of config options
+def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None,) -> dict:
+    '''
+    Apply protocol flags to a config dictionary in place and return it. Only keys relevant to each flag are touched; all others are preserved.
+    iodo flag — owns the cysteine slot in search.mods_spec:
+        True  → prepend 1C+57.0215
+        False → strip any C+/C- entry
+        None  → no change
+    low_res flag — owns search.mz_bin_width and search.score_function:
+        True  → mz_bin_width=1.0005079, score_function=combined-p-value
+        False → mz_bin_width=0.02,      score_function=xcorr
+        None  → no change
+    '''
+    cfg.setdefault('search', {})
+    if iodo is not None:
+        original = cfg['search'].get('mods_spec', '')
+        cfg['search']['mods_spec'] = _apply_iodo(original, iodo=iodo)
+    if low_res is not None:
+        if low_res:
+            cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_LOW_RES
+            cfg['search']['score_function'] = SCORE_FUNC_LOW_RES
+        else:
+            cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_HIGH_RES
+            cfg['search']['score_function'] = SCORE_FUNC_HIGH_RES
+    return cfg
+
+# -- _apply-iodo: returns mod_spec string
+def _apply_iodo(mods_spec: str, *, iodo: bool) -> str:
     '''
     Add or remove the carbamidomethylation Cys mod in a Tide mods_spec string.
+    The mods_spec format is a comma-separated list of entries such as "1M+15.9949,1Q-17.027".  This function owns the cysteine slot exclusively, so any existing C+... or C-... entry is replaced rather than appended, preventing duplicate or conflicting cysteine modifications.
     '''
     # Split on commas, discard empty strings from a blank mods_spec
     entries = [e.strip() for e in mods_spec.split(',') if e.strip()]
@@ -193,6 +214,31 @@ def _apply_protocol_flags(mods_spec: str, *, iodo: bool) -> str:
     cys_pattern = re.compile(r'^\d*C[+\-]', re.IGNORECASE)
     entries = [e for e in entries if not cys_pattern.match(e)]
     if iodo:
-        # Prepend so cysteine mod appears first — purely cosmetic but consistent
+        # Prepend so cysteine mod appears first
         entries = [f'1{CARBAMIDOMETHYL_MOD}'] + entries
     return ','.join(entries)
+
+# _print_set_summary: prints a summary of changes made
+def _printSetSummary(*, iodo: bool | None, low_res: bool | None) -> None:
+    '''Print a summary of what config_set changed.'''
+    print()
+    if iodo is not None:
+        action = 'added to' if iodo else 'removed from'
+        print(
+            f'[bold green]✓[/bold green] [cyan]{CARBAMIDOMETHYL_MOD}[/cyan] '
+            f'{action} [dim]search.mods_spec[/dim]'
+        )
+    if low_res is not None:
+        if low_res:
+            print(
+                f'[bold green]✓[/bold green] Low-resolution mode set: '
+                f'[dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], '
+                f'[dim]score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]'
+            )
+        else:
+            print(
+                f'[bold green]✓[/bold green] High-resolution mode set: '
+                f'[dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], '
+                f'[dim]score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]'
+            )
+    print()

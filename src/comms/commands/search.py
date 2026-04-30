@@ -19,7 +19,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
-        print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
+        print(f'[bold red]ERROR:[/bold red] Crux binary not found in [cyan]{bin_dir}[/cyan].')
         raise SystemExit(1)
     mzml_files = sorted(
         list(input_dir.glob('*.mzML')) + list(input_dir.glob('*.mzML.gz'))
@@ -31,6 +31,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     log_path = out_dir / 'search.log'
     # -- Optional: param-medic tolerance estimation
     precursor_tol = None
+    mz_bin_width  = None
     if param_medic:
         lg.info('search | Running param-medic on first mzML file...')
         print('Running param-medic to estimate mass tolerances...')
@@ -38,12 +39,14 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
         pm_out.mkdir(parents=True, exist_ok=True)
         ok = cruxutil.paramMedic(crux_bin, mzml_files[0], pm_out, log_path)
         if ok:
-            precursor_tol, fragment_tol = _parseParamMedicOutput(pm_out)
+            precursor_tol, mz_bin_width = _parseParamMedicOutput(pm_out)
         if precursor_tol is None:
             print(f'[bold yellow]WARNING:[/bold yellow] param-medic did not produce usable output — using config defaults.')
     prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
+    bin_width_display = mz_bin_width or config['search']['mz_bin_width']
     print(f'\nRunning Tide-search on {len(mzml_files)} file(s)...')
     print(f'- Precursor tolerance: {prec_display} ppm')
+    print(f'- m/z bin width: {bin_width_display} Da')
     print(f"- Score function: {config['search']['score_function']}")
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -57,6 +60,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
                 fileroot=fileroot,
                 config=config,
                 precursor_tol=precursor_tol,
+                mz_bin_width=mz_bin_width,
             )
             if ok:
                 n_ok += 1
@@ -80,7 +84,7 @@ def _parseParamMedicOutput(pm_dir: Path):
         return None, None
     text = result_file.read_text()
     prec_match = re.search(r'precursor[^\d]+([\d.]+)\s*ppm', text, re.IGNORECASE)
-    frag_match  = re.search(r'fragment[^\d]+([\d.]+)\s*Da',  text, re.IGNORECASE)
-    prec = float(prec_match.group(1)) if prec_match else None
-    frag = float(frag_match.group(1)) if frag_match else None
-    return prec, frag
+    bin_width_match = re.search(r'fragment[^\d]+([\d.]+)\s*Da', text, re.IGNORECASE)
+    prec = float(prec_match.group(1))      if prec_match else None
+    bin_width = float(bin_width_match.group(1)) if bin_width_match else None
+    return prec, bin_width

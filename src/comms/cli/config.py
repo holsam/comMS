@@ -63,8 +63,15 @@ def set(
             help=('Add (--iodo) or remove (--no-iodo) static carbamidomethylation of cysteine as a static modification.'),
         ),
     ] = None,
+    low_res: Annotated[
+        Optional[bool],
+        typer.Option(
+            '--low-res/--high-res',
+            help=('Set search parameters for low-resolution (--low-res) or high-resolution (--high-res) instruments.'),
+        ),
+    ] = None,
 ):
     '''
     Set values in user configuration file
     '''
-    configFuncs.config_set(iodo=iodo)
+    configFuncs.config_set(iodo=iodo, low_res=low_res)
