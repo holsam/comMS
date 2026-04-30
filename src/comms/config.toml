@@ -5,12 +5,13 @@ verbose = false
 debug = false
 
 [convert]
-format = 2      # 2 = indexed mzML
+format = 2    # 2 = indexed mzML
 gzip = true
 metadata = 0    # 0 = JSON metadata capture
 
 [search]
-score_function = "combined-p-value"     # combined-p-value for robust FDR control
+score_function = "xcorr"    # xcorr for high-res MS (default); combined-p-value for low-res (run: comms config set --low-res)
+mz_bin_width = 0.02    # 0.02 for high-res MS (default); 1.0005079 for low-res (run: comms config set --low-res)
 min_peaks = 10
 mods_spec = "1M+15.9949"
 nterm_peptide_mods_spec = "1Q-17.027"
@@ -22,10 +23,9 @@ missed_cleavages = 2
 threads = 2
 
 [percolator]
-psm_fdr = 0.01          # psm-level FDR threshold
+psm_fdr = 0.01    # psm-level FDR threshold
 protein_enzyme = "trypsin"
-picked_protein = true   # use picked-protein FDR (c.f. Savitski et al. 2015)
-min_peptides_per_protein = 2
+picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015)
 
 [quantify]
 measure = "dNSAF"
