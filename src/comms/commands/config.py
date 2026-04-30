@@ -97,7 +97,7 @@ def config_reset(force: bool = False):
 
 
 # -- config_set: apply named protocol flags to the user config
-def config_set(iodo: bool | None, low_res: bool | None) -> None:
+def config_set(iodo: bool | None = None, low_res: bool | None = None) -> None:
     if iodo is None and low_res is None:
         print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold].\n')
         raise typer.Exit(1)
@@ -177,7 +177,7 @@ def _printTable(user_config: dict, default_config: dict):
     console.print(table)
 
 # -- _apply_protocol_flags: returns dictionary of config options
-def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None,) -> dict:
+def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None) -> dict:
     '''
     Apply protocol flags to a config dictionary in place and return it. Only keys relevant to each flag are touched; all others are preserved.
     iodo flag — owns the cysteine slot in search.mods_spec:
