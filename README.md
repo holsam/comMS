@@ -54,8 +54,8 @@ comMS wraps two external binaries that must be available under the `bin/` direct
 
 Tool | Purpose | Platform notes
 ---|---|---
-[Crux toolkit](https://crux.ms) | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
-[ThermoRawFileParser](https://github.com/compomics/ThermoRawFileParser) | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
+[Crux toolkit][crux-url] | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
+[ThermoRawFileParser][trfp-url] | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
 
 ### Input files
 #### Mass spectrometry data files
@@ -84,8 +84,40 @@ S2	sample_treat_1.RAW	TREAT	1	A
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Installation
+The recommended installation method is `uv tool install`, which installs comMS as an isolated command available on your `PATH`:
+
+```bash
+uv tool install git+https://github.com/holsam/comMS
+```
+
+To install from a local checkout:
+
+```bash
+git clone https://github.com/holsam/comMS
+cd comMS
+uv tool install .
+```
+
+Once installed, verify the installation:
+
+```bash
+comms version
+```
 
 ### Installing external tools
+Download [Crux][crux-url] and [ThermoRawFileParser][trfp-url] and place them under the `bin/` directory at the project root. The expected layout is:
+```
+bin/
+  crux-4.3.Linux.x86_64/
+    bin/
+      crux
+  ThermoRawFileParser-1.4.5/
+    ThermoRawFileParser.exe
+```
+
+comMS locates binaries using regular expressions, so version subdirectories are expected but exact names are flexible.
+
+On Linux and macOS, [ThermoRawFileParser][trfp-url] versions below 2.0.0 require [Mono](https://mono-project.com). Install it via your system package manager (e.g. `brew install mono` on macOS or `apt install mono-complete` on Debian/Ubuntu).
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
@@ -155,3 +187,5 @@ This repository is distributed under the GPL-3.0 license. See [LICENSE][license-
 [issues-url]: https://github.com/holsam/comMS/issues
 [license-shield]: https://img.shields.io/github/license/holsam/comMS.svg?style=for-the-badge&color=informational
 [license-url]: https://github.com/holsam/comMS/blob/main/LICENSE
+[crux-url]: https://crux.ms
+[trfp-url]: https://github.com/compomics/ThermoRawFileParser
