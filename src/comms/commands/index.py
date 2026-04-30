@@ -20,7 +20,7 @@ def run_index(database: Path, output: Path):
         print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
         raise SystemExit(1)
     out_dir = pathutil.generateOutputFileStructure(output, 'index')
-    log_path = out_dir.parent / 'index.log'
+    log_path = out_dir / 'index.log'
     print(f'\nBuilding Tide peptide index...')
     print(f'- Database: {database}')
     print(f'- Output: {out_dir}')
@@ -29,7 +29,6 @@ def run_index(database: Path, output: Path):
         database=database,
         index_dir=out_dir,
         config=config,
-        log_path=log_path,
     )
     if not ok:
         print(f'[bold red]ERROR:[/bold red] Tide-index failed. Check {log_path} for details.')

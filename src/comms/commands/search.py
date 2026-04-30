@@ -28,10 +28,9 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
         print(f'[bold red]ERROR:[/bold red] No mzML files found in {input_dir}.')
         raise SystemExit(1)
     out_dir = pathutil.generateOutputFileStructure(output, 'search')
-    log_path = out_dir.parent / 'search.log'
+    log_path = out_dir / 'search.log'
     # -- Optional: param-medic tolerance estimation
     precursor_tol = None
-    fragment_tol = None
     if param_medic:
         lg.info('search | Running param-medic on first mzML file...')
         print('Running param-medic to estimate mass tolerances...')
@@ -43,10 +42,8 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
         if precursor_tol is None:
             print(f'[bold yellow]WARNING:[/bold yellow] param-medic did not produce usable output — using config defaults.')
     prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
-    frag_display = fragment_tol or config['search']['fragment_tolerance_da']
     print(f'\nRunning Tide-search on {len(mzml_files)} file(s)...')
     print(f'- Precursor tolerance: {prec_display} ppm')
-    print(f'- Fragment tolerance: {frag_display} Da')
     print(f"- Score function: {config['search']['score_function']}")
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -60,15 +57,14 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
                 fileroot=fileroot,
                 config=config,
                 precursor_tol=precursor_tol,
-                fragment_tol=fragment_tol,
-                log_path=log_path,
             )
             if ok:
                 n_ok += 1
             else:
                 lg.warning(f'search | Tide-search failed for {mzml_file.name}.')
                 n_fail += 1
-
+    if n_fail > 0:
+        print(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} files(s). Check {log_path} for details.')
     print(f'\n[bold]Search summary[/bold]')
     print(f'- Files searched successfully: {n_ok}')
     print(f'- Files failed: {n_fail}')

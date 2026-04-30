@@ -38,7 +38,6 @@ def run_convert(input_dir: Path, output: Path, gzip: bool):
             output_format=config['convert']['format'],
             gzip=gzip,
             metadata=config['convert']['metadata'],
-            log_path=log_path,
         )
         if ok:
             n_ok += 1

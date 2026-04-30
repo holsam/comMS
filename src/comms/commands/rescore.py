@@ -26,7 +26,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path):
         print(f'[bold red]ERROR:[/bold red] No Tide-search target PSM files found in {input_dir}.')
         raise SystemExit(1)
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
-    log_path = out_dir.parent / 'rescore.log'
+    log_path = out_dir / 'rescore.log'
     print(f'\nRescoring {len(target_files)} PSM file(s) with Percolator...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -39,13 +39,14 @@ def run_rescore(input_dir: Path, database: Path, output: Path):
                 out_dir=out_dir,
                 fileroot=fileroot,
                 config=config,
-                log_path=log_path,
             )
             if ok:
                 n_ok += 1
             else:
                 lg.warning(f'rescore | Percolator failed for {target_file.name}.')
                 n_fail += 1
+    if n_fail > 0:
+        print(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} files(s). Check {log_path} for details.')
     print(f'\n[bold]Rescore summary[/bold]')
     print(f'- Files rescored successfully: {n_ok}')
     print(f'- Files failed: {n_fail}')
