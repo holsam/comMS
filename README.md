@@ -168,14 +168,66 @@ Command | Description
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Configuration
+comMS reads settings from a TOML configuration file, and provides the `config` command and its subcommands to interact with this file. 
+
+A default configuration file is bundled with comMS, but any modifications should be made to a user config file. Initialise a user config file at the OS-appropriate location by using:
+
+```bash
+comms config init
+```
+
+Config file locations:
+
+| OS | Path |
+|---|---|
+| Linux/macOS | `~/.config/comms/config.toml` |
+| Windows | `%APPDATA%\comms\config.toml` |
+
+If no user config file exists, comMS falls back to its bundled defaults.
 
 ### Viewing and verifying user configuration
-
+```bash
+comms config list      # print current values vs defaults
+comms config verify    # check all expected keys are present
+comms config reset     # overwrite with defaults (prompts for confirmation)
+```
 ### Protocol flags
+The `config set` command applies experiment-specific presets. Multiple flags can be combined in a single call.
+#### Instrument resolution
+```bash
+comms config set --high-res    # mz_bin_width=0.02, score_function=xcorr (default)
+comms config set --low-res     # mz_bin_width=1.0005079, score_function=combined-p-value
+```
+
+Use `--low-res` for ion-trap MS2 data (e.g. older LTQ instruments). Use `--high-res` for Orbitrap data (default for modern instruments).
+
+#### Cysteine alkylation
+
+```bash
+comms config set --iodo        # add static carbamidomethylation (C+57.0215 Da)
+comms config set --no-iodo     # remove carbamidomethylation
+```
+
+Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
 
 ### Default search parameters
+The default configuration applies the following search parameters, informed by *[Svozil & Baerenfaller, 2017](https://doi.org/10.1016/bs.mie.2016.11.007)*:
+
+Parameter | Default | Description
+---|---|---
+Protease | trypsin | Full tryptic digestion
+Missed cleavages | 2 | Maximum missed cleavage sites
+Precursor tolerance | 10 ppm | Precursor mass window
+Methionine oxidation | `1M+15.9949` | Variable modification
+Glutamine cyclisation | `1Q-17.027` | (N-terminal) Pyro-glutamic acid formation |
+Protein N-terminal acetylation | `1X+42.011` | Variable modification
+Cysteine carbamidomethylation | not set by default | Add with `--iodo` if applicable
+
+
+It is recommended that any proteomes processed using the `index` command include a contaminant protein sequences, such as those in the [cRAP contaminant protein dataset](https://www.thegpm.org/crap/).
 
 ### Percolator settings
+By default, PSM rescoring uses picked-protein FDR *[Savitski et al., 2015](https://doi.org/10.1021/acs.jproteome.5b00135)* at a 1% PSM-level FDR threshold, requiring at least two unique peptides per protein for confident identification.
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
