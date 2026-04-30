@@ -233,7 +233,19 @@ By default, PSM rescoring uses picked-protein FDR *[Savitski et al., 2015](https
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Output structure
+comMS accepts an output directory option (defaults to the current working directory), and writes all outputs following the below directory structure:
+```
+<out_dir>/
+  comms/
+    results/
+      convert/      # indexed .mzML files
+      index/        # Crux tide-index output
+      search/       # Crux tide-search target PSM files
+      rescore/      # Percolator rescored PSM files
+      quantify/     # dNSAF spectral-counts output
+```
 
+If an output directory for a given command already exists, comMS will not overwrite existing directories and instead add an incremental suffix (e.g. `search-1/`, `search-2/`).
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
