@@ -140,12 +140,29 @@ Use `--skip-convert` if `.mzML` files are already available, and `--skip-report`
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Commands
-
+comMS provides the following commands. Run `comms --help` or `comms <command> --help` for full option descriptions.
 ### Pipeline
+Command | Description
+-- | --
+`pipeline`| Run the full analysis pipeline end-to-end from a sample sheet
 
 ### Individual commands
+Command | Description
+-- | --
+`convert` | Convert `.RAW` files to indexed `.mzML` files using ThermoRawFileParser
+`index` | Build a tryptic peptide index from a FASTA file using Crux `tide-index`
+`search` | Match spectra to peptides using Crux `tide-search`
+`rescore` | Rescore PSMs using Crux `percolator` with picked-protein FDR
+`quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
+`report` | Generate an HTML report containing visualisations *(not yet implemented)*
 
 ### Utilities
+Command | Description
+-- | --
+`config` | Manage a user configuration file
+`license` | Print the comMS license
+`setup` | Verify setup is correct *(not yet implemented)*
+`version` | Print the installed comMS version
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
