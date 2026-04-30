@@ -256,7 +256,20 @@ If an output directory for a given command already exists, comMS will not overwr
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Limitations
+comMS is still being developed and has several known limitations, which are detailed below:
 
+### Unimplemented commands
+Both `report` and `setup` commands are not implemented at present. Both raise a `NotImplementedException` but should be avoided where possible.
+
+### Path resolution
+comMS commands resolve the `bin/` directory relative to the package installation path. This works but is a crude way of resolving the path, and may break in differnt installtion environments. A more robust method of resolving the path to this directory will be implemented in future updates.
+
+### Input file requirements
+comMS requires both a sample sheet (in `.tsv` or `.csv` format) and a FASTA file (containing proteomes and contaminants). Additional functionality will be added to validate any such files before beginning processing, and to assist in generating them.
+
+### `param-medic` output parsing
+
+The `--param-medic` flag estimates mass tolerances from data before searching, and the `search` command using regular expressions to parse this where available. While comMS will fall back to default values if parsing fails, this requires further validation.
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
