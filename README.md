@@ -29,7 +29,7 @@
     - [Percolator settings](#percolator-settings)
 - [Output structure](#output-structure)
 - [Limitations](#limitations)
-- [Contributing](#contributing)
+- [Getting help & contributing](#getting-help--contributing)
 - [License](#license)
 
 ---
@@ -250,11 +250,6 @@ If an output directory for a given command already exists, comMS will not overwr
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
-## Contributing
-
----
-<p align="right"><a href="#comms">^ Back to top</a></p>
-
 ## Limitations
 comMS is still being developed and has several known limitations, which are detailed below:
 
@@ -274,6 +269,13 @@ The `--param-medic` flag estimates mass tolerances from data before searching, a
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
+## Getting help & contributing
+If you come across any bugs/issues while using comMS, or if you have a feature request, please open an [issue via GitHub][issues-url].
+
+Any contributions to this project are also very welcome! Specific guidance for developers is provided in `CONTRIBUTING.md`, please read this beforehand.
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## License
 This repository is distributed under the GPL-3.0 license. See [LICENSE][license-url] for more information.
