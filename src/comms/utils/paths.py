@@ -19,11 +19,21 @@ def generateOutputFileStructure(out_dir: Path, command: str) -> Path:
     Appends comms/results/<command>/ to out_dir if not already present.
     '''
     expected = f'comms/results/{command}'
-    if not out_dir.match(expected):
-        out_path = Path(out_dir, expected)
-        out_path.mkdir(parents=True, exist_ok=True)
-        return out_path
-    return out_dir
+    if out_dir.match(expected):
+        return out_dir
+    base = Path(out_dir, expected)
+    if not base.exists():
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+    # Increment until we find an unused directory
+    counter = 1
+    while True:
+        candidate = Path(out_dir, f'comms/results/{command}-{counter}')
+        if not candidate.exists():
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate
+        counter += 1
+
 
 # checkUniqueFileName: returns Path to the output file to generate
 def checkUniqueFileName(
