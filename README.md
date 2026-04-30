@@ -9,26 +9,86 @@
 # comMS
 <ins>com</ins>parative <ins>M</ins>ass <ins>S</ins>pectrometry analysis pipeline
 
+## Contents
+- [Overview](#overview)
+- [Requirements](#requirements)
+    - [Python](#python)
+    - [External tools](#external-tools)
+    - [Input files](#input-files)
+- [Installation](#installation)
+    - [Installing external tools](#installing-external-tools)
+- [Quick start](#quick-start)
+    - [Sample sheet format](#sample-sheet-format)
+    - [Running the pipeline](#running-the-pipeline)
+- [Commands](#commands)
+    - [Pipeline](#pipeline)
+    - [Individual commands](#individual-commands)
+    - [Utilities](#utilities)
+- [Configuration](#configuration)
+    - [Viewing and verifying user configuration](#viewing-and-verifying-user-configuration)
+    - [Protocol flags](#protocol-flags)
+    - [Default search parameters](#default-search-parameters)
+    - [Percolator settings](#percolator-settings)
+- [Output structure](#output-structure)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
+
+## Overview
 comMS is a command-line tool for automated proteomic analysis and quantification, wrapping the [Crux toolkit](https://crux.ms) and [ThermoRawFileParser](https://github.com/compomics/ThermoRawFileParser) into a single reproducible pipeline. comMS was designed to enable rapid and accurate proteomic analysis and quantification, particularly from multi-species experiments where samples may originate from different species. 
 
 comMS was originally written to allow comparative analysis of samples derived from experiments investigating arbuscular mycorrhizal symbiosis (a plant-fungal mutualism) in *Medicago truncatula*, but should be applicable to any shotgun proteomics experiment that uses tryptic digestion.
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Requirements
-### Python
+### Python
+comMS requires Python 3.14 or later. The recommended way to manage comMS and its Python dependencies is using the package manager [`uv`](https://docs.astral.sh/uv/). If `uv` is not already installed, follow the [installation instructions](https://docs.astral.sh/uv/getting-started/installation/). 
 
 ### External tools
+comMS wraps two external binaries that must be available under the `bin/` directory at the repository root. Both tools must currently be downloaded and placed under `bin/` manually. See [Installing external tools](#installing-external-tools) below.
+
+Tool | Purpose | Platform notes
+---|---|---
+[Crux toolkit](https://crux.ms) | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
+[ThermoRawFileParser](https://github.com/compomics/ThermoRawFileParser) | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
 
 ### Input files
+#### Mass spectrometry data files
+comMS expects mass spectrometry data in Thermo `.RAW` format as input to the `convert` command. If `.mzML` files are already available, the conversion step can be skipped with `--skip-convert` when running the full pipeline. Other mass spectrometry data file formats should be converted to `.mzML` externally before continuing as described above.
+
+#### Sample information
+comMS also requires a sample sheet in either `.TSV` or `.CSV` format with the following columns:
+
+Column | Description
+---|---
+`sample_id` | Unique identifier for each sample
+`raw_file` | Filename of the `.RAW` (or `.mzML`) source file
+`treatment` | Experimental group label
+`replicate` | Replicate number within treatment
+`batch` | Batch label (optional)
+
+Example:
+
+```
+sample_id	raw_file	treatment	replicate	batch
+S1	sample_mock_1.RAW	MOCK	1	A
+S2	sample_treat_1.RAW	TREAT	1	A
+```
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Installation
 
 ### Installing external tools
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Quick start
 ### Sample sheet format
@@ -37,6 +97,7 @@ comMS was originally written to allow comparative analysis of samples derived fr
 
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Commands
 
@@ -47,10 +108,11 @@ comMS was originally written to allow comparative analysis of samples derived fr
 ### Utilities
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Configuration
 
-### Viewing and verifying the config
+### Viewing and verifying user configuration
 
 ### Protocol flags
 
@@ -59,20 +121,27 @@ comMS was originally written to allow comparative analysis of samples derived fr
 ### Percolator settings
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Output structure
 
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
+
+## Contributing
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Limitations
 
 
 ---
+<p align="right"><a href="#comms">^ Back to top</a></p>
 
 
 ## License
-
 This repository is distributed under the GPL-3.0 license. See [LICENSE][license-url] for more information.
 
 <br>
