@@ -18,8 +18,6 @@
 - [Installation](#installation)
     - [Installing external tools](#installing-external-tools)
 - [Quick start](#quick-start)
-    - [Sample sheet format](#sample-sheet-format)
-    - [Running the pipeline](#running-the-pipeline)
 - [Commands](#commands)
     - [Pipeline](#pipeline)
     - [Individual commands](#individual-commands)
@@ -123,10 +121,20 @@ On Linux and macOS, [ThermoRawFileParser][trfp-url] versions below 2.0.0 require
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Quick start
-### Sample sheet format
+```bash
+comms pipeline sample_sheet.tsv \
+    --database combined_proteome.fasta \
+    --input /path/to/raw_files/ \
+    --out-dir /path/to/results/
+```
+This runs all pipeline stages in sequence: 
+1. `.RAW` to `.mzML` conversion
+2. Peptide index construction
+3. Peptide-spectrum matching (via Tide-search)
+4. PSM rescoring (via Percolator)
+5. Quantification (via dNSAF spectral counting). 
 
-### Running the pipeline
-
+Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step (which is not yet implemented).
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
