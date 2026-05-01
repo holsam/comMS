@@ -39,7 +39,7 @@ wheels = [
 
 [[package]]
 name = "comms"
-version = "0.7.17"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pandas" },
