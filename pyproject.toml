@@ -1,17 +1,39 @@
 [project]
 name = "comms"
-version = "0.0.0"
+version = "1.0.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
     { name = "Sam Holland", email = "hol_sam@icloud.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pandas>=3.0.2",
+    "platformdirs>=4.9.6",
+    "rich>=15.0.0",
+    "tomli-w>=1.2.0",
+    "tqdm>=4.67.3",
+    "typer>=0.24.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
 
 [project.scripts]
-comms = "comms:main"
+comms = "comms.main:comms"
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short -ra --cov=comms --cov-report=term-missing"
+minversion = "7.0"
+markers = [
+    "crux: requires the Crux binary to be present under bin/ (auto-skipped if absent)",
+    "trfp: requires ThermoRawFileParser.exe to be present under bin/ (auto-skipped if absent)",
+]

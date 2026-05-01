@@ -1,0 +1,41 @@
+# comMS default configuration
+
+[global]
+verbose = false
+debug = false
+
+[convert]
+format = 2    # 2 = indexed mzML
+gzip = true
+metadata = 0    # 0 = JSON metadata capture
+
+[search]
+score_function = "xcorr"    # xcorr for high-res MS (default); combined-p-value for low-res (run: comms config set --low-res)
+mz_bin_width = 0.02    # 0.02 for high-res MS (default); 1.0005079 for low-res (run: comms config set --low-res)
+min_peaks = 10
+mods_spec = "1M+15.9949"
+nterm_peptide_mods_spec = "1Q-17.027"
+nterm_protein_mods_spec = "1X+42.011"
+# Default tolerances (overridden by param-medic if enabled)
+precursor_tolerance_ppm = 10.0
+missed_cleavages = 2
+threads = 2
+
+[percolator]
+psm_fdr = 0.01    # psm-level FDR threshold
+protein_enzyme = "trypsin"
+picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015)
+
+[quantify]
+measure = "dNSAF"
+qvalue_threshold = 0.01
+unique_mapping = true
+
+[report]
+top_n_proteins = 50
+fdr_threshold = 0.01
+colour_palette = "Set2"
+include_organism_panel = true
+include_pca = true
+include_volcano = true
+include_heatmap = true
