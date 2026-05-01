@@ -1,6 +1,13 @@
 # comMS test suite
 This document outlines the comMS test suite: its structure, shared fixtures, and what each module covers.
 
+## Contents
+- [Running the test suite](#running-the-test-suite)
+- [Test markers](#test-markers)
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
 ## Running the test suite
 comMS uses [pytest](https://docs.pytest.org). To run the full suite:
 
@@ -26,6 +33,9 @@ To run with verbose output:
 uv run pytest -v
 ```
 
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
 ## Test markers
 Two custom markers control which tests are run depending on external binary availability:
 
@@ -39,3 +49,6 @@ Tests decorated with these markers are skipped automatically (with a message) if
 ```bash
 uv run pytest -m "not crux and not trfp"
 ```
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
