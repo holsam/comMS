@@ -15,6 +15,12 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Synthetic proteome](#synthetic-proteome)
     - [Synthetic mzML](#synthetic-mzml)
     - [Mass calculations](#mass-calculations)
+- [Unit tests](#unit-tests)
+    - [`tests/unit/test_config.py`](#testsunittest_configpy)
+    - [`tests/unit/test_download.py`](#testsunittest_downloadpy)
+    - [`tests/unit/test_paths.py](#testsunittest_pathspy)
+    - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
+    - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -153,6 +159,66 @@ Peptide mass = sum(residues) + water
 ```
 
 b-ions and y-ions are singly charged and skip the terminal ions (b1 and y1), following the standard convention.
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
+## Unit tests
+Unit tests cover logic in isolation, i.e. they do not require external binaries and do not write to the local filesystem beyond `tmp_path`. All config-touching tests use the `isolated_config_dir` fixture described [above](#config-fixtures).
+
+### `tests/unit/test_config.py`
+Unit tests covering `src/comms/commands/config.py`, and indirectly `src/comms/utils/settings.py`:
+
+Function | Test description
+-- | --
+`loadDefaultConfig` | return type, required top-level sections, required search keys, correct value types, correct defaults for `score_function` and `mz_bin_width`
+`_flatten` | correct dot-separated key flattening at all nesting depths
+`_configCheck` | correct True/False returns for both `exists=True` and `exists=False` branches
+`_writeConfig`, `_loadUserConfig` | write/read preserves content; raises `FileNotFoundError` when no config exists
+`config_init` | creates config file; raises on attempt to overwrite an existing file
+`config_exists` | exits non-zero when absent; does not raise when present
+`config_verify` | valid config passes; missing key causes non-zero exit; no config causes non-zero exit
+`config_reset` | `--force` restores defaults; without `--force`, prompts; proceeds on confirmation
+`_apply_iodo` | adds/removes carbamidomethylation; replaces any existing Cys mod; handles empty specs; result has no leading/trailing commas or double commas
+`_apply_protocol_flags` | all flag combinations; only relevant keys are modified; all other config sections are untouched
+`config_set` | auto-creates config from defaults if absent; `--iodo`, `--no-iodo`, `--high-res`, `--low-res` all behave correctly and are idempotent; combined flags work; `--no-flags` exits non-zero
+
+### `tests/unit/test_download.py`
+Unit tests covering `src/comms/utils/download.py`:
+
+Function | Test description
+-- | --
+Constants | correct types, non-empty strings, valid URL templates
+`_detect_platform` | returns two non-empty strings; system is a recognised value
+`_resolve_bin_dir` | returns the override when supplied; falls back to `repoBinDir()` when `None`
+URL construction | tarball name for each known platform key matches expected format
+`download_crux` | raises `NotImplementedError` on Windows (monkeypatched); raises `RuntimeError` on unrecognised platform
+
+### `tests/unit/test_paths.py`
+Unit tests covering `src/comms/utils/paths.py`:
+
+Function | Test description
+-- | --
+`generateOutputFileStructure` | creates the expected `comms/results/<command>/` subdirectory; creates directories if absent; returns existing path unchanged if already correct; works for all supported commands
+`checkUniqueFileName` | returns expected base name when no conflict; increments suffix on conflict; increments correctly through multiple conflicts; correct naming patterns for all commands (`search`, `quantify`, `rescore`, `report`); returned path is within `out_dir`
+
+### `tests/unit/test_samples.py`
+Unit tests covering `src/comms/utils/samples.py`:
+
+Function | Test description
+-- | --
+`loadSampleSheet` — loads valid TSV; correct row count; column names are lowercased; required columns present; raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
+`getSamplesByTreatment` — filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
+`getRawFileMap` — maps existing files; omits missing files; returns `Path` objects
+
+### `tests/unit/test_settings.py`
+Unit tests covering `src/comms/utils/settings.py`:
+
+Function | Test description
+-- | --
+`userConfigPath` | returns a `Path`; name is `config.toml`; parent directory is named `comms`
+`loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
+Module-level `config` | is a dict; contains `search` and `percolator` sections; critical keys are not `None`
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
