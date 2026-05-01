@@ -1,6 +1,6 @@
 [project]
 name = "comms"
-version = "0.7.16"
+version = "0.7.17"
 description = "Add your description here"
 readme = "README.md"
 authors = [

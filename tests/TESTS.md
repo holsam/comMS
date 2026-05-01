@@ -119,6 +119,7 @@ Fixture | Description
 A Python script to generate the necessary synthetic fixture files is provided under `tests/fixtures/generate_fixtures.py`. This script generates the two synthetic files consumed by the integration tests.
 
 ### Running standalone
+ The functions in this file are importable, and will be called by `conftest.py` during testing, so there is typically no need to run the file. However it can be ran outside of testing contexts by using:
 ```bash
 python tests/fixtures/generate_fixtures.py
 ```

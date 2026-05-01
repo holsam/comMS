@@ -210,6 +210,23 @@ comms config set --no-iodo     # remove carbamidomethylation
 
 Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
 
+### Default index parameters
+Peptide indices are generated using the following parameters:
+
+Parameter | Default | Description | Crux equivalent parameter
+--|--|--|--
+Protease | trypsin | Use tryptic digestion rules | `--enzyme`
+Digestion | full | Completely digest proteins | `--digestion`
+Missed cleavages | 2 | Maximum missed cleavage sites | `--missed-cleavages`
+Leading peptide clipping | True | Duplicate leading peptides with one duplicate lacking N-terminal methionine | `--clip-nterm-methionine`
+Duplicate decoys | True | Allow duplicated decoy proteins | `--allow-dups`
+Number decoys | 1 | Number of decoy peptides per target peptide | `--num-decoys-per-target`
+Decoy strategy | reverse | Generate decoy peptides by reversing residues | `--decoy-format`
+M oxidation | True | Add methionine oxidation as variable modification (`1M+15.9949`) | `--mods-spec`
+STY phosphorylation | False | Add serine/threonine/tyrosine phosphorylation as variable modification (`1STY+79.966331`) | `--mods-spec`
+Peptide N-cyclicisation | True | Add cyclicisation of glutamine to pyro-glutamic acid as variable modification of peptide N-termini (`1Q-17.027`) | `--nterm-peptide-mods-spec`
+Protein N-acetylation | True | Add acetylation of protein N-terminal residue as variable modification (`1X+42.011`) | `--nterm-protein-mod-spec`
+
 ### Default search parameters
 The default configuration applies the following search parameters, informed by *[Svozil & Baerenfaller, 2017](https://doi.org/10.1016/bs.mie.2016.11.007)*:
 
@@ -222,7 +239,6 @@ Methionine oxidation | `1M+15.9949` | Variable modification
 Glutamine cyclisation | `1Q-17.027` | (N-terminal) Pyro-glutamic acid formation |
 Protein N-terminal acetylation | `1X+42.011` | Variable modification
 Cysteine carbamidomethylation | not set by default | Add with `--iodo` if applicable
-
 
 It is recommended that any proteomes processed using the `index` command include a contaminant protein sequences, such as those in the [cRAP contaminant protein dataset](https://www.thegpm.org/crap/).
 
