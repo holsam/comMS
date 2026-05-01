@@ -10,6 +10,11 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Sample sheet fixtures](#sample-sheet-fixtures)
     - [Config fixtures](#config-fixtures)
     - [Synthetic Percolator results](#synthetic-percolator-results)
+- [Synthetic fixture generator](#synthetic-fixture-generator)
+    - [Running standalone](#running-standalone)
+    - [Synthetic proteome](#synthetic-proteome)
+    - [Synthetic mzML](#synthetic-mzml)
+    - [Mass calculations](#mass-calculations)
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -94,3 +99,60 @@ Fixture | Description
 Fixture | Description
 ---|---
 `synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic Percolator PSM file at the expected path, bypassing the need to run Percolator on synthetic data (which does not provide enough PSMs for Percolator to converge); shared between `test_crux.py` and `test_pipeline.py`
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
+## Synthetic fixture generator
+A Python script to generate the necessary synthetic fixture files is provided under `tests/fixtures/generate_fixtures.py`. This script generates the two synthetic files consumed by the integration tests.
+
+### Running standalone
+```bash
+python tests/fixtures/generate_fixtures.py
+```
+By default, the script will write files to the directory containing the script. This can be overriden by providing a path during the initial call:
+```bash
+python tests/fixtures/generate_fixtures.py path/to/output/dir
+```
+### Synthetic proteome
+The synthetic proteome is written to `synthetic_proteome.fasta`. It contains five protein sequences, each with one or two tryptic peptides which exclusively map to the source protein. The protein IDs and peptide sequences are:
+
+Protein ID | Tryptic peptides |
+---|---
+SP\|PROT1\|GENE1 | ACDEFGHIK, LMNPQR
+SP\|PROT2\|GENE2 | SAMPLEK
+SP\|PROT3\|GENE3 | PEPTIDEFK
+SP\|PROT4\|GENE4 | SYNTHETICR
+SP\|PROT5\|GENE5 | VALIDATEK
+
+### Synthetic mzML
+The synthetic indexed `.mzML` file is written to `synthetic.mzML`. It is a minimal example, designed to pass through `tide-search` without error, and follows the mzML 1.1.0 standard. It contains:
+
+Scan | Description
+-- | --
+1x MS1 survey scan | All precursor m/z values represented as centroid peaks
+6x MS2 scans | One per target peptide, each containing a computed b/y fragment ion series
+
+All spectra use uncompressed 32-bit float binary arrays with no compression, which is the simplest format accepted by Crux/ProteoWizard without special decoder flags.
+
+### Mass calculations
+Monoisotopic residue masses (in Daltons) used throughout the test suite fixtures are:
+
+```
+G  57.02146   A  71.03711   V  99.06841   L 113.08406
+I 113.08406   P  97.05276   F 147.06841   W 186.07931
+M 131.04049   S  87.03203   T 101.04768   C 103.00919
+Y 163.06333   H 137.05891   D 115.02694   E 129.04259
+N 114.04293   Q 128.05858   K 128.09496   R 156.10111
+
+Masses
+Proton: 1.007276 Da
+Water: 18.010565 Da
+Peptide mass = sum(residues) + water
+[M+nH]n+ = (peptide_mass + n × proton) / n
+```
+
+b-ions and y-ions are singly charged and skip the terminal ions (b1 and y1), following the standard convention.
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
