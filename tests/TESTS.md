@@ -15,12 +15,18 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Synthetic proteome](#synthetic-proteome)
     - [Synthetic mzML](#synthetic-mzml)
     - [Mass calculations](#mass-calculations)
+    - [Real `.RAW` fixture](#real-raw--fixture)
 - [Unit tests](#unit-tests)
     - [`tests/unit/test_config.py`](#testsunittest_configpy)
     - [`tests/unit/test_download.py`](#testsunittest_downloadpy)
     - [`tests/unit/test_paths.py](#testsunittest_pathspy)
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
+- [Integration tests](#integration-tests)
+    - [`tests/integration/test_convert.py`](#testsintegrationtest_convertpy)
+    - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
+    - [`tests/integration/test_pipeline.py`](#testsintegrationtest_pipelinepy)
+    - [`tests/integration/test_trfp.py`](#testsintegrationtest_tfrppy)
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -160,6 +166,13 @@ Peptide mass = sum(residues) + water
 
 b-ions and y-ions are singly charged and skip the terminal ions (b1 and y1), following the standard convention.
 
+### Real `.RAW ` fixture
+Valid synthetic `.RAW` file cannot be generated without the ThermoFisher vendor SDK, therefore integration tests which would require a `.RAW` file are gated behind the `REAL_RAW_FIXTURE` guard. To run these tests, place a valid file at:
+```
+tests/fixtures/real_sample.RAW
+```
+If this file is absent, the relevant tests are skipped automatically.
+
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
 
@@ -219,6 +232,56 @@ Function | Test description
 `userConfigPath` | returns a `Path`; name is `config.toml`; parent directory is named `comms`
 `loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
 Module-level `config` | is a dict; contains `search` and `percolator` sections; critical keys are not `None`
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
+## Integration tests
+Integration tests call external binaries and verify that the command-level orchestration functions behave correctly end-to-end. They use the synthetic fixtures described [above](#synthetic-file-fixtures) to avoid requiring real experimental data.
+
+Note that these tests do not validate the 'accuracy' of either external binary, as this falls outside the remit of comMS and would be covered by the binary's respective test suite.
+
+### `tests/integration/test_convert.py`
+Integration tests covering the `run_convert` function's orchestration logic, as opposed to ThermoRawFileParser internals (which are covered in [`test_trfp.py`](#testsintegrationtest_tfrppy)). All tests require ThermoRawFileParser (`pytest.mark.trfp`).
+
+The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
+
+Checks | Description
+-- | -- 
+Empty input directory | `run_convert` returns cleanly and prints a warning
+Invalid `.RAW` file | a deliberately malformed file causes TRFP to exit non-zero; the summary reports a failure
+Real `.RAW` file (optional) | tests verify that the output directory is created and contains at least one `.mzML` file; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
+
+### `tests/integration/test_crux.py`
+Integration tests covering the Crux toolkit aspects used in the comMS pipeline. All tests in this file require the Crux binary (`pytest.mark.crux`).
+
+Test | Description
+-- | -- 
+`TestFindCrux` | binary exists at returned path; path is executable; returns `None` for an empty `bin/` directory.
+`TestTideIndex` | creates and populates the index directory; writes a log file; returns `False` for an invalid FASTA.
+`TestTideSearch` | creates the target PSM file; file has at least a header and one data row; log file is written.
+`TestRunRescore` | *n.b. this is currently commented out as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
+`TestSpectralCounts` | uses the synthetic Percolator PSM fixture to bypass Percolator (which requires more PSMs than the synthetic data provides); creates a spectral-counts output file with content.
+
+### `tests/integration/test_pipeline.py`
+Integration tests/smoke tests that assert the pipeline stages complete without raising errors and create the expected output directories and files. All tests in this file require the Crux binary (`pytest.mark.crux`).
+
+Test | Description
+-- | -- 
+`TestRunIndex` | output directory is created and non-empty; prints a success message.
+`TestRunSearch` | output directory is created; target PSM file exists; prints search summary.
+`TestRunRescore` | output directory is created; prints rescore summary; log file is written. The rescore step may fail with synthetic data due to insufficient PSMs for Percolator — the test asserts on directory creation rather than success.
+`TestRunQuantify` | uses synthetic Percolator results fixture; output directory is created; spectral-counts file exists; prints quantify summary.
+`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories are created under `comms/results/`.
+
+### `tests/integration/test_tfrp.py`
+Integration tests covering the comMS wrapper around ThermoRawFileParser. All tests require ThermoRawFileParser (`pytest.mark.trfp`). The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
+
+Test | Description
+-- | -- 
+`TestFindTRFP` | returned path exists; suffix is `.exe`; returns `None` for an empty or nonexistent `bin/` directory
+`TestConvertRawFailure` | a deliberately invalid `.RAW` file causes `convertRaw` to return `False`
+`TestConvertRawRealFile` (optional) | verifies that `convertRaw` produces a non-empty `.mzML` file for a real Thermo `.RAW` input
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
