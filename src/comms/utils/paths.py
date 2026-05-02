@@ -43,8 +43,7 @@ def checkUniqueFileName(
     fmt: Optional[str] = '',
 ) -> Path:
     '''
-    Build a unique output file path for a given command, incrementing a
-    counter suffix if a file with the same name already exists.
+    Build a unique output file path for a given command, incrementing a counter suffix if a file with the same name already exists.
     '''
     naming = {
         'convert': f'{orig_name}.mzML.gz',
@@ -66,3 +65,21 @@ def checkUniqueFileName(
                 break
             counter += 1
     return out_path
+
+def checkUniqueLogFile(
+    out_dir: Path,
+) -> Path:
+    '''
+    Build a unique output file path for the comms log file, incrementing a counter suffix if a file with the same name already exists.
+    '''
+    out_path = Path(out_dir, "comms/comms.log")
+    if out_path.exists():
+        stem = out_path.stem
+        suffix = out_path.suffix
+        counter = 1
+        while True:
+            out_path = Path(out_dir, f'{stem}-{counter}{suffix}')
+            if not out_path.exists():
+                break
+            counter +=1
+        return out_path
