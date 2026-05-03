@@ -2,8 +2,31 @@
 Shared utility functions: logging
 '''
 # -- Import external dependencies
-import datetime, logging, re
+import logging
 from pathlib import Path
+
+# -- Define custom logger class
+class logMsg:
+    _instance: 'logMsg | None' = None
+    def __init__(self, command: str):
+        self.logger = logging.getLogger(command)
+        logMsg._instance = self
+    @classmethod
+    def debug(cls, msg: str):
+        if cls._instance:
+            cls._instance.logger.debug(msg)
+    @classmethod
+    def info(cls, msg):
+        if cls._instance:
+            cls._instance.logger.info(msg)
+    @classmethod
+    def warn(cls, msg):
+        if cls._instance:
+            cls._instance.logger.warning(msg)
+    @classmethod
+    def error(cls, msg: str):
+        if cls._instance:
+            cls._instance.logger.error(msg)
 
 # -- Define custom class LogState to define log level
 class LogState:
@@ -50,16 +73,3 @@ def configureLogger(out_dir: Path):
 
 # -- Initialise state
 log_state = LogState()
-
-# -- Define custom logger class
-class logMsg:
-    def __init__(self, command: str):
-        self.logger = logging.getLogger(command)
-    def debug(self, msg: str):
-        self.logger.debug(msg)
-    def info(self, msg):
-        self.logger.info(msg)
-    def warn(self, msg):
-        self.logger.warning(msg)
-    def error(self, msg: str):
-        self.logger.error(msg)
