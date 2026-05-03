@@ -8,6 +8,7 @@ from typing import Annotated
 
 # -- Import internal utility functions
 from comms.utils.settings import configureLogger, initComms, logMsg
+from comms.utils.log import log_state
 
 # -- Import comMS commands
 from comms.cli.convert import commsConvert
@@ -64,10 +65,10 @@ def main(
         typer.Option("-vv", "--debug", help="Show debug messages in terminal (implies --verbose).", rich_help_panel="Options")
     ] = False,
 ):
-    global log_level
     if debug:
         log_level = logging.DEBUG
     elif verbose:
         log_level = logging.INFO
     else:
         log_level = logging.WARN
+    log_state.log_level = log_level
