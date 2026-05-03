@@ -9,8 +9,8 @@ from typing import Optional
 from urllib.error import URLError
 
 # -- Import internal dependencies
+from comms.utils.log import logMsg
 from comms.utils.paths import repoBinDir
-from comms.utils.settings import config, lg
 
 # -- Define constants
 TRFP_DEFAULT_VERSION = "1.4.5"
@@ -33,7 +33,6 @@ _CRUX_PLATFORM_MAP: dict[tuple[str, str], tuple[str, str]] = {
     ('Darwin', 'aarch64'): ('Darwin', 'arm64'),
 }
 
-
 # -- _resolve_bin_dir: return Path to bin directory
 # =========================
 def _resolve_bin_dir(override: Optional[Path] = None) -> Path:
@@ -55,12 +54,12 @@ def _download_file(url: str, dest: Path) -> None:
     '''
     Progress logged at INFO level, raises urllib.error.URLError on network failure.
     '''
-    lg.info(f'download | Fetching {url}')
+    logMsg.info(f'Fetching: {url}')
     try:
         urllib.request.urlretrieve(url, str(dest))
     except URLError as exc:
         raise URLError(f'Failed to download {url}: {exc}') from exc
-    lg.debug(f'download | Saved to {dest}')
+    logMsg.debug(f'Saved to: {dest}')
 
 # -- _set_executable: add the owner-execute bit to a file (no-op on Windows)
 def _set_executable(path: Path) -> None:
@@ -74,12 +73,11 @@ def download_thermorawfileparser(
     force: bool = False,
 ) -> Path:
     bin_dir_resolved = _resolve_bin_dir(bin_dir)
+    logMsg.debug(f'Resolving bin directory: {bin_dir_resolved}')
     target_dir = bin_dir_resolved / f'ThermoRawFileParser-{version}'
     exe_path = target_dir / _TRFP_EXE_NAME
     if exe_path.exists() and not force:
-        lg.warning(
-            f'download | ThermoRawFileParser v{version} already present at {exe_path} — skipping. Pass force=True to overwrite.'
-        )
+        logMsg.warn(f'ThermoRawFileParser v{version} already present at {exe_path} — skipping (use --force to overwrite)')
         return exe_path
     target_dir.mkdir(parents=True, exist_ok=True)
     tmp_zip = target_dir / _TRFP_ZIP_NAME
@@ -89,21 +87,17 @@ def download_thermorawfileparser(
     except URLError:
         tmp_zip.unlink(missing_ok=True)
         raise
-    lg.info(f'download | Extracting {_TRFP_ZIP_NAME} to {target_dir}')
+    logMsg.info(f'Extracting ThermoRawFileParser archive to: {target_dir}')
     try:
         with zipfile.ZipFile(tmp_zip, 'r') as zf:
             zf.extractall(target_dir)
     except zipfile.BadZipFile as exc:
-        raise RuntimeError(
-            f'Downloaded file is not a valid zip archive: {tmp_zip}. The GitHub release asset for v{version} may have changed.'
-        ) from exc
+        raise RuntimeError(f'Downloaded file is not a valid zip archive: {tmp_zip}.') from exc
     finally:
         tmp_zip.unlink(missing_ok=True)
     if not exe_path.exists():
-        raise RuntimeError(
-            f'{_TRFP_EXE_NAME} not found in extracted archive at {target_dir}. The archive layout may have changed for v{version}.'
-        )
-    lg.info(f'download | ThermoRawFileParser v{version} ready at {exe_path}')
+        raise RuntimeError(f'{_TRFP_EXE_NAME} not found in extracted archive at {target_dir}.')
+    logMsg.info(f'ThermoRawFileParser v{version} ready at: {exe_path}')
     return exe_path
 
 # -- download_crux: download and extract the Crux toolkit from crux.ms
@@ -113,6 +107,7 @@ def download_crux(
     force: bool = False,
 ) -> Path:
     system, machine = _detect_platform()
+    logMsg.debug(f'Detected platform: {system}/{machine}')
     # Windows: no tarball distribution available.
     if system == 'Windows':
         raise NotImplementedError(
@@ -132,9 +127,7 @@ def download_crux(
     target_dir = bin_dir_resolved / tarball_stem
     crux_bin = target_dir / 'bin' / 'crux'
     if crux_bin.exists() and not force:
-        lg.warning(
-            f'download | Crux v{version} already present at {crux_bin} — skipping. Pass force=True to overwrite.'
-        )
+        logMsg.warn(f'Crux v{version} already present at {crux_bin} — skipping (use --force to overwrite)')
         return crux_bin
     bin_dir_resolved.mkdir(parents=True, exist_ok=True)
     tmp_tar = bin_dir_resolved / tarball_name
@@ -144,7 +137,7 @@ def download_crux(
     except URLError:
         tmp_tar.unlink(missing_ok=True)
         raise
-    lg.info(f'download | Extracting {tarball_name} to {bin_dir_resolved}')
+    logMsg.info(f'Extracting Crux archive to: {bin_dir_resolved}')
     try:
         with tarfile.open(tmp_tar, "r:gz") as tf:
             tf.extractall(bin_dir_resolved)
@@ -159,5 +152,5 @@ def download_crux(
             f'crux binary not found at expected path {crux_bin} after extraction. The archive layout may have changed for v{version}.'
         )
     _set_executable(crux_bin)
-    lg.info(f'download | Crux v{version} ready at {crux_bin}')
+    logMsg.info(f'Crux v{version} ready at: {crux_bin}')
     return crux_bin
