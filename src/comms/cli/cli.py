@@ -7,7 +7,7 @@ import logging, typer
 from typing import Annotated
 
 # -- Import internal utility functions
-from comms.utils.settings import configureLogger, initComms, logMsg
+from comms.utils.settings import initComms
 from comms.utils.log import log_state
 
 # -- Import comMS commands
