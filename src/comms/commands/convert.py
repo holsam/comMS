@@ -7,30 +7,32 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.settings import config, lg
+from comms.utils.log import logMsg
+from comms.utils.settings import config
 from comms.utils import trfp as trfputil
 from comms.utils import paths as pathutil
 
 # -- run_convert: converts all .RAW files in input_dir to indexed mzML and writes them to output
 def run_convert(input_dir: Path, output: Path, gzip: bool):
-    lg.debug('convert | Locating ThermoRawFileParser...')
-    import shutil
+    log = logMsg('convert')
+    log.debug('Locating ThermoRawFileParser binary')
     bin_dir = pathutil.repoBinDir()
     exe_path = trfputil.findTRFP(bin_dir)
     if exe_path is None:
-        print(f'[bold red]ERROR:[/bold red] ThermoRawFileParser.exe not found under {bin_dir}.')
+        log.error(f'ThermoRawFileParser not found under: {bin_dir}')
         raise SystemExit(1)
-    lg.debug('convert | Scanning for .RAW files...')
+    log.debug(f'Scanning for .RAW files in: {input_dir}')
     raw_files = sorted(input_dir.glob('*.raw')) + sorted(input_dir.glob('*.RAW'))
     if not raw_files:
-        print(f'[bold yellow]WARNING:[/bold yellow] No .RAW files found in {input_dir}.')
+        log.warn(f'No .RAW files found in: {input_dir}')
         return
+    log.info(f'Found {len(raw_files)} .RAW file(s) — starting conversion')
     out_dir = pathutil.generateOutputFileStructure(output, 'convert')
     log_path = out_dir / 'convert.log'
     print(f'\nConverting {len(raw_files)} .RAW file(s) to indexed mzML...')
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
-        lg.info(f'convert | Converting {raw_file.name}...')
+        log.info(f'Converting: {raw_file.name}')
         ok = trfputil.convertRaw(
             exe_path=exe_path,
             raw_file=raw_file,
@@ -42,9 +44,10 @@ def run_convert(input_dir: Path, output: Path, gzip: bool):
         if ok:
             n_ok += 1
         else:
-            lg.warning(f'convert | Conversion failed for {raw_file.name}.')
+            log.warn(f'Conversion failed for: {raw_file.name}')
             n_fail += 1
-    print(f'\n[bold]Convert summary[/bold]')
+    log.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
+    print(f'\n[bold green]Convert finished successfully - summary:[/]')
     print(f'- Files converted successfully : {n_ok}')
     print(f'- Files failed : {n_fail}')
     print(f'- Output directory: {out_dir}\n')

@@ -47,7 +47,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path):
                 n_fail += 1
     if n_fail > 0:
         print(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} files(s). Check {log_path} for details.')
-    print(f'\n[bold]Rescore summary[/bold]')
+    print(f'\n[bold green]Rescore finished successfully - summary:[/]')
     print(f'- Files rescored successfully: {n_ok}')
     print(f'- Files failed: {n_fail}')
     print(f'- Output directory: {out_dir}\n')

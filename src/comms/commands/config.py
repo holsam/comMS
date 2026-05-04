@@ -11,6 +11,7 @@ from rich.table import Table
 from typing import Annotated
 
 # -- Import internal functions
+from comms.utils.log import logMsg
 from comms.utils.settings import loadDefaultConfig, userConfigPath
 
 # -- Define constants
@@ -22,21 +23,25 @@ SCORE_FUNC_LOW_RES = 'combined-p-value'    # low-resolution instruments
 
 # -- config_init: creates a user config file with default settings in the OS config directory
 def config_init():
-    print()
+    log = logMsg('config')
+    log.debug(f'Checking config path: {userConfigPath()}')
     config_path = userConfigPath()
     if not _configCheck(config_path, exists=False):
         raise typer.Exit(1)
     try:
+        log.info(f'Writing default config to: {config_path}')
         defaults = loadDefaultConfig()
         _writeConfig(defaults)
         print(f'[bold green]SUCCESS:[/bold green] User config written to [cyan]{config_path}[/cyan]\n')
     except Exception as e:
+        log.error(f'Failed to write config: {e}')
         print(f'[bold red]ERROR:[/bold red] Could not write config: {e}\n')
         raise typer.Exit(1)
 
 # -- config_exists: reports whether a user config file exists and prints its path
 def config_exists():
-    print()
+    log = logMsg('config')
+    log.debug(f'Checking for user config at: {userConfigPath()}')
     config_path = userConfigPath()
     if config_path.exists():
         print(f'[bold green]SUCCESS:[/bold green] User config found at [cyan]{config_path}[/cyan]\n')
@@ -46,6 +51,8 @@ def config_exists():
 
 # -- config_list: prints current config values, highlighting differences from bundled defaults
 def config_list():
+    log = logMsg('config')
+    log.debug(f'Listing config values')
     config_path = userConfigPath()
     default_config = _flatten(loadDefaultConfig())
     if _configCheck(config_path, exists=True):
@@ -59,6 +66,8 @@ def config_list():
 
 # -- config_verify: checks that all expected keys are present in the user config file
 def config_verify():
+    log = logMsg('config')
+    log.debug(f'Verifying config keys at: {userConfigPath()}')
     config_path = userConfigPath()
     if not _configCheck(config_path, exists=True):
         raise typer.Exit(1)
@@ -70,10 +79,12 @@ def config_verify():
         print(f'[bold green]SUCCESS:[/bold green] User config [cyan]{config_path}[/cyan] is valid.\n')
         return
     if missing:
+        log.warn(f'Missing keys in user config: {missing}')
         print(f'[bold red]ERROR:[/bold red] {len(missing)} missing key(s):')
         for k in sorted(missing):
             print(f'\t[red]✗[/red] {k} [dim](expected: {default_config[k]})[/dim]')
     if unexpected:
+        log.warn(f'Unexpected keys in user config: {unexpected}')
         print(f'[bold red]ERROR:[/bold red] {len(unexpected)} unexpected key(s):')
         for k in sorted(unexpected):
             print(f'\t[red]?[/red] {k}: {user_config[k]}')
@@ -82,6 +93,7 @@ def config_verify():
 
 # -- config_reset: overwrites the user config file with comMS built-in defaults
 def config_reset(force: bool = False):
+    log = logMsg('config')
     config_path = userConfigPath()
     if not force:
         print(f'\n[bold yellow]WARNING:[/bold yellow] This will overwrite [cyan]{config_path}[/cyan] with comMS defaults.')
@@ -89,8 +101,10 @@ def config_reset(force: bool = False):
             print('[dim]Reset cancelled.[/dim]\n')
             raise typer.Exit(0)
     try:
+        log.info(f'Resetting config to defaults at: {config_path}')
         _writeConfig(loadDefaultConfig())
     except Exception as e:
+        log.error(f'Failed to reset config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Failed to reset config: {e}')
         raise typer.Exit(1)
     print(f'\n[bold green]SUCCESS:[/bold green] Config at [cyan]{config_path}[/cyan] reset to defaults.\n')
@@ -98,26 +112,31 @@ def config_reset(force: bool = False):
 
 # -- config_set: apply named protocol flags to the user config
 def config_set(iodo: bool | None = None, low_res: bool | None = None) -> None:
+    log = logMsg('config')
+    log.debug(f'Applying protocol flags — iodo: {iodo}, low_res: {low_res}')
     if iodo is None and low_res is None:
         print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold].\n')
         raise typer.Exit(1)
     config_path = userConfigPath()
-    # Auto-create from defaults if no user config exists yet
     if not config_path.exists():
+        log.debug(f'No user config found — creating from defaults at: {config_path}')
         print(f'\n[dim]No user config found — creating one from defaults at [cyan]{config_path}[/cyan][/dim]')
         _writeConfig(loadDefaultConfig())
     try:
         cfg = _loadUserConfig()
     except Exception as e:
+        log.error(f'Failed to read user config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
         raise typer.Exit(1)
     cfg = _apply_protocol_flags(cfg, iodo=iodo, low_res=low_res)
     try:
         _writeConfig(cfg)
     except Exception as e:
+        log.error(f'Failed to write user config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise typer.Exit(1)
     _printSetSummary(iodo=iodo, low_res=low_res)
+    print()
 
 # -- Internal helpers
 # -- _loadUserConfig: returns the user config as a dict
@@ -200,6 +219,7 @@ def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None)
         else:
             cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_HIGH_RES
             cfg['search']['score_function'] = SCORE_FUNC_HIGH_RES
+        logMsg.debug(f'low_res flag applied — mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
     return cfg
 
 # -- _apply-iodo: returns mod_spec string
@@ -216,7 +236,9 @@ def _apply_iodo(mods_spec: str, *, iodo: bool) -> str:
     if iodo:
         # Prepend so cysteine mod appears first
         entries = [f'1{CARBAMIDOMETHYL_MOD}'] + entries
-    return ','.join(entries)
+    result = ','.join(entries)
+    logMsg.debug(f'iodo flag applied — mods_spec updated to: {result}')
+    return result
 
 # _print_set_summary: prints a summary of changes made
 def _printSetSummary(*, iodo: bool | None, low_res: bool | None) -> None:
