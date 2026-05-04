@@ -15,39 +15,41 @@ from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_search: runs tide-search on all mzML files in input_dir and writes results to output
-def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool, threads: int):
-    log = logMsg('search')
-    log.debug('Locating Crux binary')
+def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool, threads: int, in_pipeline: bool = False):
+    if not in_pipeline:
+        log = logMsg('search')
+        log.debug('Starting search command')
+    logMsg.debug('Locating Crux binary')
     bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
-        log.error(f'Crux binary not found under: {bin_dir}')
+        logMsg.error(f'Crux binary not found under: {bin_dir}')
         raise SystemExit(1)
-    log.debug(f'Scanning for mzML files in: {input_dir}')
+    logMsg.debug(f'Scanning for mzML files in: {input_dir}')
     mzml_files = sorted(
         list(input_dir.glob('*.mzML')) + list(input_dir.glob('*.mzML.gz'))
     )
     if not mzml_files:
-        log.warn(f'No mzML files found in: {input_dir}')
+        logMsg.warn(f'No mzML files found in: {input_dir}')
         raise SystemExit(1)
-    log.info(f'Found {len(mzml_files)} mzML file(s) — starting search')
+    logMsg.info(f'Found {len(mzml_files)} mzML file(s) — starting search')
     out_dir = pathutil.generateOutputFileStructure(output, 'search')
     log_path = out_dir / 'search.log'
     # -- Optional: param-medic tolerance estimation
     precursor_tol = None
     mz_bin_width  = None
     if param_medic:
-        log.info(f'Running param-medic on: {mzml_files[0].name}')
+        logMsg.info(f'Running param-medic on: {mzml_files[0].name}')
         pm_out = out_dir.parent / 'param-medic'
         pm_out.mkdir(parents=True, exist_ok=True)
         ok = cruxutil.paramMedic(crux_bin, mzml_files[0], pm_out, log_path)
         if ok:
             precursor_tol, mz_bin_width = _parseParamMedicOutput(pm_out)
         if precursor_tol is None:
-            log.warn('param-medic produced no usable output — falling back to config defaults')
+            logMsg.warn('param-medic produced no usable output — falling back to config defaults')
     prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width_display = mz_bin_width or config['search']['mz_bin_width']
-    log.debug(f'Using precursor tolerance: {prec_display} ppm, m/z bin width: {bin_width_display}')
+    logMsg.debug(f'Using precursor tolerance: {prec_display} ppm, m/z bin width: {bin_width_display}')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for mzml_file in tqdm(mzml_files, desc='Files searched'):
@@ -65,11 +67,11 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
             if ok:
                 n_ok += 1
             else:
-                log.warn(f'Tide-search failed for: {mzml_file.name}')
+                logMsg.warn(f'Tide-search failed for: {mzml_file.name}')
                 n_fail += 1
-    log.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
+    logMsg.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
     if n_fail > 0:
-        log.warn(f'Quantification failed for {n_fail} files(s). Check {log_path} for details.')
+        logMsg.warn(f'Quantification failed for {n_fail} files(s). Check {log_path} for details.')
     print(f'\n[bold green]Search finished successfully - summary:[/]')
     print(f'- Search parameters: {prec_display} precursor tolerance; {bin_width_display} m/z bin width')
     print(f'- Files searched successfully: {n_ok}')

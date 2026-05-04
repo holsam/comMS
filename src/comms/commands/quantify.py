@@ -15,22 +15,24 @@ from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_quantify: runs dNSAF spectral counting on all Percolator PSM files in input_dir and writes results to output
-def run_quantify(input_dir: Path, database: Path, output: Path):
-    log = logMsg('quantify')
-    log.debug('Locating Crux binary')
+def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: bool = False):
+    if not in_pipeline:
+        log = logMsg('quantify')
+        log.debug('Starting quantify command')
+    logMsg.debug('Locating Crux binary')
     bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
-        log.error(f'Crux binary not found under: {bin_dir}')
+        logMsg.error(f'Crux binary not found under: {bin_dir}')
         print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
         raise SystemExit(1)
-    log.debug(f'Scanning for Percolator PSM files in: {input_dir}')
+    logMsg.debug(f'Scanning for Percolator PSM files in: {input_dir}')
     psm_files = sorted(input_dir.glob('*.percolator.target.psms.txt'))
     if not psm_files:
-        log.warn(f'No Percolator PSM files found in: {input_dir}')
+        logMsg.warn(f'No Percolator PSM files found in: {input_dir}')
         print(f'[bold red]ERROR:[/bold red] No Percolator PSM files found in {input_dir}.')
         raise SystemExit(1)
-    log.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
+    logMsg.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
     out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
     log_path = out_dir / 'quantify.log'
     print(f'\nRunning dNSAF spectral counting on {len(psm_files)} file(s)...')
@@ -49,9 +51,9 @@ def run_quantify(input_dir: Path, database: Path, output: Path):
             if ok:
                 n_ok += 1
             else:
-                log.warn(f'spectral-counts failed for: {psm_file.name}')
+                logMsg.warn(f'spectral-counts failed for: {psm_file.name}')
                 n_fail += 1
-    log.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
+    logMsg.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
     if n_fail > 0:
         print(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} file(s). Check {log_path} for details.')
     print(f'\n[bold green]Quantify finished successfully - summary:[/]')
