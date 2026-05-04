@@ -8,14 +8,18 @@ from pathlib import Path
 from typing import Optional
 
 # -- Import internal functions
-from comms.utils.settings import lg
+from comms.utils.log import logMsg
 
 # -- findTRFP: returns a Path to ThermoRawFileParser.exe under bin_dir, or None if not found
 def findTRFP(bin_dir: Path) -> Optional[Path]:
+    logMsg.debug(f'Searching for ThermoRawFileParser under: {bin_dir}')
     matches = list(bin_dir.glob('*/ThermoRawFileParser.exe'))
     if not matches:
+        logMsg.warn(f'No ThermoRawFileParser binary found under: {bin_dir}')
         return None
-    return sorted(matches)[-1]
+    result = sorted(matches)[-1]
+    logMsg.debug(f'ThermoRawFileParser found: {result}')
+    return result
 
 # -- convertRaw: returns True on successful conversion of a .RAW file to indexed mzML or False on failure
 def convertRaw(
@@ -39,19 +43,19 @@ def convertRaw(
     if not is_windows:
         mono = shutil.which('mono')
         if mono is None:
-            lg.error('Mono not found. Mono is required to run ThermoRawFileParser on non-Windows systems.')
+            logMsg.error('Mono not found — required to run ThermoRawFileParser on non-Windows systems')
             return False
         cmd = [mono] + cmd
-    lg.debug(f"trfp | Running: {' '.join(cmd)}")
+    logMsg.debug(f'Running: {" ".join(cmd)}')
     log_fh = open(log_path, 'a') if log_path else subprocess.DEVNULL
     try:
         result = subprocess.run(cmd, stdout=log_fh, stderr=log_fh, check=False)
         if result.returncode != 0:
-            lg.warning(f'trfp | ThermoRawFileParser exited with code {result.returncode} for {raw_file.name}.')
+            logMsg.warn(f'ThermoRawFileParser exited with non-zero return code {result.returncode} for {raw_file.name}')
             return False
         return True
     except Exception as e:
-        lg.error(f'trfp | Unexpected error converting {raw_file.name}: {e}')
+        logMsg.error(f'Unexpected error converting {raw_file.name}: {e}')
         return False
     finally:
         if log_path:

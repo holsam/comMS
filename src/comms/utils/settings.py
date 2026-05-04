@@ -3,14 +3,11 @@ comMS application settings and start up
 '''
 
 # -- Import external dependencies
-import logging, tomllib
+import tomllib
 from importlib.resources import files as pkg_files
 from pathlib import Path
 from platformdirs import user_config_dir
 from rich import print
-
-# -- Initialise logger
-lg = logging.getLogger("__name__")
 
 # -- userConfigPath: returns Path to OS-appropriate config file
 def userConfigPath() -> Path:

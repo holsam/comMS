@@ -14,6 +14,7 @@ from comms.commands.search import run_search
 from comms.commands.rescore import run_rescore
 from comms.commands.quantify import run_quantify
 from comms.commands.pipeline import run_pipeline
+from comms.utils.log import logMsg
 
 # -- Define pytest mark for crux (all tests in file require Crux)
 pytestmark = pytest.mark.crux
@@ -34,6 +35,10 @@ class TestRunIndex:
         run_index(database=synthetic_fasta, output=tmp_path)
         captured = capsys.readouterr()
         assert 'SUCCESS' in captured.out or 'index' in captured.out.lower()
+
+    def test_comms_logger_is_index(self, crux_bin, synthetic_fasta, tmp_path):
+        run_index(database=synthetic_fasta, output=tmp_path)
+        assert logMsg._instance.logger.name == 'index'
 
 # -- Define fixture for generating index using tide-index
 @pytest.fixture(scope='module')
@@ -85,7 +90,18 @@ class TestRunSearch:
             threads=1,
         )
         captured = capsys.readouterr()
-        assert 'Search summary' in captured.out
+        assert 'Search finished successfully - summary:' in captured.out
+
+    def test_comms_logger_is_search(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=False,
+            threads=1,
+        )
+        assert logMsg._instance.logger.name == 'search'
 
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
@@ -140,6 +156,14 @@ class TestRunRescore:
         assert log.exists()
         assert log.stat().st_size > 0
 
+    def test_comms_logger_is_rescore(self, crux_bin, pipeline_search, tmp_path):
+        search_dir, fasta, _ = pipeline_search
+        try:
+            run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+        except SystemExit:
+            pass
+        assert logMsg._instance.logger.name == 'rescore'
+
 # -- Define tests for quantify command
 class TestRunQuantify:
     def test_creates_quantify_output_dir(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
@@ -159,13 +183,16 @@ class TestRunQuantify:
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
         run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
         captured = capsys.readouterr()
-        assert 'Quantify summary' in captured.out
+        assert 'Quantify finished successfully - summary:' in captured.out
+
+    def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
+        rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
+        run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+        assert logMsg._instance.logger.name == 'quantify'
 
 # -- Define tests for running end-to-end pipeline
 class TestRunPipeline:
-    def test_pipeline_completes_without_raising(
-        self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path
-    ):
+    def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
@@ -184,9 +211,7 @@ class TestRunPipeline:
                 'Check that synthetic fixtures are valid and Crux is working.'
             )
 
-    def test_pipeline_creates_results_tree(
-        self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path
-    ):
+    def test_pipeline_creates_results_tree(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
@@ -206,3 +231,23 @@ class TestRunPipeline:
         for stage in ('index', 'search', 'rescore', 'quantify'):
             stage_dir = results_root / stage
             assert stage_dir.exists(), f'Expected results directory for stage: {stage}'
+
+    def test_comms_logger_is_pipeline(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
+        fasta, mzml = synthetic_fixtures
+        try:
+            run_pipeline(
+                sample_sheet=valid_sample_sheet,
+                database=fasta,
+                input_dir=mzml.parent,
+                output_dir=tmp_path,
+                param_medic=False,
+                skip_convert=True,
+                skip_report=True,
+                threads=1,
+            )
+            assert logMsg._instance.logger.name == 'pipeline'
+        except SystemExit as e:
+            pytest.fail(
+                f'run_pipeline raised SystemExit({e.code}). '
+                'Check that synthetic fixtures are valid and Crux is working.'
+            )

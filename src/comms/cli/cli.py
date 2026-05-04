@@ -7,7 +7,8 @@ import logging, typer
 from typing import Annotated
 
 # -- Import internal utility functions
-from comms.utils.settings import initComms, lg
+from comms.utils.settings import initComms
+from comms.utils.log import log_state
 
 # -- Import comMS commands
 from comms.cli.convert import commsConvert
@@ -70,8 +71,4 @@ def main(
         log_level = logging.INFO
     else:
         log_level = logging.WARN
-    logging.basicConfig(
-        format='%(asctime)s %(levelname)-10s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=log_level,
-    )
+    log_state.log_level = log_level

@@ -7,23 +7,25 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.settings import config, lg
+from comms.utils.log import logMsg
+from comms.utils.settings import config
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_index: builds a Tide peptide index from database and writes it to output
-def run_index(database: Path, output: Path):
-    lg.debug('index | Locating Crux binary...')
+def run_index(database: Path, output: Path, in_pipeline: bool = False):
+    if not in_pipeline:
+        log = logMsg('index')
+        log.debug('Starting index command')
+    logMsg.debug('Locating Crux binary')
     bin_dir = pathutil.repoBinDir()
     crux_bin = cruxutil.findCrux(bin_dir)
     if crux_bin is None:
-        print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
+        logMsg.error(f'Crux binary not found under: {bin_dir}')
         raise SystemExit(1)
+    logMsg.info(f'Building Tide peptide index from: {database.name}')
     out_dir = pathutil.generateOutputFileStructure(output, 'index')
     log_path = out_dir / 'index.log'
-    print(f'\nBuilding Tide peptide index...')
-    print(f'- Database: {database}')
-    print(f'- Output: {out_dir}')
     ok = cruxutil.tideIndex(
         crux_bin=crux_bin,
         database=database,
@@ -31,6 +33,9 @@ def run_index(database: Path, output: Path):
         config=config,
     )
     if not ok:
-        print(f'[bold red]ERROR:[/bold red] Tide-index failed. Check {log_path} for details.')
+        logMsg.error(f'tide-index failed — see: {log_path}')
         raise SystemExit(1)
-    print(f'\n[bold green]SUCCESS:[/bold green] Peptide index written to {out_dir}\n')
+    logMsg.info(f'Peptide index written to: {out_dir}')
+    print(f'\n[bold green]Index finished successfully - summary:[/]')
+    print(f'- Source database: {database}')
+    print(f'- Output: {out_dir}')

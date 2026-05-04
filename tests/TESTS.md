@@ -275,6 +275,8 @@ Test | Description
 `TestRunQuantify` | uses synthetic Percolator results fixture; output directory is created; spectral-counts file exists; prints quantify summary.
 `TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories are created under `comms/results/`.
 
+Each test also includes a test to ensure the comMS logger was instantiated correctly.
+
 ### `tests/integration/test_tfrp.py`
 Integration tests covering the comMS wrapper around ThermoRawFileParser. All tests require ThermoRawFileParser (`pytest.mark.trfp`). The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
 

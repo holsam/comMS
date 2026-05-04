@@ -6,6 +6,8 @@ comMS output path utility functions
 from pathlib import Path
 from typing import Optional
 
+# -- Import internal dependencies
+from comms.utils.log import logMsg
 
 # repoBinDir: returns Path to bin/ directory in repo root
 def repoBinDir() -> Path:
@@ -24,11 +26,13 @@ def generateOutputFileStructure(out_dir: Path, command: str) -> Path:
     base = Path(out_dir, expected)
     if not base.exists():
         base.mkdir(parents=True, exist_ok=True)
+        logMsg.debug(f'Output directory created: {base}')
         return base
     # Increment until we find an unused directory
     counter = 1
     while True:
         candidate = Path(out_dir, f'comms/results/{command}-{counter}')
+        logMsg.debug(f'Output directory already exists, incrementing: {candidate}')
         if not candidate.exists():
             candidate.mkdir(parents=True, exist_ok=True)
             return candidate
@@ -43,8 +47,7 @@ def checkUniqueFileName(
     fmt: Optional[str] = '',
 ) -> Path:
     '''
-    Build a unique output file path for a given command, incrementing a
-    counter suffix if a file with the same name already exists.
+    Build a unique output file path for a given command, incrementing a counter suffix if a file with the same name already exists.
     '''
     naming = {
         'convert': f'{orig_name}.mzML.gz',
@@ -62,6 +65,7 @@ def checkUniqueFileName(
         counter = 1
         while True:
             out_path = Path(out_dir, f'{stem}-{counter}{suffix}')
+            logMsg.debug(f'Output filename already exists, incrementing: {out_path}')
             if not out_path.exists():
                 break
             counter += 1

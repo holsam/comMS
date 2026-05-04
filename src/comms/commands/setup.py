@@ -9,13 +9,13 @@ from typing import Optional
 from urllib.error import URLError
 
 # -- Import internal dependencies
+from comms.utils.log import logMsg
 from comms.utils.download import (
     CRUX_DEFAULT_VERSION,
     TRFP_DEFAULT_VERSION,
     download_crux,
     download_thermorawfileparser,
 )
-from comms.utils.settings import lg
 
 
 # -- setup_tools: download ThermoRawFileParser and/or the Crux toolkit
@@ -26,7 +26,8 @@ def setup_tools(
     bin_dir: Optional[Path] = None,
     force: bool = False,
 ) -> None:
-    lg.warning(f'setup | comms setup functionality is not yet supported.')
+    log = logMsg('setup')
+    log.warn('Setup functionality is not yet supported')
     raise NotImplementedError()
 #     valid = {'all', 'crux', 'trfp'}
 #     if tool not in valid:
