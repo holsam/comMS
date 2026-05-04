@@ -85,7 +85,7 @@ class TestRunSearch:
             threads=1,
         )
         captured = capsys.readouterr()
-        assert 'Search summary' in captured.out
+        assert 'Search finished successfully - summary:' in captured.out
 
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
@@ -159,7 +159,7 @@ class TestRunQuantify:
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
         run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
         captured = capsys.readouterr()
-        assert 'Quantify summary' in captured.out
+        assert 'Quantify finished successfully - summary:' in captured.out
 
 # -- Define tests for running end-to-end pipeline
 class TestRunPipeline:

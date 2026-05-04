@@ -3,11 +3,12 @@ Integration tests for src/comms/commands/convert.py > run_convert()
 '''
 
 # -- Import external dependencies
-import pytest
+import logging, pytest
 from pathlib import Path
 
 # -- Import internal functions
 from comms.commands.convert import run_convert
+from comms.utils.log import logMsg
 from tests.integration.test_trfp import REAL_RAW_FIXTURE
 
 # -- Define pytest mark
@@ -15,13 +16,13 @@ pytestmark = pytest.mark.trfp
 
 # -- Define test for no input files found
 class TestRunConvertNoFiles:
-    def test_handles_empty_input_directory(self, trfp_exe, tmp_path, capsys):
+    def test_handles_empty_input_directory(self, trfp_exe, tmp_path, caplog):
         input_dir = tmp_path / 'raw_files'
         input_dir.mkdir()
         # Should return cleanly without raising; a warning should be printed
-        run_convert(input_dir=input_dir, output=tmp_path / 'out', gzip=False)
-        captured = capsys.readouterr()
-        assert 'No .RAW files' in captured.out or 'WARNING' in captured.out
+        with caplog.at_level(logging.DEBUG, logger="convert"):
+            run_convert(input_dir=input_dir, output=tmp_path / 'out', gzip=False)
+        assert 'No .RAW files' in caplog.text or 'WARNING' in caplog.text
 
 # -- Define test for invalid .RAW file input
 class TestRunConvertInvalidFile:
