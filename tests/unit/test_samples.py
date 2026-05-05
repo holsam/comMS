@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.samples import loadSampleSheet, getSamplesByTreatment, getRawFileMap, REQUIRED_COLUMNS
+from comms.utils.samples import loadSampleSheet, getSamplesByTreatment, getSamplesByFraction, getRawFileMap, REQUIRED_COLUMNS
 
 # -- Define tests for loading sample sheet
 class TestLoadSampleSheet:
@@ -42,7 +42,7 @@ class TestLoadSampleSheet:
             loadSampleSheet(tmp_path / 'does_not_exist.tsv')
 
     def test_loads_csv_as_well_as_tsv(self, tmp_path):
-        content = 'sample_id,raw_file,treatment,replicate\nS1,file.mzML,CTRL,1\n'
+        content = 'sample_id,raw_file,treatment,fraction,replicate\nS1,file.mzML,CTRL,WCL,1\n'
         p = tmp_path / 'sheet.csv'
         p.write_text(content)
         df = loadSampleSheet(p)
@@ -53,7 +53,7 @@ class TestLoadSampleSheet:
         assert 'batch' in df.columns   # present in fixture, should not cause error
 
     def test_strips_whitespace_from_column_names(self, tmp_path):
-        content = ' sample_id \t raw_file \t treatment \t replicate \nS1\tf.mzML\tCTRL\t1\n'
+        content = ' sample_id \t raw_file \t treatment \t fraction \t replicate \nS1\tf.mzML\tCTRL\tWCL\t1\n'
         p = tmp_path / 'spaced.tsv'
         p.write_text(content)
         df = loadSampleSheet(p)
@@ -81,6 +81,31 @@ class TestGetSamplesByTreatment:
     def test_returns_copy_not_view(self, valid_sample_sheet):
         df = loadSampleSheet(valid_sample_sheet)
         result = getSamplesByTreatment(df, 'CONTROL')
+        result['sample_id'] = 'MODIFIED'
+        original = loadSampleSheet(valid_sample_sheet)
+        assert original.iloc[0]['sample_id'] == 'S1'
+
+# -- Define tests for filtering samples by fraction
+class TestGetSamplesByFraction:
+    def test_filters_correctly(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'WCL')
+        assert len(result) == 2
+        assert result.iloc[0]['sample_id'] == 'S1'
+
+    def test_case_insensitive(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'wcl')
+        assert len(result) == 2
+
+    def test_returns_empty_for_unknown_treatment(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'NONEXISTENT')
+        assert len(result) == 0
+
+    def test_returns_copy_not_view(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'WCL')
         result['sample_id'] = 'MODIFIED'
         original = loadSampleSheet(valid_sample_sheet)
         assert original.iloc[0]['sample_id'] == 'S1'

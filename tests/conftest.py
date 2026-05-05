@@ -87,9 +87,9 @@ def valid_sample_sheet(tmp_path: Path) -> Path:
     Write a minimal valid comMS sample sheet (TSV) and return its path
     '''
     content = (
-        'sample_id\traw_file\ttreatment\treplicate\tbatch\n'
-        'S1\tsynthetic.mzML\tCONTROL\t1\tA\n'
-        'S2\tsynthetic.mzML\tTREATMENT\t1\tA\n'
+        'sample_id\traw_file\ttreatment\tfraction\treplicate\tbatch\n'
+        'S1\tsynthetic.mzML\tCONTROL\tWCL\t1\tA\n'
+        'S2\tsynthetic.mzML\tTREATMENT\tWCL\t1\tA\n'
     )
     p = tmp_path / 'sample_sheet.tsv'
     p.write_text(content)
@@ -110,9 +110,9 @@ def sample_sheet_missing_col(tmp_path: Path) -> Path:
 def sample_sheet_duplicate_ids(tmp_path: Path) -> Path:
     '''Sample sheet with duplicate sample_id values'''
     content = (
-        'sample_id\traw_file\ttreatment\treplicate\n'
-        'S1\tsynthetic.mzML\tCONTROL\t1\n'
-        'S1\tsynthetic.mzML\tTREATMENT\t1\n'
+        'sample_id\traw_file\ttreatment\tfraction\treplicate\n'
+        'S1\tsynthetic.mzML\tCONTROL\tWCL\t1\n'
+        'S1\tsynthetic.mzML\tTREATMENT\tWCL\t1\n'
     )
     p = tmp_path / 'dup_sample_sheet.tsv'
     p.write_text(content)
