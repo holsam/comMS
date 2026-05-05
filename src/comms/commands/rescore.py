@@ -42,10 +42,10 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
         organism_tags = _parseOrganismTags(org_tags)
     else:
         if config['organism']:
-            organism_tags = _parseOrganismTags(config['organism'])
+            organism_tags = config['organism']
         else:
             logMsg.error(f'No organism tag data found in user config file.')
-            print(f'[bold red]ERROR:[/bold red] No organism tag data found in user config file. Set for one command only using [italic]--organism-tags[/] or set in user config.')
+            print(f'[bold red]ERROR:[/bold red] No organism tag data found in user config file. Set for one command only using [bold]--organism-tags[/] or set in user config using [bold]comms config set --organism[/bold].')
             raise SystemExit(1)
     
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
