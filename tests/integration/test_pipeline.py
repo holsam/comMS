@@ -103,6 +103,136 @@ class TestRunSearch:
         )
         assert logMsg._instance.logger.name == 'search'
 
+
+class TestRunSearchParamMedic:
+    def test_completes_without_raising(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+ 
+    def test_creates_search_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+        assert (tmp_path / 'comms' / 'results' / 'search').exists(), 'No comms/results/search directory created when run with --param-medic'
+ 
+    def test_creates_target_psm_file(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+        search_dir = tmp_path / 'comms' / 'results' / 'search'
+        psm_files = list(search_dir.glob('*.tide-search.target.txt'))
+        assert psm_files, 'No target PSM file found after run_search with --param-medic'
+ 
+    def test_creates_param_medic_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+        pm_dir = tmp_path / 'comms' / 'results' / 'param-medic'
+        assert pm_dir.exists()
+ 
+    def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+        '''
+        When param-medic cannot estimate tolerances (as expected for synthetic data), run_search should fall back to config defaults and report those values in the terminal summary.
+        '''
+        from comms.utils.settings import loadDefaultConfig
+        cfg = loadDefaultConfig()
+        expected_prec = str(cfg['search']['precursor_tolerance_ppm'])
+        expected_bw = str(cfg['search']['mz_bin_width'])
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+        captured = capsys.readouterr()
+        assert expected_prec in captured.out
+        assert expected_bw in captured.out
+ 
+    def test_warns_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+        '''
+        When param-medic produces no usable estimates, a warning should be
+        logged indicating fallback to defaults.
+        '''
+        import logging
+        index_dir, _ = pipeline_index
+        with caplog.at_level(logging.WARNING):
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        warning_text = caplog.text.lower()
+        assert 'falling back' in warning_text or 'no usable' in warning_text
+ 
+    def test_search_summary_reports_numeric_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=tmp_path,
+            param_medic=True,
+            threads=1,
+        )
+        captured = capsys.readouterr()
+        assert 'precursor tolerance' in captured.out
+        assert 'bin width' in captured.out
+ 
+    def test_produces_same_output_as_no_param_medic_when_estimates_unavailable(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+        '''
+        When param-medic falls back to defaults, the search output (PSM file
+        existence and line count) should be identical to a run without
+        param-medic, since both use the same config tolerance values.
+        '''
+        out_with = tmp_path / 'with_pm'
+        out_without = tmp_path / 'without_pm'
+        index_dir, _ = pipeline_index
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=out_with,
+            param_medic=True,
+            threads=1,
+        )
+        run_search(
+            input_dir=synthetic_mzml.parent,
+            index_dir=index_dir,
+            output=out_without,
+            param_medic=False,
+            threads=1,
+        )
+        psm_with = list((out_with / 'comms' / 'results' / 'search').glob('*.tide-search.target.txt'))
+        psm_without = list((out_without / 'comms' / 'results' / 'search').glob('*.tide-search.target.txt'))
+        assert psm_with and psm_without
+        lines_with = psm_with[0].read_text().splitlines()
+        lines_without = psm_without[0].read_text().splitlines()
+        assert len(lines_with) == len(lines_without)
+
+
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
 def pipeline_search(crux_bin, pipeline_index, tmp_path_factory):
