@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.samples import loadSampleSheet, getSamplesByTreatment, getRawFileMap, REQUIRED_COLUMNS
+from comms.utils.samples import loadSampleSheet, getSamplesByTreatment, getSamplesByFraction, getRawFileMap, REQUIRED_COLUMNS
 
 # -- Define tests for loading sample sheet
 class TestLoadSampleSheet:
@@ -81,6 +81,31 @@ class TestGetSamplesByTreatment:
     def test_returns_copy_not_view(self, valid_sample_sheet):
         df = loadSampleSheet(valid_sample_sheet)
         result = getSamplesByTreatment(df, 'CONTROL')
+        result['sample_id'] = 'MODIFIED'
+        original = loadSampleSheet(valid_sample_sheet)
+        assert original.iloc[0]['sample_id'] == 'S1'
+
+# -- Define tests for filtering samples by fraction
+class TestGetSamplesByFraction:
+    def test_filters_correctly(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'WCL')
+        assert len(result) == 2
+        assert result.iloc[0]['sample_id'] == 'S1'
+
+    def test_case_insensitive(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'wcl')
+        assert len(result) == 2
+
+    def test_returns_empty_for_unknown_treatment(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'NONEXISTENT')
+        assert len(result) == 0
+
+    def test_returns_copy_not_view(self, valid_sample_sheet):
+        df = loadSampleSheet(valid_sample_sheet)
+        result = getSamplesByFraction(df, 'WCL')
         result['sample_id'] = 'MODIFIED'
         original = loadSampleSheet(valid_sample_sheet)
         assert original.iloc[0]['sample_id'] == 'S1'
