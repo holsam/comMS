@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ## Issue Details
-### Describe the feature you'd like to see added to EValuator.
+### Describe the feature you'd like to see added to comMS.
 A clear and concise description of your proposed feature.
 
 ### Would your feature request affect any current functionality?
