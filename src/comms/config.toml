@@ -4,6 +4,9 @@
 verbose = false
 debug = false
 
+[organism]
+
+
 [convert]
 format = 2    # 2 = indexed mzML
 gzip = true
