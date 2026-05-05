@@ -7,6 +7,7 @@ run_quantify)
 # -- Import external dependencies
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 # -- Import internal functions
 from comms.commands.index import run_index
@@ -102,7 +103,6 @@ class TestRunSearch:
             threads=1,
         )
         assert logMsg._instance.logger.name == 'search'
-
 
 class TestRunSearchParamMedic:
     def test_completes_without_raising(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
@@ -232,6 +232,54 @@ class TestRunSearchParamMedic:
         lines_without = psm_without[0].read_text().splitlines()
         assert len(lines_with) == len(lines_without)
 
+class TestRunSearchParamMedicMocked:
+    '''
+    Tests that verify run_search correctly uses numeric tolerance values returned by _runParamMedic, by mocking _runParamMedic to return known values and checking those values appear in the terminal summary.
+    '''
+    def test_uses_mocked_precursor_tolerance_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+        with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02),):
+            index_dir, _ = pipeline_index
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        captured = capsys.readouterr()
+        assert '7.5' in captured.out
+
+    def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+        with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)):
+            index_dir, _ = pipeline_index
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        captured = capsys.readouterr()
+        assert '0.035' in captured.out
+ 
+    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+        '''
+        If _runParamMedic returns (None, None), run_search should fall back to config defaults without raising.
+        '''
+        from comms.utils.settings import loadDefaultConfig
+        cfg = loadDefaultConfig()
+        with patch('comms.commands.search._runParamMedic', return_value=(None, None)):
+            index_dir, _ = pipeline_index
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        captured = capsys.readouterr()
+        assert str(cfg['search']['precursor_tolerance_ppm']) in captured.out
+        assert str(cfg['search']['mz_bin_width']) in captured.out
 
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
