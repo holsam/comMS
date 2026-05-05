@@ -24,9 +24,13 @@ def rescore(
         Path,
         typer.Option('-d', '--database', help='Path to proteome FASTA (required for picked-protein FDR)', exists=True, file_okay=True, dir_okay=False)
     ],
+    organism_tags: Annotated[
+        str,
+        typer.option('--organism-tags', help='Patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
+    ],
     output: Annotated[
         Path | None,
         typer.Option('-o', '--out-dir', help='Output directory', file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):
-    rescoreFuncs.run_rescore(input, database, output)
+    rescoreFuncs.run_rescore(input, database, output, organism_tags)
