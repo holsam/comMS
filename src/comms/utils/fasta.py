@@ -51,13 +51,18 @@ def splitFastaByOrganism(fasta_path: Path, out_dir: Path, organism_tags: dict[st
         else:
             subfastas.update({'contaminants': [entry]})
     # Add all contaminants to each organism
-    for contaminant in subfastas['contaminants']:
-        for subfasta_key in [key for key in subfastas.keys() if key != 'contaminants']:
-            subfastas[subfasta_key].append(contaminant)
-    # Remove contaminants sub-FASTA now it's been added to all others
-    del subfastas['contaminants']
+    if 'contaminants' in subfastas.keys():
+        for contaminant in subfastas['contaminants']:
+            for subfasta_key in [key for key in subfastas.keys() if key != 'contaminants']:
+                subfastas[subfasta_key].append(contaminant)
+        # Remove contaminants sub-FASTA now it's been added to all others
+        del subfastas['contaminants']
     # Write all sub-FASTAs
+    outputs = {}
     for subfasta_key in subfastas.keys():
         out_file = out_dir / f"{subfasta_key}.fa"
         writeFasta(data=subfastas[subfasta_key], out_file=out_file)
         logMsg.debug(f'Wrote organism-specific FASTA file to {out_file}')
+        outputs.update({subfasta_key: out_file})
+    # Return dictionary of strings
+    return outputs
