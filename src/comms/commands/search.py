@@ -39,14 +39,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     precursor_tol = None
     mz_bin_width  = None
     if param_medic:
-        logMsg.info(f'Running param-medic on: {mzml_files[0].name}')
-        pm_out = out_dir.parent / 'param-medic'
-        pm_out.mkdir(parents=True, exist_ok=True)
-        ok = cruxutil.paramMedic(crux_bin, mzml_files[0], pm_out, log_path)
-        if ok:
-            precursor_tol, mz_bin_width = _parseParamMedicOutput(pm_out)
-        if precursor_tol is None:
-            logMsg.warn('param-medic produced no usable output — falling back to config defaults')
+        precursor_tol, mz_bin_width = _runParamMedic(crux_bin=crux_bin, mzml_files=mzml_files, out_dir=out_dir)
     prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width_display = mz_bin_width or config['search']['mz_bin_width']
     logMsg.debug(f'Using precursor tolerance: {prec_display} ppm, m/z bin width: {bin_width_display}')
@@ -95,3 +88,35 @@ def _parseParamMedicOutput(pm_dir: Path):
     bin_width = float(bin_width_match.group(1)) if bin_width_match else None
     logMsg.debug(f'param-medic result — precursor: {prec} ppm, bin width: {bin_width} Da')
     return prec, bin_width
+
+# -- _runParamMedic:
+def _runParamMedic(crux_bin, mzml_files, out_dir):
+    import statistics
+    logMsg.debug(f'Running param-medic')
+    prec_estimates, bin_width_estimates = [], []
+    pm_out = out_dir.parent / 'param-medic'
+    pm_out.mkdir(parents=True, exist_ok=True)
+    for mzml_file in mzml_files:
+        logMsg.info(f'Running param-medic on: {mzml_files[0].name}')
+        file_out = pm_out / mzml_file.stem
+        file_out.mkdir(parents=True, exist_ok=False)
+        ok = cruxutil.paramMedic(crux_bin, mzml_file, file_out)
+        if ok:
+            prec, bin_width = _parseParamMedicOutput(file_out)
+            if prec is not None:
+                prec_estimates.append(prec)
+            if bin_width is not None:
+                bin_width_estimates.append(bin_width)
+    if prec_estimates:
+        precursor_tol = statistics.median(prec_estimates)
+        logMsg.info(f'param-medic median precursor tolerance: {precursor_tol:.2f} ppm (from {len(prec_estimates)} file(s))')
+    else:
+        precursor_tol = None
+        logMsg.warn(f'param-medic produced no usable precursor estimates. Falling back to default values.')
+    if bin_width_estimates:
+        mz_bin_width = statistics.median(bin_width_estimates)
+        logMsg.info(f'param-medic median precursor tolerance: {mz_bin_width} Da (from {len(bin_width_estimates)} file(s))')
+    else:
+        mz_bin_width = None
+        logMsg.warn(f'param-medic produced no usable bin width estimates. Falling back to default values.')
+    return precursor_tol, mz_bin_width
