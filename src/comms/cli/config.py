@@ -70,8 +70,15 @@ def set(
             help=('Set search parameters for low-resolution (--low-res) or high-resolution (--high-res) instruments.'),
         ),
     ] = None,
+    organism: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            '--organism', 
+            help='Set organism header patterns for per-organism picked protein FDR [/dim](format: OrganismLabel=Pattern)[/dim].'
+        ),
+    ] = None,
 ):
     '''
     Set values in user configuration file
     '''
-    configFuncs.config_set(iodo=iodo, low_res=low_res)
+    configFuncs.config_set(iodo=iodo, low_res=low_res, organism=organism)
