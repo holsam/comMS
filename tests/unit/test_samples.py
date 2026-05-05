@@ -42,7 +42,7 @@ class TestLoadSampleSheet:
             loadSampleSheet(tmp_path / 'does_not_exist.tsv')
 
     def test_loads_csv_as_well_as_tsv(self, tmp_path):
-        content = 'sample_id,raw_file,treatment,replicate\nS1,file.mzML,CTRL,1\n'
+        content = 'sample_id,raw_file,treatment,fraction,replicate\nS1,file.mzML,CTRL,WCL,1\n'
         p = tmp_path / 'sheet.csv'
         p.write_text(content)
         df = loadSampleSheet(p)
@@ -53,7 +53,7 @@ class TestLoadSampleSheet:
         assert 'batch' in df.columns   # present in fixture, should not cause error
 
     def test_strips_whitespace_from_column_names(self, tmp_path):
-        content = ' sample_id \t raw_file \t treatment \t replicate \nS1\tf.mzML\tCTRL\t1\n'
+        content = ' sample_id \t raw_file \t treatment \t fraction \t replicate \nS1\tf.mzML\tCTRL\tWCL\t1\n'
         p = tmp_path / 'spaced.tsv'
         p.write_text(content)
         df = loadSampleSheet(p)
