@@ -21,6 +21,7 @@ def run_pipeline(
     skip_convert: bool,
     skip_report: bool,
     threads: int,
+    org_tags: str
 ):
     log = logMsg('pipeline')
     START = datetime.datetime.now()
@@ -66,7 +67,7 @@ def run_pipeline(
     # -- Step 4: Rescore
     log.debug(f'Starting PSM rescoring')
     print(f'\n[bold blue]Step 4/5:[/bold blue] Running Percolator rescoring...')
-    rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, in_pipeline=True)
+    rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, org_tags=org_tags, in_pipeline=True)
     rescore_dir = output_dir / 'comms/results/rescore'
     log.debug(f'rescore_dir: {rescore_dir}')
     # -- Step 5: Quantify
