@@ -99,6 +99,7 @@ def _runParamMedic(crux_bin, mzml_files, out_dir):
     for mzml_file in mzml_files:
         logMsg.info(f'Running param-medic on: {mzml_files[0].name}')
         file_out = pm_out / mzml_file.stem
+        file_out.mkdir(parents=True, exist_ok=False)
         ok = cruxutil.paramMedic(crux_bin, mzml_file, file_out)
         if ok:
             prec, bin_width = _parseParamMedicOutput(file_out)
