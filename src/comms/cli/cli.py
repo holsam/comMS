@@ -13,6 +13,7 @@ from comms.utils.log import log_state
 # -- Import comMS commands
 from comms.cli.convert import commsConvert
 from comms.cli.index import commsIndex
+from comms.cli.lfq import commsLfq
 from comms.cli.search import commsSearch
 from comms.cli.rescore import commsRescore
 from comms.cli.quantify import commsQuantify
@@ -43,6 +44,7 @@ comms.add_typer(commsConvert)
 comms.add_typer(commsIndex)
 comms.add_typer(commsSearch)
 comms.add_typer(commsRescore)
+comms.add_typer(commsLfq)
 comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
 comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='Utilities')
