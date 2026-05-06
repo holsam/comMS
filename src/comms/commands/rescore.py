@@ -60,11 +60,13 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
             for target_file in tqdm(target_files, desc='Files rescored'):
                 fileroot = target_file.name.removesuffix('.tide-search.target.txt')
                 filename = f'{fileroot}.{label}'
+                org_out_dir = out_dir / label
+                org_out_dir.mkdir(parents=True, exist_ok=True)
                 ok = cruxutil.percolator(
                     crux_bin=crux_bin,
                     target_psm_file=target_file,
                     database=sub_fasta,
-                    out_dir=out_dir / label,
+                    out_dir=org_out_dir,
                     fileroot=filename,
                     config=config,
                 )
