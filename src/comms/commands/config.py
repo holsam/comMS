@@ -264,9 +264,9 @@ def _parse_organism_arg(pairs: list[str]) -> dict[str, str]:
             logMsg.error(f'Invalid organism argument ({item}). Expected format: Organism=Pattern')
             print(f'\n[bold red]ERROR:[/] Invalid organism argument ({item}). Expected format: Organism=Pattern')
             raise SystemExit(1)
-        key, pattern = item.split('=')
-        key = ''.join(key.split(''))
-        pattern = ''.join(pattern.split(''))
+        key, _, pattern = item.partition('=')
+        key = ''.join(key.split())
+        pattern = ''.join(pattern.split())
         if not key:
             logMsg.error(f'Empty label in organism argument ({item}).')
             print(f'\n[bold red]ERROR:[/] Empty label in organism argument ({item})')
@@ -303,9 +303,9 @@ def _printSetSummary(*, iodo: bool | None, low_res: bool | None, organism: list[
             )
     if organism is not None:
         for item in organism:
-            key, pattern = item.split('=')
-            key = ''.join(key.split(''))
-            pattern = ''.join(pattern.split(''))
+            key, _, pattern = item.partition('=')
+            key = ''.join(key.split())
+            pattern = ''.join(pattern.split())
             print(
                 f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]'
             )
