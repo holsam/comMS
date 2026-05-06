@@ -51,7 +51,7 @@ def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
         return False
 
 # -- tideIndex: returns True if the Tide peptide index was built successfully, False on failure
-def tideIndex(crux_bin, database, index_dir, config):
+def tideIndex(crux_bin: Path, database: Path, index_dir: Path, config: dict) -> bool:
     logMsg.debug(f'Starting tide-index for database: {database.name}')
     args = [
         '--verbosity', '40',
@@ -75,7 +75,7 @@ def tideIndex(crux_bin, database, index_dir, config):
         return runCrux(crux_bin, 'tide-index', args)
 
 # -- paramMedic: returns True if param-medic completed successfully, False on failure
-def paramMedic(crux_bin, mzml_file, out_dir):
+def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
     logMsg.debug(f'Running param-medic on: {mzml_file.name}')
     args = [
         '--verbosity', '40',
@@ -85,7 +85,7 @@ def paramMedic(crux_bin, mzml_file, out_dir):
     return runCrux(crux_bin, 'param-medic', args)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precursor_tol=None, mz_bin_width=None):
+def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, precursor_tol=None, mz_bin_width=None) -> bool:
     logMsg.debug(f'Starting tide-search for: {mzml_file.name}')
     prec = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width = mz_bin_width  or config['search']['mz_bin_width']
@@ -109,7 +109,7 @@ def tideSearch(crux_bin, mzml_file, index_dir, out_dir, fileroot, config, precur
     return runCrux(crux_bin, 'tide-search', args)
 
 # -- percolator: returns True if Percolator rescoring completed successfully, False on failure
-def percolator(crux_bin, target_psm_file, database, out_dir, fileroot, config):
+def percolator(crux_bin:Path, target_psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
     logMsg.debug(f'Starting Percolator for: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
@@ -125,7 +125,7 @@ def percolator(crux_bin, target_psm_file, database, out_dir, fileroot, config):
     return runCrux(crux_bin, 'percolator', args)
 
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
-def spectralCounts(crux_bin, psm_file, database, out_dir, fileroot, config):
+def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
     logMsg.debug(f'Starting spectral-counts for: {psm_file.name}')
     args = [
         '--verbosity', '40',
@@ -141,3 +141,19 @@ def spectralCounts(crux_bin, psm_file, database, out_dir, fileroot, config):
     ]
     with _cleanBinaryFasta(out_dir):
         return runCrux(crux_bin, 'spectral-counts', args)
+
+# -- lfq: returns True if LFQ quantification completed successfully, False on failure
+def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fileroot: str, config: dict, mbr: bool | None = None) -> bool:
+    logMsg.debug(f'Starting label-free quantification with')
+    match_between_runs = mbr or config['lfq']['match_between_runs']
+    logMsg.debug(f'LFQ parameters: psm_files={psm_files}; mzml_dir={mzml_dir}; match_between_runs={match_between_runs}')
+    args = [
+        '--verbosity', '40',
+        '--output-dir', str(out_dir),
+        '--fileroot', fileroot,
+        '--overwrite', 'T',
+    ]
+    if match_between_runs:
+        args += ['--mbr', 'T']
+    args += [str(file) for file in psm_files] + [str(mzml_dir)]
+    return runCrux(crux_bin, 'lfq', args)
