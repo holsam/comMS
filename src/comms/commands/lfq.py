@@ -74,12 +74,20 @@ def run_lfq(
 # -- _groupPsmsByFraction: return dictionary mapping fraction labels to PSM file paths
 def _groupPsmsByFraction(psm_files: list[Path], samples: pd.DataFrame) -> dict[str, list[Path]]:
     groups: dict[str, list[Path]] = {}
+    if samples.empty:
+        logMsg.warn(f'Sample sheet does not contain any entries')
+        return groups
     for psm_file in psm_files:
         stem = psm_file.name.removesuffix('.percolator.target.psms.txt')
-        match = samples[samples['raw_file'].str.removesuffix('.RAW') == stem]
+        samples['file_stem'] = samples.apply(_get_stem, axis=1)
+        match = samples[samples['file_stem'] == stem]
         if match.empty:
             logMsg.warn(f'No sample sheet entry found for PSM file: {psm_file.name}')
             continue
         fraction = match.iloc[0]['fraction']
         groups.setdefault(fraction, []).append(psm_file)
     return groups
+
+# -- _get_stem: return str corresponding to stem of file from raw_file in sample sheet
+def _get_stem(row):
+    return Path(row['raw_file']).stem
