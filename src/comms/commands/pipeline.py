@@ -9,7 +9,7 @@ from rich import print
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
-from comms.commands import convert, index, search, rescore, quantify, report
+from comms.commands import convert, index, search, rescore, lfq, quantify, report
 
 # -- run_pipeline: runs the full comMS pipeline end-to-end from a sample sheet
 def run_pipeline(
@@ -19,6 +19,8 @@ def run_pipeline(
     output_dir: Path,
     param_medic: bool,
     skip_convert: bool,
+    skip_lfq: bool,
+    skip_quantify: bool,
     skip_report: bool,
     threads: int,
     org_tags: str
@@ -71,11 +73,26 @@ def run_pipeline(
     rescore_dir = output_dir / 'comms/results/rescore'
     log.debug(f'rescore_dir: {rescore_dir}')
     # -- Step 5: Quantify
-    log.debug('Starting quantification')
-    print(f'\n[bold blue]Step 5/5:[/bold blue] Running dNSAF spectral counting...')
-    quantify.run_quantify(input_dir=rescore_dir, database=database, output=output_dir, in_pipeline=True)
-    quantify_dir = output_dir / 'comms/results/quantify'
-    log.debug(f'quantify_dir: {quantify_dir}')
+    if skip_lfq and skip_quantify:
+        log.debug('Both quantification methods skipped')
+        print(f'\n[bold blue]Step 5/5:[/bold blue] skipping quantification...')
+    else:
+        log.debug('Starting quantification')
+        print(f'\n[bold blue]Step 5/5:[/bold blue] Running quantification...')
+        num_steps = int(not skip_lfq) + int(not skip_quantify)
+        step = 1
+        if not skip_lfq:
+            # -- Step 5a: MS1 label free quantification
+            print(f'\n\t[bold blue]Step {step}/{num_steps}:[/bold blue] Running MS1 label-free quantification...')
+            lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, output=output_dir, mbr=None, in_pipeline=True)
+            lfq_dir = output_dir / 'comms/results/lfq'
+            log.debug(f'lfq_dir: {lfq_dir}')
+        if not skip_quantify:
+            # -- Step 5b: dNSAF spectral counting
+            print(f'\n[bold blue]Step {step}/{num_steps}:[/bold blue] Running dNSAF spectral counting...')
+            quantify.run_quantify(input_dir=rescore_dir, database=database, output=output_dir, in_pipeline=True)
+            quantify_dir = output_dir / 'comms/results/quantify'
+            log.debug(f'quantify_dir: {quantify_dir}')
     END = datetime.datetime.now()
     print(f'\n[bold green]Pipeline complete.[/bold green] Runtime: {END - START}')
     print(f'All results written to: {output_dir}\n')

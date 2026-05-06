@@ -45,6 +45,14 @@ def pipeline(
         bool,
         typer.Option('--skip-convert', help='Skip the .RAW conversion step (use if mzML files are already available)')
     ] = False,
+    skip_lfq: Annotated[
+        bool,
+        typer.Option('--skip-lfq', help='Skip MS1 label free quantification')
+    ] = False,
+    skip_quantify: Annotated[
+        bool,
+        typer.Option('--skip-quant', help='Skip dNSAF spectral counting quantification')
+    ] = False,
     skip_report: Annotated[
         bool,
         typer.Option('--skip-report', help='Skip the report generation step')
@@ -61,6 +69,8 @@ def pipeline(
         output_dir=output,
         param_medic=param_medic,
         skip_convert=skip_convert,
+        skip_lfq=skip_lfq,
+        skip_quantify=skip_quantify,
         skip_report=skip_report,
         threads=threads,
         org_tags=organism_tags,
