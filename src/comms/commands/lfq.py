@@ -22,7 +22,7 @@ def run_lfq(
     mzml_dir: Path,
     sample_sheet: Path,
     output: Path,
-    mbr: bool = True,
+    mbr: bool | None,
     in_pipeline: bool = False
 ):
     '''
