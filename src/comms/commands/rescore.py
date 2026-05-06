@@ -51,7 +51,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
     log_path = out_dir / 'rescore.log'
     
-    sub_fastas = splitFastaByOrganism(database, organism_tags, out_dir)
+    sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
     
     print(f'\nRescoring {len(target_files)} PSM file(s) with Percolator using {len(sub_fastas)} organism database(s)...')
     n_ok, n_fail = 0, 0
