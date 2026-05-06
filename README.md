@@ -14,10 +14,10 @@
 - [Requirements](#requirements)
     - [Python](#python)
     - [External tools](#external-tools)
-    - [Input files](#input-files)
 - [Installation](#installation)
     - [Installing external tools](#installing-external-tools)
 - [Quick start](#quick-start)
+- [Input files](#input-files)
 - [Commands](#commands)
     - [Pipeline](#pipeline)
     - [Individual commands](#individual-commands)
@@ -54,30 +54,6 @@ Tool | Purpose | Platform notes
 ---|---|---
 [Crux toolkit][crux-url] | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
 [ThermoRawFileParser][trfp-url] | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
-
-### Input files
-#### Mass spectrometry data files
-comMS expects mass spectrometry data in Thermo `.RAW` format as input to the `convert` command. If `.mzML` files are already available, the conversion step can be skipped with `--skip-convert` when running the full pipeline. Other mass spectrometry data file formats should be converted to `.mzML` externally before continuing as described above.
-
-#### Sample information
-comMS also requires a sample sheet in either `.TSV` or `.CSV` format with the following columns:
-
-Column | Required | Description
----|---|---
-`sample_id` | Required | Unique identifier for each sample
-`raw_file` | Required | Filename of the `.RAW` (or `.mzML`) source file
-`treatment` | Required | Experimental group label
-`fraction` | Required | Sample fraction/type label
-`replicate` | Required | Replicate number within treatment/fraction
-`batch` | Optional | Batch label
-
-Example:
-
-```
-sample_id	raw_file	treatment	fraction replicate	batch
-S1  sample_mock_1.RAW	MOCK	WCL 1   A
-S2	sample_treat_1.RAW	TREAT	WCL 1   A
-```
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
@@ -141,6 +117,33 @@ Use `--skip-convert` if `.mzML` files are already available, and `--skip-report`
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
+## Input files
+### Mass spectrometry data files
+comMS expects mass spectrometry data in Thermo `.RAW` format as input to the `convert` command. If `.mzML` files are already available, the conversion step can be skipped with `--skip-convert` when running the full pipeline. Other mass spectrometry data file formats should be converted to `.mzML` externally before continuing as described above.
+
+### Sample information
+comMS also requires a sample sheet in either `.TSV` or `.CSV` format with the following columns:
+
+Column | Required | Description
+---|---|---
+`sample_id` | Required | Unique identifier for each sample
+`raw_file` | Required | Filename of the `.RAW` (or `.mzML`) source file
+`treatment` | Required | Experimental group label
+`fraction` | Required | Sample fraction/type label used for LFQ grouping
+`replicate` | Required | Replicate number within treatment/fraction
+`batch` | Optional | Batch label
+
+Example:
+
+```
+sample_id	raw_file	treatment	fraction replicate	batch
+S1  sample_mock_1.RAW	MOCK	WCL 1   A
+S2	sample_treat_1.RAW	TREAT	WCL 1   A
+```
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
+
 ## Commands
 comMS provides the following commands. Run `comms --help` or `comms <command> --help` for full option descriptions.
 ### Pipeline
@@ -155,6 +158,7 @@ Command | Description
 `index` | Build a tryptic peptide index from a FASTA file using Crux `tide-index`
 `search` | Match spectra to peptides using Crux `tide-search`
 `rescore` | Rescore PSMs using Crux `percolator` with picked-protein FDR
+`lfq` | Run MS1 label-free quantification using grouped fractions
 `quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
 `report` | Generate an HTML report containing visualisations *(not yet implemented)*
 
@@ -273,6 +277,8 @@ comMS accepts an output directory option (defaults to the current working direct
       search/       # Crux tide-search target PSM files
       rescore/      # Merged Percolator rescored PSM files
         organism_n/ # Percolator rescored PSM files for specific organism
+      lfq/          # MS1 label-free quantification output
+        fraction_n/ # FlashLFQ output for each sample fraction
       quantify/     # dNSAF spectral-counts output
 ```
 
