@@ -96,6 +96,39 @@ def valid_sample_sheet(tmp_path: Path) -> Path:
     return p
 
 @pytest.fixture()
+def valid_sample_sheet_single_fraction(tmp_path: Path) -> Path:
+    '''
+    Write a minimal sample sheet with a single fraction (WCL) and return its path
+    '''
+    content = (
+        'sample_id\traw_file\ttreatment\tfraction\treplicate\n'
+        'S1\tsample_mock_wcl_1.RAW\tMOCK\tWCL\t1\n'
+        'S2\tsample_treat_wcl_1.RAW\tTREAT\tWCL\t1\n'
+    )
+    p = tmp_path / 'sample_sheet_single_fraction.tsv'
+    p.write_text(content)
+    return p
+
+@pytest.fixture()
+def valid_sample_sheet_multiple_fractions(tmp_path: Path) -> Path:
+    '''
+    Write a minimal sample sheet with three fractions (WCL, ECF, PUR), two treatments, and one
+    replicate each and return its path
+    '''
+    content = (
+        'sample_id\traw_file\ttreatment\tfraction\treplicate\tbatch\n'
+        'S1\tsample_mock_wcl_1.RAW\tMOCK\tWCL\t1\tA\n'
+        'S2\tsample_treat_wcl_1.RAW\tTREAT\tWCL\t1\tA\n'
+        'S3\tsample_mock_ecf_1.RAW\tMOCK\tECF\t1\tA\n'
+        'S4\tsample_treat_ecf_1.RAW\tTREAT\tECF\t1\tA\n'
+        'S5\tsample_mock_pur_1.RAW\tMOCK\tPUR\t1\tA\n'
+        'S6\tsample_treat_pur_1.RAW\tTREAT\tPUR\t1\tA\n'
+    )
+    p = tmp_path / 'sample_sheet_multiple_fractions.tsv'
+    p.write_text(content)
+    return p
+
+@pytest.fixture()
 def sample_sheet_missing_col(tmp_path: Path) -> Path:
     '''Sample sheet missing the required `treatment` column'''
     content = (
@@ -150,4 +183,43 @@ def synthetic_percolator_results(tmp_path):
         'synthetic_3_2_1\t1.3\t0.01\t0.002\tR.LMNPQR.S\tSP|PROT1|GENE1\n'
         'synthetic_4_2_1\t1.2\t0.01\t0.003\tK.SAMPLEK.T\tSP|PROT2|GENE2\n'
     )
+    return rescore_dir
+
+@pytest.fixture()
+def multi_fraction_psm_dir(tmp_path: Path) -> Path:
+    '''
+    Write synthetic Percolator PSM files for three fractions (WCL, AWF, EV),
+    two samples per fraction, matching the filenames in
+    valid_multi_fraction_sample_sheet. Returns the directory path.
+    '''
+    rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+    rescore_dir.mkdir(parents=True)
+    psm_header = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
+    psm_row = 'synthetic_1\t1.5\t0.01\t0.001\tK.ACDEFGHIK.L\tSP|PROT1|GENE1\n'
+    stems = [
+        'sample_mock_wcl_1',
+        'sample_treat_wcl_1',
+        'sample_mock_ecf_1',
+        'sample_treat_ecf_1',
+        'sample_mock_pur_1',
+        'sample_treat_pur_1',
+    ]
+    for stem in stems:
+        psm_file = rescore_dir / f'{stem}.percolator.target.psms.txt'
+        psm_file.write_text(psm_header + psm_row)
+    return rescore_dir
+
+@pytest.fixture()
+def single_fraction_psm_dir(tmp_path: Path) -> Path:
+    '''
+    Write synthetic Percolator PSM files for a single fraction (WCL), matching
+    the filenames in valid_sample_sheet_single_fraction.
+    '''
+    rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+    rescore_dir.mkdir(parents=True)
+    psm_header = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
+    psm_row = 'synthetic_1\t1.5\t0.01\t0.001\tK.ACDEFGHIK.L\tSP|PROT1|GENE1\n'
+    for stem in ('sample_mock_wcl_1', 'sample_treat_wcl_1'):
+        psm_file = rescore_dir / f'{stem}.percolator.target.psms.txt'
+        psm_file.write_text(psm_header + psm_row)
     return rescore_dir
