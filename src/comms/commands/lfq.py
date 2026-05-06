@@ -54,15 +54,17 @@ def run_lfq(
 
     samples = samputil.loadSampleSheet(sample_sheet)
     psm_files = sorted(rescore_dir.glob('*.percolator.target.psms.txt'))
+    out_dir = pathutil.generateOutputFileStructure(output, 'lfq')
     fraction_groups = _groupPsmsByFraction(psm_files, samples)
     for fraction, fraction_psms in fraction_groups.items():
         logMsg.info(f'Running LFQ for fraction: {fraction} ({len(fraction_psms)} files(s))')
-        out_dir = pathutil.generateOutputFileStructure(output, 'lfq') / fraction
+        out_dir_fraction = out_dir / fraction
+        out_dir_fraction.mkdir(parents=True, exist_ok=True)
         ok = cruxutil.lfq(
             crux_bin=crux_bin,
             psm_files=fraction_psms,
             mzml_dir=mzml_dir,
-            out_dir=out_dir,
+            out_dir=out_dir_fraction,
             fileroot=fraction,
             config=config,
             match_between_runs=mbr,
