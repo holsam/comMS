@@ -49,6 +49,10 @@ class TestLiveConfig:
 
     def test_config_has_percolator_section(self):
         assert 'percolator' in live_config
+    
+    def test_config_has_organism_section(self):
+        assert 'organism' in live_config
+        assert live_config['organism'] == {}
 
     def test_config_values_are_not_none(self):
         '''Spot-check that critical keys are not None.'''
