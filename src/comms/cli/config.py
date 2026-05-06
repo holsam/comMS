@@ -77,8 +77,15 @@ def set(
             help='Set organism header patterns for per-organism picked protein FDR [/dim](format: OrganismLabel=Pattern)[/dim].'
         ),
     ] = None,
+    mbr: Annotated[
+        Optional[bool],
+        typer.Option(
+            '--mbr/--no-mbr',
+            help='Use match between runs option when running LFQ command'
+        ),
+    ] = None
 ):
     '''
     Set values in user configuration file
     '''
-    configFuncs.config_set(iodo=iodo, low_res=low_res, organism=organism)
+    configFuncs.config_set(iodo=iodo, low_res=low_res, organism=organism, mbr=mbr)
