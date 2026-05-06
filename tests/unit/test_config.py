@@ -8,7 +8,7 @@ from pathlib import Path
 
 # -- Import internal functions
 import comms.utils.settings as settings
-from comms.commands.config import CARBAMIDOMETHYL_MOD, MZ_BIN_WIDTH_HIGH_RES, MZ_BIN_WIDTH_LOW_RES, SCORE_FUNC_HIGH_RES, SCORE_FUNC_LOW_RES, _apply_protocol_flags, _apply_iodo, _flatten, _configCheck, _loadUserConfig, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
+from comms.commands.config import CARBAMIDOMETHYL_MOD, MZ_BIN_WIDTH_HIGH_RES, MZ_BIN_WIDTH_LOW_RES, SCORE_FUNC_HIGH_RES, SCORE_FUNC_LOW_RES, _apply_organism, _apply_protocol_flags, _apply_iodo, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
 
 # -- Define fixture for initialised user config file
 @pytest.fixture()
@@ -190,6 +190,34 @@ class TestConfigReset:
         config_reset(force=False)
         assert _loadUserConfig() == settings.loadDefaultConfig()
 
+# -- Define tests for _apply_organism helper function
+class TestApplyOrganism:
+    def test_sets_organism_section(self):
+        cfg = {'organism': {}, 'search': {'threads': 2}}
+        result = _apply_organism(cfg, {'Test1': 'TEST1', 'Test2': 'TEST2'})
+        assert result['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
+    
+    def test_replaces_existing_organism_section(self):
+        cfg = {'organism': {'OldTest', 'OLDTEST'}}
+        result = _apply_organism(cfg, {'NewTest': 'NEWTEST'})
+        assert 'OldTest' not in result['organism']
+        assert result['organism'] == {'NewTest': 'NEWTEST'}
+    
+    def test_does_not_touch_other_sections(self):
+        cfg = {'organism': {}, 'search': {'threads': 2}, 'percolator': {'psm_fdr': 0.01}}
+        _apply_organism(cfg, {'Test': 'TEST'})
+        assert cfg['search']['threads'] == 2
+        assert cfg['percolator']['psm_fdr'] == 0.01
+    
+    def test_empty_dict_clears_organism_section(self):
+        cfg = {'organism': {'Test', 'TEST'}}
+        result = _apply_organism(cfg, {})
+        assert result['organism'] == {}
+    
+    def test_returns_cfg(self):
+        cfg = {'organism': {}}
+        result = _apply_organism(cfg, {'Test': 'TEST'})
+        assert result is cfg
 
 # -- Define tests for _apply_iodo helper function
 class TestApplyIodo:
@@ -303,15 +331,56 @@ class TestApplyProtocolFlags:
         for section in ('global', 'convert', 'percolator', 'quantify'):
             assert cfg_after.get(section) == cfg_before.get(section), (f'_apply_protocol_flags unexpectedly changed section [{section}]')
 
+# -- Define tests for _parse_organism_arg helper function
+class TestParseOrganismArg:
+    def test_parses_single_pair(self):
+        result = _parse_organism_arg(['TestOrg=TEST'])
+        assert result == {'TestOrg': 'TEST'}
+
+    def test_parses_multiple_pairs(self):
+        result = _parse_organism_arg(['TestOrg1=TEST1', 'TestOrg2=TEST2'])
+        assert result == {'TestOrg1': 'TEST1', 'TestOrg2': 'TEST2'}
+
+    def test_strips_whitespace_from_key_and_pattern(self):
+        result = _parse_organism_arg(['Test = TEST'])
+        assert result == {'Test': 'TEST'}
+
+    def test_preserves_regex_characters_in_pattern(self):
+        result = _parse_organism_arg(['Test=TEST$'])
+        assert result['Test'] == 'TEST$'
+    
+    def test_raises_system_exit_when_no_equals_sign(self):
+        with pytest.raises(SystemExit):
+            _parse_organism_arg(['TestTEST'])
+
+    def test_raises_system_exit_when_key_is_empty(self):
+        with pytest.raises(SystemExit):
+            _parse_organism_arg(['=TEST'])
+
+    def test_raises_system_exit_when_pattern_is_empty(self):
+        with pytest.raises(SystemExit):
+            _parse_organism_arg(['Test='])
+
+    def test_returns_dict(self):
+        assert isinstance(_parse_organism_arg(['Test=TEST']), dict)
+
+    def test_empty_list_returns_empty_dict(self):
+        result = _parse_organism_arg([])
+        assert result == {}
+
+    def test_pattern_containing_equals_sign_is_preserved(self):
+        result = _parse_organism_arg(['Test=TE=ST'])
+        assert result == {'Test': 'TE=ST'}
+
 # Define tests for config set subcommand
 class TestConfigSet:
     def test_creates_config_if_absent(self, isolated_config_dir):
         '''config_set should auto-create the user config if none exists'''
-        config_set(iodo=True, low_res=None)
+        config_set(iodo=True, low_res=None, organism=None)
         assert settings.userConfigPath().exists()
 
     def test_created_config_is_valid_toml(self, isolated_config_dir):
-        config_set(iodo=True, low_res=None)
+        config_set(iodo=True, low_res=None, organism=None)
         with settings.userConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
@@ -373,23 +442,65 @@ class TestConfigSet:
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
-    def test_combined_iodo_and_low_res_in_one_call(self, initialised_config):
+    def test_sets_organism_in_config(self, initialised_config):
+        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
+    
+    def test_set_organism_replaces_existing(self, initialised_config):
+        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        config_set(iodo=None, low_res=None, organism=['Test1=NEWTEST1'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'NEWTEST1'}
+        assert 'Test2' not in cfg['organism']
+
+    def test_organism_section_written_as_toml_table(self, initialised_config):
+        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        cfg = _loadUserConfig()
+        assert isinstance(cfg['organism'], dict)
+        assert isinstance(cfg['organism']['Test1'], str)
+
+    def test_combined_iodo_and_low_res(self, initialised_config):
         config_set(iodo=True, low_res=True)
         cfg = _loadUserConfig()
         assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
-    def test_combined_iodo_and_high_res_in_one_call(self, initialised_config):
+    def test_combined_iodo_and_high_res(self, initialised_config):
         config_set(iodo=True, low_res=False)
         cfg = _loadUserConfig()
         assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-        assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_HIGH_RES
+        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
+    def test_combined_organism_and_iodo(self, initialised_config):
+        config_set(iodo=True, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
+        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
+
+    def test_combined_organism_and_low_res(self, initialised_config):
+        config_set(iodo=None, low_res=True, organism=['Test1=TEST1'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'TEST1'}
+        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
+
+    def test_combined_organism_and_iodo(self, initialised_config):
+        config_set(iodo=True, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
+        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
+
+    def test_combined_organism_and_high_res(self, initialised_config):
+        config_set(iodo=None, low_res=False, organism=['Test1=TEST1'])
+        cfg = _loadUserConfig()
+        assert cfg['organism'] == {'Test1': 'TEST1'}
+        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
+
     def test_no_flags_exits_nonzero(self, isolated_config_dir):
-        with pytest.raises(click.exceptions.Exit) as exc:
-            config_set(iodo=None, low_res=None)
+        with pytest.raises((SystemExit, click.exceptions.Exit)) as exc:
+            config_set(iodo=None, low_res=None, organism=None)
         assert exc.value.exit_code != 0
 
     def test_all_other_config_keys_unchanged_after_set(self, initialised_config):
@@ -407,3 +518,12 @@ class TestConfigSet:
                 assert after[section] == values, (
                     f'config_set unexpectedly changed section [{section}]'
                 )
+
+    def test_other_sections_unchanged_after_organism_set(self, initialised_config):
+        before = _loadUserConfig()
+        config_set(iodo=None, low_res=None, organism=['Mt=MEDTR'])
+        after = _loadUserConfig()
+        for section in ('search', 'percolator', 'quantify', 'convert', 'global'):
+            assert after.get(section) == before.get(section), (
+                f'config_set --organism unexpectedly changed section [{section}]'
+            )

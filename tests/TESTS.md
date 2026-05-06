@@ -10,6 +10,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Sample sheet fixtures](#sample-sheet-fixtures)
     - [Config fixtures](#config-fixtures)
     - [Synthetic Percolator results](#synthetic-percolator-results)
+    - [Rescore integration fixtures](#rescore-integration-fixtures)
 - [Synthetic fixture generator](#synthetic-fixture-generator)
     - [Running standalone](#running-standalone)
     - [Synthetic proteome](#synthetic-proteome)
@@ -19,7 +20,10 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
 - [Unit tests](#unit-tests)
     - [`tests/unit/test_config.py`](#testsunittest_configpy)
     - [`tests/unit/test_download.py`](#testsunittest_downloadpy)
-    - [`tests/unit/test_paths.py](#testsunittest_pathspy)
+    - [`tests/unit/test_fasta.py`](#testsunittest_fastapy)
+    - [`tests/unit/test_parammedic.py`](#testsunittest_parammedicpy)
+    - [`tests/unit/test_paths.py`](#testsunittest_pathspy)
+    - [`tests/unit/test_rescore.py`](#testsunittest_rescorepy)
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
 - [Integration tests](#integration-tests)
@@ -97,7 +101,7 @@ Fixture | Description
 ### Sample sheet fixtures
 Fixture | Description
 ---|---
-`valid_sample_sheet(tmp_path)` | Two samples across two treatments, one replicate each; written as TSV
+`valid_sample_sheet(tmp_path)` | Two samples across two treatments with a `fraction` column (`WCL`) and optional `batch` column, one replicate each; written as TSV
 `sample_sheet_missing_col(tmp_path)` | Missing the required `treatment` column; used to test validation errors
 `sample_sheet_duplicate_ids(tmp_path)` | Duplicate `sample_id` values; used to test duplicate detection
 
@@ -111,6 +115,17 @@ Fixture | Description
 Fixture | Description
 ---|---
 `synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic Percolator PSM file at the expected path, bypassing the need to run Percolator on synthetic data (which does not provide enough PSMs for Percolator to converge); shared between `test_crux.py` and `test_pipeline.py`
+
+### Rescore integration fixtures
+
+The following fixtures are defined within `tests/integration/test_pipeline.py` for use by the rescore integration test classes.
+
+Fixture | Description
+---|---
+`two_organism_fasta(tmp_path)` | Writes a combined FASTA containing one TESTEUK protein, one TESTPRO protein, and one cRAP contaminant; returns the path
+`synthetic_tide_search_dir(tmp_path)` | Writes a minimal synthetic Tide-search target PSM file to `tmp_path / 'search'` and returns the directory path, bypassing the need to run `tide-search` in rescore tests
+
+A module-level helper function `_write_per_organism_psm_files(rescore_dir, file_base, labels)` is also defined in `test_pipeline.py`. This is not a fixture but is used as a mock side effect within `TestRunRescoreMergedOutput` to write synthetic per-organism Percolator output files so that `_mergeRescoredPsms` has something to read without Percolator running.
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -195,7 +210,11 @@ Function | Test description
 `config_reset` | `--force` restores defaults; without `--force`, prompts; proceeds on confirmation
 `_apply_iodo` | adds/removes carbamidomethylation; replaces any existing Cys mod; handles empty specs; result has no leading/trailing commas or double commas
 `_apply_protocol_flags` | all flag combinations; only relevant keys are modified; all other config sections are untouched
-`config_set` | auto-creates config from defaults if absent; `--iodo`, `--no-iodo`, `--high-res`, `--low-res` all behave correctly and are idempotent; combined flags work; `--no-flags` exits non-zero
+`_apply_organism` | sets `[organism]` section; replaces existing entries; does not touch other sections; empty dict clears the section; returns the modified config dict
+`_parse_organism_arg` | parses single and multiple `Label=Pattern` pairs; strips whitespace; preserves regex characters; raises `SystemExit` on missing `=`, empty label, or empty pattern; handles patterns containing `=`
+`config_set` | auto-creates config from defaults if absent; `--iodo`, `--no-iodo`, `--high-res`, `--low-res` all behave correctly and are idempotent; `--organism` sets and replaces the organism section; combined flags work; `--no-flags` exits non-zero
+
+---
 
 ### `tests/unit/test_download.py`
 Unit tests covering `src/comms/utils/download.py`:
@@ -208,6 +227,30 @@ Constants | correct types, non-empty strings, valid URL templates
 URL construction | tarball name for each known platform key matches expected format
 `download_crux` | raises `NotImplementedError` on Windows (monkeypatched); raises `RuntimeError` on unrecognised platform
 
+---
+
+### `tests/unit/test_fasta.py`
+Unit tests covering `src/comms/utils/fasta.py`. No external binaries are required.
+
+Function | Test description
+-- | --
+`readFasta` | returns a list; single entry returns one item; multi-entry returns correct count; entry is a two-element list; header does not contain leading `>`; header content is correct; sequence content is correct; wrapped sequences are joined into a single string with no newlines; empty sequence returns `''`; multi-entry order is preserved
+`writeFasta` | creates file at specified path; headers are prefixed with `>`; header and sequence are on separate lines; all entries present after multi-entry write; round-trips correctly via `readFasta`
+`_searchHeaderForTag` | returns `True` on match; returns `False` on no match; adds matching entry to the correct organism key; creates key on first match; appends to existing key; uses regex matching (anchored patterns do not match longer strings); assigns entry to the first matching tag only
+`splitFastaByOrganism` | returns `dict[str, Path]`; one key per organism (contaminants key absent); sub-FASTAs contain only the correct organism's proteins; contaminants are appended to all organism sub-FASTAs; output files exist on disk; output files use `.fa` extension; files are named `<label>.fa`; no crash when no contaminants are present; empty FASTA returns `{}`
+
+---
+
+### `tests/unit/test_parammedic.py`
+Unit tests covering `_parseParamMedicOutput` and `_runParamMedic` in `src/comms/commands/search.py`. No external binaries are required; `cruxutil.paramMedic` is mocked throughout `TestRunParamMedic`.
+
+Function | Test description
+-- | --
+`_parseParamMedicOutput` | returns `(None, None)` when output file is absent; parses well-formed output correctly; handles precursor-only or bin-width-only files; returns `(None, None)` for empty or malformed files; is case-insensitive; returns `float` types for both values
+`_runParamMedic` | single file returns that file's values; odd and even file counts return the correct median; all-`None` parse results return `(None, None)`; mixed `None` and valid values exclude `None` from the median; `paramMedic` is called once per file; files where `paramMedic` returns `False` are excluded from estimates; per-file output subdirectories are created under a `param-medic/` directory
+
+---
+
 ### `tests/unit/test_paths.py`
 Unit tests covering `src/comms/utils/paths.py`:
 
@@ -216,14 +259,30 @@ Function | Test description
 `generateOutputFileStructure` | creates the expected `comms/results/<command>/` subdirectory; creates directories if absent; returns existing path unchanged if already correct; works for all supported commands
 `checkUniqueFileName` | returns expected base name when no conflict; increments suffix on conflict; increments correctly through multiple conflicts; correct naming patterns for all commands (`search`, `quantify`, `rescore`, `report`); returned path is within `out_dir`
 
+---
+
+### `tests/unit/test_rescore.py`
+Unit tests covering helper functions in `src/comms/commands/rescore.py`. No external binaries are required; tests use synthetic PSM files written directly to `tmp_path`.
+
+Function | Test description
+-- | --
+`_parseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`
+`_mergeTypeRescoredPsms` | returns a list; all elements end with `\n`; first element is the modified header prefixed with `organism\t`; header appears exactly once; data rows are prefixed with the organism label; rows from both organisms are present; works for both `target` and `decoy` match types
+`_mergeRescoredPsms` | returns `True` on success; returns `False` when an input file is missing; writes both `target` and `decoy` merged files; merged files are non-empty; merged file content is valid text
+
+---
+
 ### `tests/unit/test_samples.py`
 Unit tests covering `src/comms/utils/samples.py`:
 
 Function | Test description
 -- | --
-`loadSampleSheet` — loads valid TSV; correct row count; column names are lowercased; required columns present; raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
-`getSamplesByTreatment` — filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
-`getRawFileMap` — maps existing files; omits missing files; returns `Path` objects
+`loadSampleSheet` | loads valid TSV; correct row count; column names are lowercased; required columns present (including `fraction`); raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
+`getSamplesByTreatment` | filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
+`getSamplesByFraction` | filters correctly by fraction label; case-insensitive; returns empty DataFrame for unknown fraction; returns a copy, not a view
+`getRawFileMap` | maps existing files; omits missing files; returns `Path` objects
+
+---
 
 ### `tests/unit/test_settings.py`
 Unit tests covering `src/comms/utils/settings.py`:
@@ -232,7 +291,7 @@ Function | Test description
 -- | --
 `userConfigPath` | returns a `Path`; name is `config.toml`; parent directory is named `comms`
 `loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
-Module-level `config` | is a dict; contains `search` and `percolator` sections; critical keys are not `None`
+Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -253,6 +312,8 @@ Empty input directory | `run_convert` returns cleanly and prints a warning
 Invalid `.RAW` file | a deliberately malformed file causes TRFP to exit non-zero; the summary reports a failure
 Real `.RAW` file (optional) | tests verify that the output directory is created and contains at least one `.mzML` file; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
 
+---
+
 ### `tests/integration/test_crux.py`
 Integration tests covering the Crux toolkit aspects used in the comMS pipeline. All tests in this file require the Crux binary (`pytest.mark.crux`).
 
@@ -261,21 +322,28 @@ Test | Description
 `TestFindCrux` | binary exists at returned path; path is executable; returns `None` for an empty `bin/` directory.
 `TestTideIndex` | creates and populates the index directory; writes a log file; returns `False` for an invalid FASTA.
 `TestTideSearch` | creates the target PSM file; file has at least a header and one data row; log file is written.
-`TestRunRescore` | *n.b. this is currently commented out as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
+`TestRunRescore` | *n.b. this is currently skipped as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
 `TestSpectralCounts` | uses the synthetic Percolator PSM fixture to bypass Percolator (which requires more PSMs than the synthetic data provides); creates a spectral-counts output file with content.
 
+---
+
 ### `tests/integration/test_pipeline.py`
-Integration tests/smoke tests that assert the pipeline stages complete without raising errors and create the expected output directories and files. All tests in this file require the Crux binary (`pytest.mark.crux`).
+Integration tests and smoke tests that assert the pipeline stages complete without raising errors and create the expected output directories and files. All tests in this file require the Crux binary (`pytest.mark.crux`).
 
 Test | Description
 -- | -- 
-`TestRunIndex` | output directory is created and non-empty; prints a success message.
-`TestRunSearch` | output directory is created; target PSM file exists; prints search summary.
-`TestRunRescore` | output directory is created; prints rescore summary; log file is written. The rescore step may fail with synthetic data due to insufficient PSMs for Percolator — the test asserts on directory creation rather than success.
-`TestRunQuantify` | uses synthetic Percolator results fixture; output directory is created; spectral-counts file exists; prints quantify summary.
-`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories are created under `comms/results/`.
+`TestRunIndex` | output directory is created and non-empty; prints a success message; `logMsg` instance is named `'index'`.
+`TestRunSearch` | output directory is created; target PSM file exists; prints search summary; `logMsg` instance is named `'search'`.
+`TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values.
+`TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the terminal summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising.
+`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created for a two-organism run. Both Percolator and `_mergeRescoredPsms` are mocked.
+`TestRunRescoreMergedOutput` | verifies that `<file_base>.percolator.target.psms.txt` and `<file_base>.percolator.decoy.psms.txt` are written at the top level of the rescore directory. Percolator is mocked with a side effect that writes synthetic per-organism PSM files.
+`TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `org_tags` nor config organism is available; uses config organism when `org_tags` is falsy (monkeypatched); verifies Percolator is called exactly once per organism per file.
+`TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails for a file; warning is printed when merge fails; `logMsg` instance is named `'rescore'`.
+`TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; prints quantify summary; `logMsg` instance is named `'quantify'`.
+`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`.
 
-Each test also includes a test to ensure the comMS logger was instantiated correctly.
+---
 
 ### `tests/integration/test_tfrp.py`
 Integration tests covering the comMS wrapper around ThermoRawFileParser. All tests require ThermoRawFileParser (`pytest.mark.trfp`). The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).

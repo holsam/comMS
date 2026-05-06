@@ -111,11 +111,12 @@ def config_reset(force: bool = False):
 
 
 # -- config_set: apply named protocol flags to the user config
-def config_set(iodo: bool | None = None, low_res: bool | None = None) -> None:
+def config_set(iodo: bool | None = None, low_res: bool | None = None, organism: list[str] | None = None) -> None:
     log = logMsg('config')
-    log.debug(f'Applying protocol flags — iodo: {iodo}, low_res: {low_res}')
-    if iodo is None and low_res is None:
-        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold].\n')
+    log.debug(f'Applying protocol flags. iodo: {iodo}; low_res: {low_res}; organism: {organism}')
+    if iodo is None and low_res is None and organism is None:
+        log.warn(f'No flag supplied to config set.')
+        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold] and/or [bold]--organism[/bold].\n')
         raise typer.Exit(1)
     config_path = userConfigPath()
     if not config_path.exists():
@@ -129,13 +130,16 @@ def config_set(iodo: bool | None = None, low_res: bool | None = None) -> None:
         print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
         raise typer.Exit(1)
     cfg = _apply_protocol_flags(cfg, iodo=iodo, low_res=low_res)
+    if organism is not None:
+        organism_args = _parse_organism_arg(organism)
+        cfg = _apply_organism(cfg, organism_args)
     try:
         _writeConfig(cfg)
     except Exception as e:
         log.error(f'Failed to write user config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise typer.Exit(1)
-    _printSetSummary(iodo=iodo, low_res=low_res)
+    _printSetSummary(iodo=iodo, low_res=low_res, organism=organism if organism is not None else None)
     print()
 
 # -- Internal helpers
@@ -240,8 +244,42 @@ def _apply_iodo(mods_spec: str, *, iodo: bool) -> str:
     logMsg.debug(f'iodo flag applied — mods_spec updated to: {result}')
     return result
 
+# -- _apply_organism: returns config dict with organism section replaced
+def _apply_organism(cfg: dict, organism: dict[str, str]) -> dict:
+    '''
+    Replace the [organism] section of the user config with the supplied dictionary.
+    '''
+    cfg['organism'] = organism
+    logMsg.debug(f'organism section set to: {organism}')
+    return cfg
+
+# -- _parse_organism_arg: returns dict parsed from list of 'Key=Pattern' strings
+def _parse_organism_arg(pairs: list[str]) -> dict[str, str]:
+    '''
+    Parse a list of 'Label=Pattern' strings into a dict.
+    '''
+    result = {}
+    for item in pairs:
+        if '=' not in item:
+            logMsg.error(f'Invalid organism argument ({item}). Expected format: Organism=Pattern')
+            print(f'\n[bold red]ERROR:[/] Invalid organism argument ({item}). Expected format: Organism=Pattern')
+            raise SystemExit(1)
+        key, _, pattern = item.partition('=')
+        key = ''.join(key.split())
+        pattern = ''.join(pattern.split())
+        if not key:
+            logMsg.error(f'Empty label in organism argument ({item}).')
+            print(f'\n[bold red]ERROR:[/] Empty label in organism argument ({item})')
+            raise SystemExit(1)
+        if not pattern:
+            logMsg.error(f'Empty pattern in organism argument ({item}).')
+            print(f'\n[bold red]ERROR:[/] Empty pattern in organism argument ({item})')
+            raise SystemExit(1)
+        result[key] = pattern
+    return result
+
 # _print_set_summary: prints a summary of changes made
-def _printSetSummary(*, iodo: bool | None, low_res: bool | None) -> None:
+def _printSetSummary(*, iodo: bool | None, low_res: bool | None, organism: list[str] | None) -> None:
     '''Print a summary of what config_set changed.'''
     print()
     if iodo is not None:
@@ -262,5 +300,13 @@ def _printSetSummary(*, iodo: bool | None, low_res: bool | None) -> None:
                 f'[bold green]✓[/bold green] High-resolution mode set: '
                 f'[dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], '
                 f'[dim]score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]'
+            )
+    if organism is not None:
+        for item in organism:
+            key, _, pattern = item.partition('=')
+            key = ''.join(key.split())
+            pattern = ''.join(pattern.split())
+            print(
+                f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]'
             )
     print()

@@ -29,6 +29,10 @@ def pipeline(
         Path,
         typer.Option('-i', '--input', help='Directory containing .RAW or .mzML files', exists=True, file_okay=False, dir_okay=True)
     ],
+    organism_tags: Annotated[
+        str,
+        typer.option('--organism-tags', help='Comma-separated patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
+    ],
     output: Annotated[
         Path | None,
         typer.Option('-o', '--out-dir', help='Root output directory', file_okay=False, dir_okay=True, writable=True)
@@ -59,4 +63,5 @@ def pipeline(
         skip_convert=skip_convert,
         skip_report=skip_report,
         threads=threads,
+        org_tags=organism_tags,
     )
