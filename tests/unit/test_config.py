@@ -496,7 +496,7 @@ class TestConfigSet:
         config_set(iodo=None, low_res=False, organism=['Test1=TEST1'])
         cfg = _loadUserConfig()
         assert cfg['organism'] == {'Test1': 'TEST1'}
-        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
+        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
 
     def test_no_flags_exits_nonzero(self, isolated_config_dir):
         with pytest.raises((SystemExit, click.exceptions.Exit)) as exc:
