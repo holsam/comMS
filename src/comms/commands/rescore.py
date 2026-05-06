@@ -135,7 +135,9 @@ def _mergeTypeRescoredPsms(match_type: str, file_base: str, subfastas, out_dir):
             if not data:
                 header = f'organism\t{f.readline()}'
                 data.append(header)
-            label_data.extend(f.readlines()[1:])
+                label_data.extend(f.readlines())
+            else:
+                label_data.extend(f.readlines()[1:])
         for i in range(len(label_data)):
             label_data[i] = f'{label}\t{label_data[i]}'
         data.extend(label_data)
