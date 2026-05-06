@@ -116,6 +116,15 @@ Fixture | Description
 ---|---
 `synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic Percolator PSM file at the expected path, bypassing the need to run Percolator on synthetic data (which does not provide enough PSMs for Percolator to converge); shared between `test_crux.py` and `test_pipeline.py`
 
+### LFQ fixtures
+
+Fixture | Description
+---|---
+`valid_sample_sheet_single_fraction(tmp_path)` | Single fraction (`WCL`), two treatments; used to test the single-fraction edge case in `_groupPsmsByFraction`
+`valid_sample_sheet_multiple_fractions(tmp_path)` | Three fractions (`WCL`, `ECF`, `PUR`), two treatments, one replicate each; written as TSV
+`single_fraction_psm_dir(tmp_path)` | Writes two synthetic Percolator PSM files (one fraction) to `comms/results/rescore/`, matching `valid_sample_sheet_single_fraction`; returns the directory path
+`multi_fraction_psm_dir(tmp_path)` | Writes six synthetic Percolator PSM files (two per fraction) to `comms/results/rescore/`, matching `valid_sample_sheet_multiple_fractions`; returns the directory path
+
 ### Rescore integration fixtures
 
 The following fixtures are defined within `tests/integration/test_pipeline.py` for use by the rescore integration test classes.
@@ -241,6 +250,15 @@ Function | Test description
 
 ---
 
+### `tests/unit/test_lfq.py`
+Unit tests covering `_groupPsmsByFraction` in `src/comms/commands/lfq.py`. No external binaries are required.
+
+Function | Test description
+-- | --
+`_groupPsmsByFraction` | returns a `dict`; groups files into three fractions correctly; each fraction key maps to the correct subset of PSM file paths; values are lists of `Path` objects; the returned paths match the input paths; single-fraction input produces a dict with one key containing all files; a PSM file with no matching sample sheet row is excluded from all groups; known files are still grouped correctly when an unmatched file is also present; all files unmatched returns `{}`; empty PSM list returns `{}`; empty sample sheet returns `{}`; files whose `raw_file` column includes `.RAW` extension match correctly after suffix stripping; files whose `raw_file` column includes `.mzML` extension match correctly after suffix stripping; files whose `raw_file` column has no extension match the PSM stem directly
+
+---
+
 ### `tests/unit/test_parammedic.py`
 Unit tests covering `_parseParamMedicOutput` and `_runParamMedic` in `src/comms/commands/search.py`. No external binaries are required; `cruxutil.paramMedic` is mocked throughout `TestRunParamMedic`.
 
@@ -340,6 +358,12 @@ Test | Description
 `TestRunRescoreMergedOutput` | verifies that `<file_base>.percolator.target.psms.txt` and `<file_base>.percolator.decoy.psms.txt` are written at the top level of the rescore directory. Percolator is mocked with a side effect that writes synthetic per-organism PSM files.
 `TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `org_tags` nor config organism is available; uses config organism when `org_tags` is falsy (monkeypatched); verifies Percolator is called exactly once per organism per file.
 `TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails for a file; warning is printed when merge fails; `logMsg` instance is named `'rescore'`.
+`TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created
+`TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call
+`TestRunLfqMbrFlag` | `mbr=True` is forwarded as `match_between_runs=True` to `cruxutil.lfq`; `mbr=False` is forwarded as `match_between_runs=False`
+`TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; raises `SystemExit` when the mzML directory contains no mzML files
+`TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails
+`TestRunLfqLogger` | the `logMsg` instance is named `'lfq'`
 `TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; prints quantify summary; `logMsg` instance is named `'quantify'`.
 `TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`.
 

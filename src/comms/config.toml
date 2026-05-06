@@ -29,6 +29,9 @@ psm_fdr = 0.01    # psm-level FDR threshold
 protein_enzyme = "trypsin"
 picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015)
 
+[lfq]
+match_between_runs = true
+
 [quantify]
 measure = "dNSAF"
 qvalue_threshold = 0.01

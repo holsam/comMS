@@ -1,18 +1,17 @@
 '''
-Integration tests for src/comms/commands/pipeline.py > run_pipeline and
-the individual command-level functions (run_index, run_search, run_rescore,
-run_quantify)
+Integration tests for src/comms/commands/pipeline.py > run_pipeline and the individual command-level functions (run_index, run_search, run_rescore, run_lfq, run_quantify)
 '''
 
 # -- Import external dependencies
-import pytest
+import logging, pytest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 # -- Import internal functions
 from comms.commands.index import run_index
 from comms.commands.search import run_search
 from comms.commands.rescore import run_rescore
+from comms.commands.lfq import run_lfq
 from comms.commands.quantify import run_quantify
 from comms.commands.pipeline import run_pipeline
 from comms.utils.log import logMsg
@@ -176,7 +175,6 @@ class TestRunSearchParamMedic:
         When param-medic produces no usable estimates, a warning should be
         logged indicating fallback to defaults.
         '''
-        import logging
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.WARNING):
             run_search(
@@ -545,6 +543,186 @@ class TestRunRescoreOutput:
             )
         assert logMsg._instance.logger.name == 'rescore'
 
+# -- Define tests for lfq command
+class TestRunLfqOutputDirectories:
+    def test_lfq_root_directory_is_created(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert (tmp_path / 'comms' / 'results' / 'lfq').exists()
+
+    def test_single_fraction_creates_one_output_directory(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
+            run_lfq(
+                rescore_dir=single_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_single_fraction,
+                output=tmp_path,
+                mbr=False,
+            )
+        lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
+        subdirs = [p for p in lfq_root.iterdir() if p.is_dir()]
+        assert len(subdirs) == 1
+        assert subdirs[0].name == 'WCL'
+
+    def test_creates_per_fraction_output_directories(
+        self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path
+    ):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
+        assert (lfq_root / 'WCL').exists()
+        assert (lfq_root / 'ECF').exists()
+        assert (lfq_root / 'PUR').exists()
+
+class TestRunLfqCruxCalls:
+    def test_lfq_called_once_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert mock_lfq.call_count == 3
+
+    def test_lfq_called_with_correct_fraction_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        all_psm_files = [c.kwargs['psm_files'] for c in mock_lfq.call_args_list]
+        for files in all_psm_files:
+            assert len(files) == 2
+
+    def test_lfq_not_called_for_unmatched_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        orphan = multi_fraction_psm_dir / 'orphan_file.percolator.target.psms.txt'
+        orphan.touch()
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert mock_lfq.call_count == 3
+
+    def test_lfq_receives_correct_fileroot_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        fileroots = {c.kwargs['fileroot'] for c in mock_lfq.call_args_list}
+        assert fileroots == {'WCL', 'ECF', 'PUR'}
+
+class TestRunLfqMbrFlag:
+    def test_mbr_true_is_forwarded_to_cruxutil(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=single_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_single_fraction,
+                output=tmp_path,
+                mbr=True,
+            )
+        assert mock_lfq.call_args.kwargs['match_between_runs'] is True
+
+    def test_mbr_false_is_forwarded_to_cruxutil(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
+            run_lfq(
+                rescore_dir=single_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_single_fraction,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert mock_lfq.call_args.kwargs['match_between_runs'] is False
+
+class TestRunLfqEarlyExit:
+    def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        empty_rescore_dir = tmp_path / 'empty_rescore'
+        empty_rescore_dir.mkdir()
+        with pytest.raises(SystemExit):
+            run_lfq(
+                rescore_dir=empty_rescore_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+
+    def test_raises_system_exit_when_no_mzml_files(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path):
+        empty_mzml_dir = tmp_path / 'empty_mzml'
+        empty_mzml_dir.mkdir()
+        with pytest.raises(SystemExit):
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=empty_mzml_dir,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+
+class TestRunLfqWarnings:
+    def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, caplog):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=False), caplog.at_level(logging.WARNING):
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert 'LFQ failed' in caplog.text or 'failed' in caplog.text.lower()
+
+    def test_completes_remaining_fractions_even_if_one_fails(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+        call_count = {'n': 0}
+        def _mock_lfq(**kwargs):
+            call_count['n'] += 1
+            return call_count['n'] != 1
+        with patch('comms.commands.lfq.cruxutil.lfq', side_effect=_mock_lfq):
+            run_lfq(
+                rescore_dir=multi_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_multiple_fractions,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert call_count['n'] == 3
+
+class TestRunLfqLogger:
+    def test_logger_is_named_lfq(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
+            run_lfq(
+                rescore_dir=single_fraction_psm_dir,
+                mzml_dir=synthetic_mzml.parent,
+                sample_sheet=valid_sample_sheet_single_fraction,
+                output=tmp_path,
+                mbr=False,
+            )
+        assert logMsg._instance.logger.name == 'lfq'
+
 # -- Define tests for quantify command
 class TestRunQuantify:
     def test_creates_quantify_output_dir(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
@@ -583,6 +761,8 @@ class TestRunPipeline:
                 output_dir=tmp_path,
                 param_medic=False,
                 skip_convert=True,
+                skip_lfq=True,
+                skip_quantify=True,
                 skip_report=True,
                 threads=1,
                 org_tags='EUK,TESTEUK,PRO,TESTPRO',
@@ -603,6 +783,8 @@ class TestRunPipeline:
                 output_dir=tmp_path,
                 param_medic=False,
                 skip_convert=True,
+                skip_lfq=True,
+                skip_quantify=False,
                 skip_report=True,
                 threads=1,
                 org_tags='EUK,TESTEUK,PRO,TESTPRO',
@@ -625,6 +807,8 @@ class TestRunPipeline:
                 output_dir=tmp_path,
                 param_medic=False,
                 skip_convert=True,
+                skip_lfq=True,
+                skip_quantify=True,
                 skip_report=True,
                 threads=1,
                 org_tags='EUK,TESTEUK,PRO,TESTPRO',

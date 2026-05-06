@@ -286,48 +286,48 @@ class TestApplyProtocolFlags:
     def test_iodo_none_does_not_touch_mods_spec(self):
         cfg = self._base_cfg()
         original = cfg['search']['mods_spec']
-        result = _apply_protocol_flags(cfg, iodo=None, low_res=None)
+        result = _apply_protocol_flags(cfg, iodo=None, low_res=None, mbr=None)
         assert result['search']['mods_spec'] == original
 
     def test_low_res_none_does_not_touch_search(self):
         cfg = self._base_cfg()
         original_bw = cfg['search']['mz_bin_width']
         original_sf = cfg['search']['score_function']
-        result = _apply_protocol_flags(cfg, iodo=None, low_res=None)
+        result = _apply_protocol_flags(cfg, iodo=None, low_res=None, mbr=None)
         assert result['search']['mz_bin_width'] == original_bw
         assert result['search']['score_function'] == original_sf
 
     def test_low_res_true_sets_bin_width_and_score(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True)
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True, mbr=None)
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_low_res_false_sets_high_res_bin_width_and_score(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=False)
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=False, mbr=None)
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_combined_iodo_and_low_res(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True)
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True, mbr=None)
         assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_combined_iodo_and_high_res(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=False)
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=False, mbr=None)
         assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_only_relevant_keys_touched_by_low_res(self):
         cfg_before = self._base_cfg()
-        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True)
+        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True, mbr=None)
         for key in ('threads', 'precursor_tolerance_ppm', 'mods_spec', 'missed_cleavages', 'min_peaks'):
             assert cfg_after['search'][key] == cfg_before['search'][key], (f'_apply_protocol_flags unexpectedly changed search.{key}')
 
     def test_non_search_sections_untouched(self):
         cfg_before = self._base_cfg()
-        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True)
+        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True, mbr=None)
         for section in ('global', 'convert', 'percolator', 'quantify'):
             assert cfg_after.get(section) == cfg_before.get(section), (f'_apply_protocol_flags unexpectedly changed section [{section}]')
 

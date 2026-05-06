@@ -110,13 +110,13 @@ def config_reset(force: bool = False):
     print(f'\n[bold green]SUCCESS:[/bold green] Config at [cyan]{config_path}[/cyan] reset to defaults.\n')
 
 
-# -- config_set: apply named protocol flags to the user config
-def config_set(iodo: bool | None = None, low_res: bool | None = None, organism: list[str] | None = None) -> None:
+# -- config_set: apply named flags to the user config
+def config_set(iodo: bool | None = None, low_res: bool | None = None, organism: list[str] | None = None, mbr: bool | None = None) -> None:
     log = logMsg('config')
-    log.debug(f'Applying protocol flags. iodo: {iodo}; low_res: {low_res}; organism: {organism}')
-    if iodo is None and low_res is None and organism is None:
+    log.debug(f'Applying config set flags. iodo: {iodo}; low_res: {low_res}; organism: {organism}; mbr: {mbr}')
+    if iodo is None and low_res is None and organism is None and mbr is None:
         log.warn(f'No flag supplied to config set.')
-        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold] and/or [bold]--organism[/bold].\n')
+        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]--iodo[/bold]/[bold]--no-iodo[/bold] and/or [bold]--low-res[/bold]/[bold]--high-res[/bold] and/or [bold]--organism[/bold] and/or [bold]--mbr[/bold]/[bold]--no-mbr[/bold].\n')
         raise typer.Exit(1)
     config_path = userConfigPath()
     if not config_path.exists():
@@ -129,7 +129,7 @@ def config_set(iodo: bool | None = None, low_res: bool | None = None, organism: 
         log.error(f'Failed to read user config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
         raise typer.Exit(1)
-    cfg = _apply_protocol_flags(cfg, iodo=iodo, low_res=low_res)
+    cfg = _apply_protocol_flags(cfg, iodo=iodo, low_res=low_res, mbr=mbr)
     if organism is not None:
         organism_args = _parse_organism_arg(organism)
         cfg = _apply_organism(cfg, organism_args)
@@ -139,7 +139,7 @@ def config_set(iodo: bool | None = None, low_res: bool | None = None, organism: 
         log.error(f'Failed to write user config: {e}')
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise typer.Exit(1)
-    _printSetSummary(iodo=iodo, low_res=low_res, organism=organism if organism is not None else None)
+    _printSetSummary(iodo=iodo, low_res=low_res, organism=organism if organism is not None else None, mbr=mbr)
     print()
 
 # -- Internal helpers
@@ -200,7 +200,7 @@ def _printTable(user_config: dict, default_config: dict):
     console.print(table)
 
 # -- _apply_protocol_flags: returns dictionary of config options
-def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None) -> dict:
+def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None, mbr: bool | None) -> dict:
     '''
     Apply protocol flags to a config dictionary in place and return it. Only keys relevant to each flag are touched; all others are preserved.
     iodo flag — owns the cysteine slot in search.mods_spec:
@@ -210,6 +210,10 @@ def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None)
     low_res flag — owns search.mz_bin_width and search.score_function:
         True  → mz_bin_width=1.0005079, score_function=combined-p-value
         False → mz_bin_width=0.02,      score_function=xcorr
+        None  → no change
+    mbr flag - owns match_between_runs
+        True  → set to true
+        False → set to false
         None  → no change
     '''
     cfg.setdefault('search', {})
@@ -224,6 +228,12 @@ def _apply_protocol_flags(cfg: dict, *, iodo: bool | None, low_res: bool | None)
             cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_HIGH_RES
             cfg['search']['score_function'] = SCORE_FUNC_HIGH_RES
         logMsg.debug(f'low_res flag applied — mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
+    if mbr is not None:
+        if mbr:
+            cfg['lfq']['match_between_runs'] = 'true'
+        else:
+            cfg['lfq']['match_between_runs'] = 'false'
+        logMsg.debug(f'mbr flag applied — match_between_runs: {cfg['lfq']['match_between_runs']}')
     return cfg
 
 # -- _apply-iodo: returns mod_spec string
@@ -279,7 +289,7 @@ def _parse_organism_arg(pairs: list[str]) -> dict[str, str]:
     return result
 
 # _print_set_summary: prints a summary of changes made
-def _printSetSummary(*, iodo: bool | None, low_res: bool | None, organism: list[str] | None) -> None:
+def _printSetSummary(*, iodo: bool | None, low_res: bool | None, organism: list[str] | None, mbr) -> None:
     '''Print a summary of what config_set changed.'''
     print()
     if iodo is not None:
@@ -309,4 +319,7 @@ def _printSetSummary(*, iodo: bool | None, low_res: bool | None, organism: list[
             print(
                 f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]'
             )
+    if iodo is not None:
+        value = 'true' if iodo else 'false'
+        print(f'[bold green]✓[/bold green] Match between runs set: [dim]lfq[/dim] → to [cyan]{value}[/cyan]')
     print()
