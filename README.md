@@ -62,20 +62,21 @@ comMS expects mass spectrometry data in Thermo `.RAW` format as input to the `co
 #### Sample information
 comMS also requires a sample sheet in either `.TSV` or `.CSV` format with the following columns:
 
-Column | Description
----|---
-`sample_id` | Unique identifier for each sample
-`raw_file` | Filename of the `.RAW` (or `.mzML`) source file
-`treatment` | Experimental group label
-`replicate` | Replicate number within treatment
-`batch` | Batch label (optional)
+Column | Required | Description
+---|---|---
+`sample_id` | Required | Unique identifier for each sample
+`raw_file` | Required | Filename of the `.RAW` (or `.mzML`) source file
+`treatment` | Required | Experimental group label
+`fraction` | Required | Sample fraction/type label
+`replicate` | Required | Replicate number within treatment/fraction
+`batch` | Optional | Batch label
 
 Example:
 
 ```
-sample_id	raw_file	treatment	replicate	batch
-S1	sample_mock_1.RAW	MOCK	1	A
-S2	sample_treat_1.RAW	TREAT	1	A
+sample_id	raw_file	treatment	fraction replicate	batch
+S1  sample_mock_1.RAW	MOCK	WCL 1   A
+S2	sample_treat_1.RAW	TREAT	WCL 1   A
 ```
 
 ---
@@ -125,13 +126,14 @@ On Linux and macOS, [ThermoRawFileParser][trfp-url] versions below 2.0.0 require
 comms pipeline sample_sheet.tsv \
     --database combined_proteome.fasta \
     --input /path/to/raw_files/ \
-    --out-dir /path/to/results/
+    --out-dir /path/to/results/ \
+    --organism-tags "<Org1>,<Pattern1>,<Org2>,<Pattern2>"
 ```
 This runs all pipeline stages in sequence: 
 1. `.RAW` to `.mzML` conversion
 2. Peptide index construction
 3. Peptide-spectrum matching (via Tide-search)
-4. PSM rescoring (via Percolator)
+4. Per-organism PSM rescoring (via Percolator picked-protein)
 5. Quantification (via dNSAF spectral counting). 
 
 Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step (which is not yet implemented).
@@ -193,14 +195,6 @@ comms config reset     # overwrite with defaults (prompts for confirmation)
 ```
 ### Protocol flags
 The `config set` command applies experiment-specific presets. Multiple flags can be combined in a single call.
-#### Instrument resolution
-```bash
-comms config set --high-res    # mz_bin_width=0.02, score_function=xcorr (default)
-comms config set --low-res     # mz_bin_width=1.0005079, score_function=combined-p-value
-```
-
-Use `--low-res` for ion-trap MS2 data (e.g. older LTQ instruments). Use `--high-res` for Orbitrap data (default for modern instruments).
-
 #### Cysteine alkylation
 
 ```bash
@@ -209,6 +203,20 @@ comms config set --no-iodo     # remove carbamidomethylation
 ```
 
 Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
+
+#### Instrument resolution
+```bash
+comms config set --high-res    # mz_bin_width=0.02, score_function=xcorr (default)
+comms config set --low-res     # mz_bin_width=1.0005079, score_function=combined-p-value
+```
+
+Use `--low-res` for ion-trap MS2 data (e.g. older LTQ instruments). Use `--high-res` for Orbitrap data (default for modern instruments).
+
+#### Organism protein patterns
+```bash
+comms config set --organism Org1=Pattern1 Org2=Pattern2 # defines two organisms whose proteins will use the supplied patterns
+```
+Sets the label-to-pattern pairs used to split the combined FASTA by organism during the rescore step, enabling per-organism picked-protein FDR. Each `--organism` argument takes the format Label=Pattern, where `Pattern` is matched as a regular expression against FASTA headers. Once set, these patterns are used automatically by `pipeline` and `rescore` unless overridden with `--organism-tags` at the command line.
 
 ### Default index parameters
 Peptide indices are generated using the following parameters:
@@ -245,6 +253,12 @@ It is recommended that any proteomes processed using the `index` command include
 ### Percolator settings
 By default, PSM rescoring uses picked-protein FDR *[Savitski et al., 2015](https://doi.org/10.1021/acs.jproteome.5b00135)* at a 1% PSM-level FDR threshold, requiring at least two unique peptides per protein for confident identification.
 
+Picked-protein FDR is applied separately per organism when a combined multi-species FASTA is used. Organism patterns are configured via `comms config set --organism` or supplied at runtime with `--organism-tags` to the `rescore` and `pipeline` commands. The format for `--organism-tags` is a comma-separated list of alternating label and pattern pairs:
+```bash
+comms rescore search_dir/ --database combined_proteome.fasta --organism-tags "Org1,Pattern1,Org2,Pattern2"
+```
+This instructs comMS to split the combined FASTA into one sub-FASTA per organism (with contaminants appended to each), run Percolator separately against each, and merge the rescored PSMs into a single output file per sample.
+
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
@@ -257,7 +271,8 @@ comMS accepts an output directory option (defaults to the current working direct
       convert/      # indexed .mzML files
       index/        # Crux tide-index output
       search/       # Crux tide-search target PSM files
-      rescore/      # Percolator rescored PSM files
+      rescore/      # Merged Percolator rescored PSM files
+        organism_n/ # Percolator rescored PSM files for specific organism
       quantify/     # dNSAF spectral-counts output
 ```
 

@@ -60,7 +60,7 @@ When adding a new command, please keep these files separate.
 ## Code style
 - Use `camelCase` for functions and `snake_case` for local variables.
 - User-facing terminal output should use [Rich](https://rich.readthedocs.io) markup via `from rich import print`.
-- Logging should use the shared `lg` logger from `evaluator.utils.settings`. Use `lg.debug`, `lg.info`, `lg.warning`, `lg.error` at appropriate levels.
+- Logging should use the shared `logMsg` logger from `comms.utils.log`. Use `logMsg.debug`, `logMsg.info`, `logMsg.warning`, `logMsg.error` at appropriate levels.
 - Config values should be defined in the `config` dict imported from `comms.utils.settings`. Configuration values should not be hard-coded.
 - Please use British English in docstrings, comments, and user-facing messages.
 
@@ -69,6 +69,8 @@ When adding a new command, please keep these files separate.
 2. Create `src/comms/cli/<name>.py` with a Typer instance and command definition.
 3. Register the Typer instance in `src/comms/cli/cli.py` via `comms.add_typer(...)`.
 4. Add any new config keys to `src/comms/config.toml` with sensible defaults.
+  1. If new config keys are introduced, ensure the `config_set` function and `_apply_protocol_flags` helper function in `src/comms/commands/config.py` are updated accordingly.
+  2. Also ensure corresponding unit tests are created in `tests/unit/config.py`
 5. Write unit tests in `tests/unit/test_<name>.py` covering the business logic in isolation.
 6. Write integration tests in `tests/integration/test_<name>.py` if the command wraps an external binary.
 
