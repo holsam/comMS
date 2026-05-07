@@ -11,4 +11,4 @@ from rich import print
 def printLicense():
     with pkg_files('comms').joinpath('../../LICENSE').open('r') as f:
         print(f'\n{f.read()}')
-    typer.Exit(0)
+    raise SystemExit(0)
