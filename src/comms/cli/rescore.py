@@ -26,7 +26,7 @@ def rescore(
     ],
     organism_tags: Annotated[
         str,
-        typer.option('--organism-tags', help='Patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
+        typer.Option('--organism-tags', help='Patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
     ],
     output: Annotated[
         Path | None,
