@@ -80,6 +80,10 @@ def set(
         Optional[str],
         typer.Option('--custom', help='Add a custom variable modification following Tide mods_spec format; can be passed multiple times; pass empty string "" to remove all custom modifications')
     ] = None,
+    clip_met: Annotated[
+        Optional[bool],
+        typer.Option('--clip-met/--no-clip-met', help="Include (--clip-met) or don't include (--no-clip-met) duplicate N-terminal peptides with clipped N-terminal methionine")
+    ] = None,
     low_res: Annotated[
         Optional[bool],
         typer.Option('--low-res/--high-res', help='Set search parameters for low-resolution (--low-res) or high-resolution (--high-res) instruments'),
@@ -100,9 +104,10 @@ def set(
         iodo=iodo,
         ox=ox,
         phos=phos,
-        custom=custom,
         n_cyc=n_cyc,
         n_ace=n_ace,
+        custom=custom,
+        clip_met=clip_met,
         low_res=low_res,
         organism=organism,
         mbr=mbr,

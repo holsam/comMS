@@ -138,12 +138,13 @@ def config_set(
     n_cyc: bool | None = None,
     n_ace: bool | None = None,
     custom: str | None = None,
+    clip_met: bool | None = None,
 ) -> None:
     # Set up logger
     log = logMsg('config')
-    log.debug(f'Applying set flags: iodo={iodo}; ox={ox}; phos={phos}; n_cyc={n_cyc}; n_ace={n_ace}; low_res={low_res}; organism={organism}; mbr={mbr}; custom={custom!r}')
+    log.debug(f'Applying set flags: iodo={iodo}; ox={ox}; phos={phos}; n_cyc={n_cyc}; n_ace={n_ace}; low_res={low_res}; organism={organism}; mbr={mbr}; custom={custom!r}; clip_met={clip_met}')
     # Check at least one flag set
-    if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, mbr, custom)):
+    if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, mbr, custom, clip_met)):
         log.warn(f'No flag supplied to config set.')
         print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]comms config set --help[/bold]/[bold]to see available options.\n')
         raise SystemExit(1)
@@ -170,6 +171,7 @@ def config_set(
         n_ace=n_ace,
         low_res=low_res,
         mbr=mbr,
+        clip_met=clip_met
     )
     if organism is not None:
         cfg = _apply_organism(cfg, _parse_organism_arg(organism))
@@ -184,7 +186,7 @@ def config_set(
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise SystemExit(1)
     # Print summary
-    _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, mbr=mbr, custom=custom)
+    _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, mbr=mbr, custom=custom, clip_met=clip_met)
     print()
 
 
@@ -260,6 +262,7 @@ def _apply_protocol_flags(
     phos: bool | None = None,
     n_cyc: bool | None = None,
     n_ace: bool | None = None,
+    clip_met: bool | None = None,
     low_res: bool | None = None,
     mbr: bool | None = None,
 ) -> dict:
@@ -315,6 +318,10 @@ def _apply_protocol_flags(
         cfg.setdefault('lfq', {})
         cfg['lfq']['match_between_runs'] = 'true' if mbr else 'false'
         logMsg.debug(f'mbr flag applied — match_between_runs: {cfg['lfq']['match_between_runs']}')
+    if clip_met is not None:
+        cfg.setdefault('index', {})
+        cfg['index']['clip_n_met'] = 'true' if mbr else 'false'
+        logMsg.debug(f'clip_met flag applied — clip_n_met: {cfg['index']['clip_n_met']}')
     return cfg
 
 # -- _apply_mod: returns mod_spec string
@@ -424,6 +431,7 @@ def _printSetSummary(
     organism: list[str] | None,
     mbr: bool | None,
     custom: str | None,
+    clip_met: bool | None,
 ) -> None:
     '''
     Print a summary of what config_set changed
@@ -453,4 +461,7 @@ def _printSetSummary(
     if mbr is not None:
         value = 'true' if mbr else 'false'
         print(f'[bold green]✓[/bold green] Match between runs set: [dim]lfq[/dim] → to [cyan]{value}[/cyan]')
+    if clip_met is not None:
+        value = 'true' if clip_met else 'false'
+        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]clip_n_met[/dim] → to [cyan]{value}[/cyan]')
     print()
