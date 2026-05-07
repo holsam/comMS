@@ -13,12 +13,17 @@ gzip = true
 metadata = 0    # 0 = JSON metadata capture
 
 [search]
+# Scoring/resolution
 score_function = "xcorr"    # xcorr for high-res MS (default); combined-p-value for low-res (run: comms config set --low-res)
 mz_bin_width = 0.02    # 0.02 for high-res MS (default); 1.0005079 for low-res (run: comms config set --low-res)
+# Peaks
 min_peaks = 10
+# Modifications
+fixed_mods = ""
 mods_spec = "1M+15.9949"
 nterm_peptide_mods_spec = "1Q-17.027"
 nterm_protein_mods_spec = "1X+42.011"
+custom_mods = ""
 # Default tolerances (overridden by param-medic if enabled)
 precursor_tolerance_ppm = 10.0
 missed_cleavages = 2
