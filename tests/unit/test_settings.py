@@ -7,7 +7,7 @@ import pytest, tomllib
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.settings import loadDefaultConfig, userConfigPath, config as live_config
+from comms.utils.settings import loadDefaultConfig, userConfigPath, config as live_config, resolvedModifications
 
 # -- Define tests for validating user config path
 class TestUserConfigPath:
@@ -78,3 +78,48 @@ class TestConfigFallback:
         defaults = loadDefaultConfig()
         assert isinstance(defaults, dict)
         assert 'search' in defaults
+
+# -- Define tests for resolvedModifications function
+class TestResolvedModsSpec:
+    def test_returns_string(self):
+        cfg = loadDefaultConfig()
+        assert isinstance(resolvedModifications(cfg), str)
+
+    def test_base_only_when_no_custom(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['custom_mods'] = ''
+        assert resolvedModifications(cfg) == cfg['index']['mods_spec']+',C+0'
+
+    def test_custom_appended_to_base(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['mods_spec']  = '1M+15.9949'
+        cfg['index']['custom_mods'] = '1K+28.0313'
+        result = resolvedModifications(cfg)
+        assert '1M+15.9949' in result
+        assert '1K+28.0313' in result
+
+    def test_custom_duplicate_of_base_not_repeated(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['mods_spec']   = '1M+15.9949'
+        cfg['index']['custom_mods'] = '1M+15.9949'
+        result = resolvedModifications(cfg)
+        assert result.count('1M+15.9949') == 1
+
+    def test_empty_base_returns_custom_only(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['mods_spec']   = ''
+        cfg['index']['custom_mods'] = '1K+28.0313'
+        assert resolvedModifications(cfg) == '1K+28.0313,C+0'
+
+    def test_both_empty_returns_empty_string(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['mods_spec']   = ''
+        cfg['index']['custom_mods'] = ''
+        assert resolvedModifications(cfg) == 'C+0'
+
+    def test_no_leading_or_trailing_commas(self):
+        cfg = loadDefaultConfig()
+        cfg['index']['custom_mods'] = '1K+28.0313'
+        result = resolvedModifications(cfg)
+        assert not result.startswith(',')
+        assert not result.endswith(',')
