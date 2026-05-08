@@ -26,7 +26,7 @@ library(svglite)
 ref_info <- loadRefInfo(ref_info_path)
 cont_info <- loadContInfo(cont_csv_path)
 samples <- loadSampleSheet(sample_sheet)
-nsaf_list <- importSpectralCountFiles(quantify_dir, ref_info, cont_info)
+results_list <- importSpectralCountFiles(quantify_dir, ref_info, cont_info)
 results_wide <- mergeResults(results_list)
 dnsaf_cols <- colnames(results_wide)[startsWith(colnames(results_wide), "dNSAF_")]
 sample_meta <- buildSampleMetadata(str_remove(dnsaf_cols, "dNSAF_"), samples)
