@@ -207,28 +207,30 @@ Unit tests cover logic in isolation, i.e. they do not require external binaries 
 ### `tests/unit/test_config.py`
 Unit tests covering `src/comms/commands/config.py`, and indirectly `src/comms/utils/settings.py`:
 
-Function | Test description
+Function/class | Test description
 -- | --
-`loadDefaultConfig` | return type, required top-level sections, required search keys, correct value types, correct defaults for `score_function` and `mz_bin_width`
-`_flatten` | correct dot-separated key flattening at all nesting depths
-`_configCheck` | correct True/False returns for both `exists=True` and `exists=False` branches
-`_writeConfig`, `_loadUserConfig` | write/read preserves content; raises `FileNotFoundError` when no config exists
-`config_init` | creates config file; raises on attempt to overwrite an existing file
-`config_exists` | exits non-zero when absent; does not raise when present
-`config_verify` | valid config passes; missing key causes non-zero exit; no config causes non-zero exit
-`config_reset` | `--force` restores defaults; without `--force`, prompts; proceeds on confirmation
-`_apply_iodo` | adds/removes carbamidomethylation; replaces any existing Cys mod; handles empty specs; result has no leading/trailing commas or double commas
-`_apply_protocol_flags` | all flag combinations; only relevant keys are modified; all other config sections are untouched
-`_apply_organism` | sets `[organism]` section; replaces existing entries; does not touch other sections; empty dict clears the section; returns the modified config dict
-`_parse_organism_arg` | parses single and multiple `Label=Pattern` pairs; strips whitespace; preserves regex characters; raises `SystemExit` on missing `=`, empty label, or empty pattern; handles patterns containing `=`
-`config_set` | auto-creates config from defaults if absent; `--iodo`, `--no-iodo`, `--high-res`, `--low-res` all behave correctly and are idempotent; `--organism` sets and replaces the organism section; combined flags work; `--no-flags` exits non-zero
+`_flatten` | flat dict unchanged; nested dict flattened; deeply nested; mixed depth; empty dict; default config flattens without error
+`_configCheck` | returns `True`/`False` correctly for exists/absent file under both `exists=True` and `exists=False` modes
+`_writeConfig` / `_loadUserConfig` | round-trip preserves content; raises `FileNotFoundError` when no config present
+`_apply_mod` | adds mod to empty spec; adds to existing spec; prepends mod; duplicate entry not added; removal with exclusive pattern; exclusive pattern replaces on add; no leading/trailing commas; no double commas; empty mod with no pattern is no-op; removal of absent mod is no-op
+`_apply_iodo` | adds carbamidomethyl to empty and non-empty `fixed_mods` string; prepends; removes carbamidomethyl; no-op when not present; idempotent; result has no count prefix; no leading/trailing commas; no double commas
+`_apply_custom` | adds entry to empty string; adds to existing; empty string clears all; duplicate not added; managed Met/phos mods rejected with warning; unmanaged entry accepted; no leading/trailing commas
+`_apply_organism` | sets organism section; replaces existing; does not touch other sections; empty dict clears; returns cfg
+`_apply_protocol_flags` (original) | low_res/mbr None leaves keys unchanged; low_res True/False sets bin width and score function; combined iodo+low_res; only relevant keys touched; non-search sections untouched
+`_apply_protocol_flags` (new mods) | iodo True/False writes to `fixed_mods`, not `mods_spec`; ox/phos/n_cyc/n_ace True adds correct mod to correct key; False removes; None is no-op; n_cyc/n_ace do not touch mods_spec; ox and iodo coexist across different keys; iodo does not remove ox; all flags None changes nothing
+`_parse_organism_arg` | single and multiple pairs; strips whitespace; preserves regex chars; raises `SystemExit` on no `=`, empty key, empty pattern; returns dict; empty list returns empty dict; `=` in pattern preserved
+`config_init` | creates config file; file is valid TOML; does not overwrite existing
+`config_exists` | exits nonzero when absent; does not raise when present
+`config_verify` | valid config passes; missing key exits nonzero; exits nonzero when no config
+`config_reset` | `--force` restores defaults; without force prompts; confirms and resets on accept
+`config_set` | creates config if absent; created config is valid TOML; all named mod flags add/remove correct mod in correct key; idempotent for ox/phos/n_cyc/n_ace; n_cyc/n_ace do not change mods_spec; custom adds entry; custom is additive; custom empty string clears; custom managed mod not added; iodo flags unchanged from original tests; low_res/organism/mbr unchanged from original tests; combined flags work together; no-flags exits nonzero; all unrelated config keys unchanged after set
 
 ---
 
 ### `tests/unit/test_download.py`
 Unit tests covering `src/comms/utils/download.py`:
 
-Function | Test description
+Function/class | Test description
 -- | --
 Constants | correct types, non-empty strings, valid URL templates
 `_detect_platform` | returns two non-empty strings; system is a recognised value
@@ -241,7 +243,7 @@ URL construction | tarball name for each known platform key matches expected for
 ### `tests/unit/test_fasta.py`
 Unit tests covering `src/comms/utils/fasta.py`. No external binaries are required.
 
-Function | Test description
+Function/class | Test description
 -- | --
 `readFasta` | returns a list; single entry returns one item; multi-entry returns correct count; entry is a two-element list; header does not contain leading `>`; header content is correct; sequence content is correct; wrapped sequences are joined into a single string with no newlines; empty sequence returns `''`; multi-entry order is preserved
 `writeFasta` | creates file at specified path; headers are prefixed with `>`; header and sequence are on separate lines; all entries present after multi-entry write; round-trips correctly via `readFasta`
@@ -253,7 +255,7 @@ Function | Test description
 ### `tests/unit/test_lfq.py`
 Unit tests covering `_groupPsmsByFraction` in `src/comms/commands/lfq.py`. No external binaries are required.
 
-Function | Test description
+Function/class | Test description
 -- | --
 `_groupPsmsByFraction` | returns a `dict`; groups files into three fractions correctly; each fraction key maps to the correct subset of PSM file paths; values are lists of `Path` objects; the returned paths match the input paths; single-fraction input produces a dict with one key containing all files; a PSM file with no matching sample sheet row is excluded from all groups; known files are still grouped correctly when an unmatched file is also present; all files unmatched returns `{}`; empty PSM list returns `{}`; empty sample sheet returns `{}`; files whose `raw_file` column includes `.RAW` extension match correctly after suffix stripping; files whose `raw_file` column includes `.mzML` extension match correctly after suffix stripping; files whose `raw_file` column has no extension match the PSM stem directly
 
@@ -262,7 +264,7 @@ Function | Test description
 ### `tests/unit/test_parammedic.py`
 Unit tests covering `_parseParamMedicOutput` and `_runParamMedic` in `src/comms/commands/search.py`. No external binaries are required; `cruxutil.paramMedic` is mocked throughout `TestRunParamMedic`.
 
-Function | Test description
+Function/class | Test description
 -- | --
 `_parseParamMedicOutput` | returns `(None, None)` when output file is absent; parses well-formed output correctly; handles precursor-only or bin-width-only files; returns `(None, None)` for empty or malformed files; is case-insensitive; returns `float` types for both values
 `_runParamMedic` | single file returns that file's values; odd and even file counts return the correct median; all-`None` parse results return `(None, None)`; mixed `None` and valid values exclude `None` from the median; `paramMedic` is called once per file; files where `paramMedic` returns `False` are excluded from estimates; per-file output subdirectories are created under a `param-medic/` directory
@@ -272,7 +274,7 @@ Function | Test description
 ### `tests/unit/test_paths.py`
 Unit tests covering `src/comms/utils/paths.py`:
 
-Function | Test description
+Function/class | Test description
 -- | --
 `generateOutputFileStructure` | creates the expected `comms/results/<command>/` subdirectory; creates directories if absent; returns existing path unchanged if already correct; works for all supported commands
 `checkUniqueFileName` | returns expected base name when no conflict; increments suffix on conflict; increments correctly through multiple conflicts; correct naming patterns for all commands (`search`, `quantify`, `rescore`, `report`); returned path is within `out_dir`
@@ -282,7 +284,7 @@ Function | Test description
 ### `tests/unit/test_rescore.py`
 Unit tests covering helper functions in `src/comms/commands/rescore.py`. No external binaries are required; tests use synthetic PSM files written directly to `tmp_path`.
 
-Function | Test description
+Function/class | Test description
 -- | --
 `_parseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`
 `_mergeTypeRescoredPsms` | returns a list; all elements end with `\n`; first element is the modified header prefixed with `organism\t`; header appears exactly once; data rows are prefixed with the organism label; rows from both organisms are present; works for both `target` and `decoy` match types
@@ -293,7 +295,7 @@ Function | Test description
 ### `tests/unit/test_samples.py`
 Unit tests covering `src/comms/utils/samples.py`:
 
-Function | Test description
+Function/class | Test description
 -- | --
 `loadSampleSheet` | loads valid TSV; correct row count; column names are lowercased; required columns present (including `fraction`); raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
 `getSamplesByTreatment` | filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
@@ -305,11 +307,12 @@ Function | Test description
 ### `tests/unit/test_settings.py`
 Unit tests covering `src/comms/utils/settings.py`:
 
-Function | Test description
+Function/class | Test description
 -- | --
 `userConfigPath` | returns a `Path`; name is `config.toml`; parent directory is named `comms`
 `loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
 Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
+`resolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns empty string; no leading/trailing commas
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>

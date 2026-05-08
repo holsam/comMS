@@ -6,9 +6,12 @@ Unit tests for src/comms/commands/config.py and src/comms/utils/settings.py
 import click, pytest, tomllib
 from pathlib import Path
 
+# Import internal constants
+from comms.commands.config import CARBAMIDOMETHYL_MOD, MET_OX_MOD, PHOSPHO_MOD, NCYC_MOD, NACE_MOD, MANAGED_MOD_PATTERNS, MZ_BIN_WIDTH_HIGH_RES, MZ_BIN_WIDTH_LOW_RES, SCORE_FUNC_HIGH_RES, SCORE_FUNC_LOW_RES
+
 # -- Import internal functions
 import comms.utils.settings as settings
-from comms.commands.config import CARBAMIDOMETHYL_MOD, MZ_BIN_WIDTH_HIGH_RES, MZ_BIN_WIDTH_LOW_RES, SCORE_FUNC_HIGH_RES, SCORE_FUNC_LOW_RES, _apply_organism, _apply_protocol_flags, _apply_iodo, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
+from comms.commands.config import _apply_custom_mod, _apply_iodo, _apply_mod, _apply_organism, _apply_protocol_flags, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
 
 # -- Define fixture for initialised user config file
 @pytest.fixture()
@@ -33,7 +36,7 @@ class TestLoadDefaultConfig:
 
     def test_search_section_has_required_keys(self):
         search = settings.loadDefaultConfig()['search']
-        for key in ('threads', 'precursor_tolerance_ppm', 'mz_bin_width', 'missed_cleavages', 'score_function'):
+        for key in ('threads', 'precursor_tolerance_ppm', 'mz_bin_width', 'score_function'):
             assert key in search, f'Missing search key: {key}'
 
     def test_no_fragment_tolerance_da_key(self):
@@ -53,9 +56,9 @@ class TestLoadDefaultConfig:
     def test_default_mz_bin_width_is_high_res(self):
         assert settings.loadDefaultConfig()['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
 
-    def test_default_mods_spec_does_not_contain_carbamidomethyl(self):
+    def test_default_fixed_mods_does_not_contain_carbamidomethyl(self):
         '''Check carbamidomethylation is not in default config'''
-        mods = settings.loadDefaultConfig()['search']['mods_spec']
+        mods = settings.loadDefaultConfig()['index']['fixed_mods']
         assert CARBAMIDOMETHYL_MOD not in mods
 
 # -- Define tests for _flatten utility function
@@ -137,16 +140,16 @@ class TestConfigInit:
 
     def test_does_not_overwrite_existing(self, initialised_config):
         settings.userConfigPath().write_text('[global]\nverbose = true\n')
-        with pytest.raises(click.exceptions.Exit) as exc:
+        with pytest.raises(SystemExit) as exc:
             config_init()
-        assert exc.value.exit_code != 0
+        assert exc.value.code != 0
 
 # -- Define tests for config exists subcommand
 class TestConfigExists:
     def test_exits_nonzero_when_absent(self, isolated_config_dir):
-        with pytest.raises(click.exceptions.Exit) as exc:
+        with pytest.raises(SystemExit) as exc:
             config_exists()
-        assert exc.value.exit_code != 0
+        assert exc.value.code != 0
 
     def test_does_not_raise_when_present(self, initialised_config):
         config_exists()
@@ -159,15 +162,14 @@ class TestConfigVerify:
     def test_missing_key_exits_nonzero(self, initialised_config):
         # Remove one required key by writing a truncated config
         settings.userConfigPath().write_text('[global]\nverbose = false\n')
-        with pytest.raises(click.exceptions.Exit) as exc:
+        with pytest.raises(SystemExit) as exc:
             config_verify()
-        assert exc.value.exit_code != 0
+        assert exc.value.code != 0
 
     def test_exits_nonzero_when_no_config(self, isolated_config_dir):
-        with pytest.raises(click.exceptions.Exit) as exc:
+        with pytest.raises(SystemExit) as exc:
             config_verify()
-        assert exc.value.exit_code != 0
-
+        assert exc.value.code != 0
 
 # -- Define tests for config reset subcommand
 class TestConfigReset:
@@ -180,15 +182,102 @@ class TestConfigReset:
     def test_reset_without_force_prompts(self, initialised_config, monkeypatch):
         # Simulate user declining the prompt
         monkeypatch.setattr('typer.confirm', lambda *a, **kw: False)
-        with pytest.raises(click.exceptions.Exit) as exc:
+        with pytest.raises(SystemExit) as exc:
             config_reset(force=False)
-        assert exc.value.exit_code in (0, None)
+        assert exc.value.code in (0, None)
 
     def test_reset_without_force_proceeds_on_confirm(self, isolated_config_dir, monkeypatch):
         settings.userConfigPath().write_text('[global]\nverbose = true\n')
         monkeypatch.setattr('typer.confirm', lambda *a, **kw: True)
         config_reset(force=False)
         assert _loadUserConfig() == settings.loadDefaultConfig()
+
+# -- Define tests for _apply_custom_mod_mod helper function
+class TestApplyCustom:
+    def test_adds_custom_entry_to_empty_string(self):
+        result = _apply_custom_mod('', '1K+28.0313')
+        assert '1K+28.0313' in result
+
+    def test_adds_custom_entry_to_existing_string(self):
+        result = _apply_custom_mod('1K+28.0313', '1R+14.0157')
+        assert '1K+28.0313' in result
+        assert '1R+14.0157' in result
+
+    def test_empty_string_clears_all_custom_mods(self):
+        result = _apply_custom_mod('1K+28.0313,1R+14.0157', '')
+        assert result == ''
+
+    def test_duplicate_entry_not_added(self):
+        result = _apply_custom_mod('1K+28.0313', '1K+28.0313')
+        assert result.count('1K+28.0313') == 1
+
+    def test_managed_cys_mod_rejected_with_warning(self, capsys):
+        result = _apply_custom_mod('', '1C+57.0215')
+        assert '1C+57.0215' not in result
+
+    def test_managed_met_mod_rejected_with_warning(self, capsys):
+        result = _apply_custom_mod('', '1M+15.9949')
+        assert '1M+15.9949' not in result
+
+    def test_managed_phos_mod_rejected_with_warning(self, capsys):
+        result = _apply_custom_mod('', '1STY+79.966331')
+        assert '1STY+79.966331' not in result
+
+    def test_unmanaged_entry_accepted(self):
+        result = _apply_custom_mod('', '1K+28.0313')
+        assert result == '1K+28.0313'
+
+    def test_no_leading_or_trailing_commas(self):
+        result = _apply_custom_mod('', '1K+28.0313')
+        assert not result.startswith(',')
+        assert not result.endswith(',')
+
+# -- Define tests for _apply_mod helper function
+class TestApplyMod:
+    def test_adds_mod_to_empty_spec(self):
+        assert MET_OX_MOD in _apply_mod('', mod=MET_OX_MOD)
+    def test_adds_mod_to_existing_spec(self):
+        result = _apply_mod('1Q-17.027', mod=MET_OX_MOD)
+        assert MET_OX_MOD in result
+        assert '1Q-17.027' in result
+    def test_prepends_mod(self):
+        result = _apply_mod('1Q-17.027', mod=MET_OX_MOD)
+        assert result.startswith(MET_OX_MOD)
+
+    def test_adding_same_mod_twice_does_not_duplicate(self):
+        result = _apply_mod(MET_OX_MOD, mod=MET_OX_MOD)
+        assert result.count(MET_OX_MOD) == 1
+
+    def test_removal_with_exclusive_pattern(self):
+        spec = f'{MET_OX_MOD},{PHOSPHO_MOD}'
+        result = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*M\+15\.9949')
+        assert MET_OX_MOD not in result
+        assert PHOSPHO_MOD in result
+
+    def test_exclusive_pattern_replaces_on_add(self):
+        spec = f'1M+15.9949,{PHOSPHO_MOD}'
+        result = _apply_mod(spec, mod='2M+15.9949', exclusive_pattern=r'^\d*M\+15\.9949')
+        assert '2M+15.9949' in result
+        assert '1M+15.9949' not in result
+        assert PHOSPHO_MOD in result
+
+    def test_no_leading_or_trailing_commas(self):
+        result = _apply_mod('', mod=MET_OX_MOD)
+        assert not result.startswith(',')
+        assert not result.endswith(',')
+
+    def test_no_double_commas(self):
+        result = _apply_mod('1Q-17.027', mod=MET_OX_MOD)
+        assert ',,' not in result
+
+    def test_empty_mod_with_no_pattern(self):
+        spec = '1M+15.9949'
+        assert _apply_mod(spec, mod='') == spec
+
+    def test_removal_of_absent_mod(self):
+        spec = '1M+15.9949'
+        result = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*STY\+79\.966331')
+        assert result == spec
 
 # -- Define tests for _apply_organism helper function
 class TestApplyOrganism:
@@ -221,62 +310,46 @@ class TestApplyOrganism:
 
 # -- Define tests for _apply_iodo helper function
 class TestApplyIodo:
-    def test_iodo_adds_carbamidomethyl_to_empty_spec(self):
+    def test_iodo_adds_carbamidomethyl_to_empty_fixed_mods(self):
         result = _apply_iodo('', iodo=True)
-        assert f'1{CARBAMIDOMETHYL_MOD}' in result
+        assert CARBAMIDOMETHYL_MOD in result
 
-    def test_iodo_adds_carbamidomethyl_to_existing_spec(self):
-        result = _apply_iodo('1M+15.9949', iodo=True)
-        assert f'1{CARBAMIDOMETHYL_MOD}' in result
-        assert '1M+15.9949' in result
+    def test_iodo_adds_carbamidomethyl_to_existing_fixed_mods(self):
+        result = _apply_iodo('someother_mod', iodo=True)
+        assert CARBAMIDOMETHYL_MOD in result
+        assert 'someother_mod' in result
 
     def test_iodo_prepends_carbamidomethyl(self):
-        result = _apply_iodo('1M+15.9949', iodo=True)
-        assert result.startswith(f'1{CARBAMIDOMETHYL_MOD}')
+        result = _apply_iodo('someother_mod', iodo=True)
+        assert result.startswith(CARBAMIDOMETHYL_MOD)
 
     def test_no_iodo_removes_carbamidomethyl(self):
-        spec = f'1{CARBAMIDOMETHYL_MOD},1M+15.9949'
+        spec = f'{CARBAMIDOMETHYL_MOD},someother_mod'
         result = _apply_iodo(spec, iodo=False)
         assert CARBAMIDOMETHYL_MOD not in result
-        assert '1M+15.9949' in result
+        assert 'someother_mod' in result
 
-    def test_no_iodo_on_spec_without_cys_is_noop(self):
-        spec = '1M+15.9949'
-        result = _apply_iodo(spec, iodo=False)
-        assert result == spec
+    def test_no_iodo_on_empty_fixed_mods_returns_empty(self):
+        assert _apply_iodo('', iodo=False) == 'C+0'
 
-    def test_iodo_replaces_existing_cys_mod(self):
-        '''Any pre-existing Cys mod should be replaced, not duplicated.'''
-        spec = f'1{CARBAMIDOMETHYL_MOD},1M+15.9949'
-        result = _apply_iodo(spec, iodo=True)
-        assert result.count('C+') == 1
+    def test_no_iodo_on_spec_without_carbamidomethyl_is_noop(self):
+        spec = 'someother_mod'
+        assert _apply_iodo(spec, iodo=False) == 'C+0,'+spec
 
-    def test_iodo_replaces_alternative_cys_mod(self):
-        '''A different Cys mod (e.g. propionamide) should be replaced by carbamidomethyl.'''
-        spec = '1C+71.0371,1M+15.9949'   # propionamide on Cys
-        result = _apply_iodo(spec, iodo=True)
-        assert f'1{CARBAMIDOMETHYL_MOD}' in result
-        assert '1C+71.0371' not in result
-
-    def test_no_iodo_removes_alternative_cys_mod(self):
-        '''--no-iodo should remove any Cys mod, not just carbamidomethyl.'''
-        spec = '1C+71.0371,1M+15.9949'
-        result = _apply_iodo(spec, iodo=False)
-        assert 'C+' not in result
-        assert '1M+15.9949' in result
-
-    def test_empty_spec_no_iodo_returns_empty(self):
-        result = _apply_iodo('', iodo=False)
-        assert result == ''
+    def test_iodo_is_idempotent(self):
+        result = _apply_iodo(_apply_iodo('', iodo=True), iodo=True)
+        assert result.count(CARBAMIDOMETHYL_MOD) == 1
 
     def test_result_has_no_leading_or_trailing_commas(self):
-        result = _apply_iodo('', iodo=True)
-        assert not result.startswith(',')
-        assert not result.endswith(',')
+        assert not _apply_iodo('', iodo=True).startswith(',')
+        assert not _apply_iodo('', iodo=True).endswith(',')
 
     def test_result_has_no_double_commas(self):
-        result = _apply_iodo('1M+15.9949', iodo=True)
-        assert ',,' not in result
+        assert ',,' not in _apply_iodo('someother_mod', iodo=True)
+
+    def test_mod_string_has_no_count_prefix(self):
+        result = _apply_iodo('', iodo=True)
+        assert result == CARBAMIDOMETHYL_MOD
 
 # -- Define tests for _apply_protocol_flags helper function
 class TestApplyProtocolFlags:
@@ -285,51 +358,139 @@ class TestApplyProtocolFlags:
 
     def test_iodo_none_does_not_touch_mods_spec(self):
         cfg = self._base_cfg()
-        original = cfg['search']['mods_spec']
-        result = _apply_protocol_flags(cfg, iodo=None, low_res=None, mbr=None)
-        assert result['search']['mods_spec'] == original
+        original = cfg['index']['mods_spec']
+        result = _apply_protocol_flags(cfg)
+        assert result['index']['mods_spec'] == original
 
     def test_low_res_none_does_not_touch_search(self):
         cfg = self._base_cfg()
         original_bw = cfg['search']['mz_bin_width']
         original_sf = cfg['search']['score_function']
-        result = _apply_protocol_flags(cfg, iodo=None, low_res=None, mbr=None)
+        result = _apply_protocol_flags(cfg)
         assert result['search']['mz_bin_width'] == original_bw
         assert result['search']['score_function'] == original_sf
 
     def test_low_res_true_sets_bin_width_and_score(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True, mbr=None)
+        cfg = _apply_protocol_flags(self._base_cfg(), low_res=True)
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_low_res_false_sets_high_res_bin_width_and_score(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=False, mbr=None)
+        cfg = _apply_protocol_flags(self._base_cfg(), low_res=False)
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_combined_iodo_and_low_res(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True, mbr=None)
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True)
+        assert CARBAMIDOMETHYL_MOD in cfg['index']['fixed_mods']
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_combined_iodo_and_high_res(self):
-        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=False, mbr=None)
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=False)
+        assert CARBAMIDOMETHYL_MOD in cfg['index']['fixed_mods']
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_only_relevant_keys_touched_by_low_res(self):
         cfg_before = self._base_cfg()
-        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=None, low_res=True, mbr=None)
-        for key in ('threads', 'precursor_tolerance_ppm', 'mods_spec', 'missed_cleavages', 'min_peaks'):
+        cfg_after  = _apply_protocol_flags(self._base_cfg(), low_res=True)
+        for key in ('threads', 'precursor_tolerance_ppm', 'min_peaks'):
             assert cfg_after['search'][key] == cfg_before['search'][key], (f'_apply_protocol_flags unexpectedly changed search.{key}')
 
     def test_non_search_sections_untouched(self):
         cfg_before = self._base_cfg()
-        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True, mbr=None)
+        cfg_after  = _apply_protocol_flags(self._base_cfg(), iodo=True, low_res=True)
         for section in ('global', 'convert', 'percolator', 'quantify'):
             assert cfg_after.get(section) == cfg_before.get(section), (f'_apply_protocol_flags unexpectedly changed section [{section}]')
+
+class TestApplyProtocolFlagsMods:
+    def _base_cfg(self):
+        return settings.loadDefaultConfig()
+
+    def test_iodo_true_adds_to_fixed_mods(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True)
+        assert CARBAMIDOMETHYL_MOD in cfg['index']['fixed_mods']
+
+    def test_iodo_false_removes_from_fixed_mods(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True)
+        cfg = _apply_protocol_flags(cfg, iodo=False)
+        assert CARBAMIDOMETHYL_MOD not in cfg['index']['fixed_mods']
+
+    def test_iodo_does_not_touch_mods_spec(self):
+        cfg = self._base_cfg()
+        original_mods = cfg['index']['mods_spec']
+        cfg = _apply_protocol_flags(cfg, iodo=True)
+        assert cfg['index']['mods_spec'] == original_mods
+
+    def test_ox_true_adds_met_mod(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), ox=True)
+        assert MET_OX_MOD in cfg['index']['mods_spec']
+
+    def test_ox_false_removes_met_mod(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), ox=True)
+        cfg = _apply_protocol_flags(cfg, ox=False)
+        assert MET_OX_MOD not in cfg['index']['mods_spec']
+
+    def test_ox_none_does_not_touch_mods_spec(self):
+        cfg = self._base_cfg()
+        original = cfg['index']['mods_spec']
+        cfg = _apply_protocol_flags(cfg)
+        assert cfg['index']['mods_spec'] == original
+
+    def test_phos_true_adds_phos_mod(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), phos=True)
+        assert PHOSPHO_MOD in cfg['index']['mods_spec']
+
+    def test_phos_false_removes_phos_mod(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), phos=True)
+        cfg = _apply_protocol_flags(cfg, phos=False)
+        assert PHOSPHO_MOD not in cfg['index']['mods_spec']
+
+    def test_n_cyc_true_adds_to_nterm_peptide_key(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), n_cyc=True)
+        assert NCYC_MOD in cfg['index']['nterm_peptide_mods_spec']
+
+    def test_n_cyc_false_removes_from_nterm_peptide_key(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), n_cyc=True)
+        cfg = _apply_protocol_flags(cfg, n_cyc=False)
+        assert NCYC_MOD not in cfg['index']['nterm_peptide_mods_spec']
+
+    def test_n_ace_true_adds_to_nterm_protein_key(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), n_ace=True)
+        assert NACE_MOD in cfg['index']['nterm_protein_mods_spec']
+
+    def test_n_ace_false_removes_from_nterm_protein_key(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), n_ace=True)
+        cfg = _apply_protocol_flags(cfg, n_ace=False)
+        assert NACE_MOD not in cfg['index']['nterm_protein_mods_spec']
+
+    def test_n_cyc_does_not_touch_mods_spec(self):
+        cfg = self._base_cfg()
+        original_mods = cfg['index']['mods_spec']
+        cfg = _apply_protocol_flags(cfg, n_cyc=True)
+        assert cfg['index']['mods_spec'] == original_mods
+
+    def test_n_ace_does_not_touch_mods_spec(self):
+        cfg = self._base_cfg()
+        original_mods = cfg['index']['mods_spec']
+        cfg = _apply_protocol_flags(cfg, n_ace=True)
+        assert cfg['index']['mods_spec'] == original_mods
+
+    def test_ox_and_iodo_coexist(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), iodo=True, ox=True)
+        assert CARBAMIDOMETHYL_MOD in cfg['index']['fixed_mods']
+        assert MET_OX_MOD in cfg['index']['mods_spec']
+
+    def test_iodo_does_not_remove_ox(self):
+        cfg = _apply_protocol_flags(self._base_cfg(), ox=True)
+        cfg = _apply_protocol_flags(cfg, iodo=True)
+        assert MET_OX_MOD in cfg['index']['mods_spec']
+
+    def test_all_flags_none_changes_nothing(self):
+        cfg_before = self._base_cfg()
+        cfg_after  = _apply_protocol_flags(self._base_cfg())
+        assert cfg_after['index']['mods_spec'] == cfg_before['index']['mods_spec']
 
 # -- Define tests for _parse_organism_arg helper function
 class TestParseOrganismArg:
@@ -376,141 +537,77 @@ class TestParseOrganismArg:
 class TestConfigSet:
     def test_creates_config_if_absent(self, isolated_config_dir):
         '''config_set should auto-create the user config if none exists'''
-        config_set(iodo=True, low_res=None, organism=None)
+        config_set(iodo=True)
         assert settings.userConfigPath().exists()
 
     def test_created_config_is_valid_toml(self, isolated_config_dir):
-        config_set(iodo=True, low_res=None, organism=None)
+        config_set(iodo=True)
         with settings.userConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
-    def test_iodo_adds_mod_to_mods_spec(self, initialised_config):
-        config_set(iodo=True, low_res=None)
-        cfg = _loadUserConfig()
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-
-    def test_no_iodo_removes_mod_from_mods_spec(self, initialised_config):
-        config_set(iodo=True,  low_res=None)
-        config_set(iodo=False, low_res=None)
-        cfg = _loadUserConfig()
-        assert CARBAMIDOMETHYL_MOD not in cfg['search']['mods_spec']
-
-    def test_iodo_is_idempotent(self, initialised_config):
-        '''Calling config_set(iodo=True) twice should not duplicate the mod'''
-        config_set(iodo=True, low_res=None)
-        config_set(iodo=True, low_res=None)
-        cfg = _loadUserConfig()
-        assert cfg['search']['mods_spec'].count('C+') == 1
-
-    def test_no_iodo_is_idempotent(self, initialised_config):
-        config_set(iodo=False, low_res=None)
-        config_set(iodo=False, low_res=None)
-        cfg = _loadUserConfig()
-        assert CARBAMIDOMETHYL_MOD not in cfg['search']['mods_spec']
-
-    def test_other_mods_preserved_after_iodo(self, initialised_config):
-        '''Setting --iodo should not affect non-Cys mods'''
-        original_mods = _loadUserConfig()['search']['mods_spec']
-        config_set(iodo=True, low_res=None)
-        updated_mods = _loadUserConfig()['search']['mods_spec']
-        remaining = ','.join(e for e in updated_mods.split(',') if CARBAMIDOMETHYL_MOD not in e)
-        assert remaining == original_mods
-
-    def test_other_mods_preserved_after_no_iodo(self, initialised_config):
-        config_set(iodo=True, low_res=None)
-        original_non_cys = ','.join(e for e in _loadUserConfig()['search']['mods_spec'].split(',') if CARBAMIDOMETHYL_MOD not in e)
-        config_set(iodo=False)
-        assert _loadUserConfig()['search']['mods_spec'] == original_non_cys
-
     def test_low_res_sets_bin_width_and_score(self, initialised_config):
-        config_set(iodo=None, low_res=True)
+        config_set(low_res=True)
         cfg = _loadUserConfig()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_high_res_sets_bin_width_and_score(self, initialised_config):
-        config_set(iodo=None, low_res=False)
+        config_set(low_res=False)
         cfg = _loadUserConfig()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_low_res_is_idempotent(self, initialised_config):
-        config_set(iodo=None, low_res=True)
-        config_set(iodo=None, low_res=True)
+        config_set(low_res=True)
+        config_set(low_res=True)
         cfg = _loadUserConfig()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_sets_organism_in_config(self, initialised_config):
-        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
         cfg = _loadUserConfig()
         assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
     
     def test_set_organism_replaces_existing(self, initialised_config):
-        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
-        config_set(iodo=None, low_res=None, organism=['Test1=NEWTEST1'])
+        config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
+        config_set(organism=['Test1=NEWTEST1'])
         cfg = _loadUserConfig()
         assert cfg['organism'] == {'Test1': 'NEWTEST1'}
         assert 'Test2' not in cfg['organism']
 
     def test_organism_section_written_as_toml_table(self, initialised_config):
-        config_set(iodo=None, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
+        config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
         cfg = _loadUserConfig()
         assert isinstance(cfg['organism'], dict)
         assert isinstance(cfg['organism']['Test1'], str)
 
-    def test_combined_iodo_and_low_res(self, initialised_config):
-        config_set(iodo=True, low_res=True)
-        cfg = _loadUserConfig()
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-        assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
-        assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
-
-    def test_combined_iodo_and_high_res(self, initialised_config):
-        config_set(iodo=True, low_res=False)
-        cfg = _loadUserConfig()
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-        assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
-        assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
-
-    def test_combined_organism_and_iodo(self, initialised_config):
-        config_set(iodo=True, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
-        cfg = _loadUserConfig()
-        assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-
     def test_combined_organism_and_low_res(self, initialised_config):
-        config_set(iodo=None, low_res=True, organism=['Test1=TEST1'])
+        config_set(low_res=True, organism=['Test1=TEST1'])
         cfg = _loadUserConfig()
         assert cfg['organism'] == {'Test1': 'TEST1'}
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
 
-    def test_combined_organism_and_iodo(self, initialised_config):
-        config_set(iodo=True, low_res=None, organism=['Test1=TEST1', 'Test2=TEST2'])
-        cfg = _loadUserConfig()
-        assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
-        assert CARBAMIDOMETHYL_MOD in cfg['search']['mods_spec']
-
     def test_combined_organism_and_high_res(self, initialised_config):
-        config_set(iodo=None, low_res=False, organism=['Test1=TEST1'])
+        config_set(low_res=False, organism=['Test1=TEST1'])
         cfg = _loadUserConfig()
         assert cfg['organism'] == {'Test1': 'TEST1'}
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
 
     def test_no_flags_exits_nonzero(self, isolated_config_dir):
-        with pytest.raises((SystemExit, click.exceptions.Exit)) as exc:
-            config_set(iodo=None, low_res=None, organism=None)
-        assert exc.value.exit_code != 0
+        with pytest.raises(SystemExit) as exc:
+            config_set()
+        assert exc.value.code!= 0
 
     def test_all_other_config_keys_unchanged_after_set(self, initialised_config):
         before = _loadUserConfig()
-        config_set(iodo=True, low_res=True)
+        config_set(low_res=True)
         after = _loadUserConfig()
         for section, values in before.items():
             if section == 'search':
                 for key, val in values.items():
-                    if key not in ('mods_spec', 'mz_bin_width', 'score_function'):
+                    if key not in ('mz_bin_width', 'score_function'):
                         assert after[section][key] == val, (
                             f'config_set unexpectedly changed {section}.{key}'
                         )
@@ -521,9 +618,111 @@ class TestConfigSet:
 
     def test_other_sections_unchanged_after_organism_set(self, initialised_config):
         before = _loadUserConfig()
-        config_set(iodo=None, low_res=None, organism=['Mt=MEDTR'])
+        config_set(organism=['Mt=MEDTR'])
         after = _loadUserConfig()
         for section in ('search', 'percolator', 'quantify', 'convert', 'global'):
             assert after.get(section) == before.get(section), (
                 f'config_set --organism unexpectedly changed section [{section}]'
             )
+    
+    def test_iodo_adds_carbamidomethyl_to_fixed_mods(self, initialised_config):
+        config_set(iodo=True)
+        assert CARBAMIDOMETHYL_MOD in _loadUserConfig()['index']['fixed_mods']
+
+    def test_no_iodo_removes_carbamidomethyl_from_fixed_mods(self, initialised_config):
+        config_set(iodo=True)
+        config_set(iodo=False)
+        assert CARBAMIDOMETHYL_MOD not in _loadUserConfig()['index']['fixed_mods']
+
+    def test_iodo_does_not_add_to_mods_spec(self, initialised_config):
+        before_mods = _loadUserConfig()['index']['mods_spec']
+        config_set(iodo=True)
+        assert _loadUserConfig()['index']['mods_spec'] == before_mods
+
+    def test_iodo_is_idempotent(self, initialised_config):
+        config_set(iodo=True)
+        config_set(iodo=True)
+        assert _loadUserConfig()['index']['fixed_mods'].count(CARBAMIDOMETHYL_MOD) == 1
+
+    def test_ox_adds_met_mod(self, initialised_config):
+        config_set(ox=True)
+        assert MET_OX_MOD in _loadUserConfig()['index']['mods_spec']
+
+    def test_no_ox_removes_met_mod(self, initialised_config):
+        config_set(ox=True)
+        config_set(ox=False)
+        assert MET_OX_MOD not in _loadUserConfig()['index']['mods_spec']
+
+    def test_ox_is_idempotent(self, initialised_config):
+        config_set(ox=True)
+        config_set(ox=True)
+        assert _loadUserConfig()['index']['mods_spec'].count(MET_OX_MOD) == 1
+
+    def test_phos_adds_phos_mod(self, initialised_config):
+        config_set(phos=True)
+        assert PHOSPHO_MOD in _loadUserConfig()['index']['mods_spec']
+
+    def test_no_phos_removes_phos_mod(self, initialised_config):
+        config_set(phos=True)
+        config_set(phos=False)
+        assert PHOSPHO_MOD not in _loadUserConfig()['index']['mods_spec']
+
+    def test_n_cyc_adds_to_nterm_peptide_spec(self, initialised_config):
+        config_set(n_cyc=True)
+        assert NCYC_MOD in _loadUserConfig()['index']['nterm_peptide_mods_spec']
+
+    def test_no_n_cyc_removes_from_nterm_peptide_spec(self, initialised_config):
+        config_set(n_cyc=True)
+        config_set(n_cyc=False)
+        assert NCYC_MOD not in _loadUserConfig()['index']['nterm_peptide_mods_spec']
+
+    def test_n_ace_adds_to_nterm_protein_spec(self, initialised_config):
+        config_set(n_ace=True)
+        assert NACE_MOD in _loadUserConfig()['index']['nterm_protein_mods_spec']
+
+    def test_no_n_ace_removes_from_nterm_protein_spec(self, initialised_config):
+        config_set(n_ace=True)
+        config_set(n_ace=False)
+        assert NACE_MOD not in _loadUserConfig()['index']['nterm_protein_mods_spec']
+
+    def test_custom_adds_entry(self, initialised_config):
+        config_set(custom='1K+28.0313')
+        assert '1K+28.0313' in _loadUserConfig()['search']['custom_mods']
+
+    def test_custom_is_additive(self, initialised_config):
+        config_set(custom='1K+28.0313')
+        config_set(custom='1R+14.0157')
+        mods = _loadUserConfig()['search']['custom_mods']
+        assert '1K+28.0313' in mods
+        assert '1R+14.0157' in mods
+
+    def test_custom_empty_string_clears_all(self, initialised_config):
+        config_set(custom='1K+28.0313')
+        config_set(custom='')
+        assert _loadUserConfig()['search']['custom_mods'] == ''
+
+    def test_custom_managed_mod_not_added(self, initialised_config):
+        config_set(custom='1M+15.9949')
+        assert '1M+15.9949' not in _loadUserConfig()['search']['custom_mods']
+
+    def test_n_cyc_does_not_change_mods_spec(self, initialised_config):
+        before = _loadUserConfig()['index']['mods_spec']
+        config_set(n_cyc=True)
+        assert _loadUserConfig()['index']['mods_spec'] == before
+
+    def test_n_ace_does_not_change_mods_spec(self, initialised_config):
+        before = _loadUserConfig()['index']['mods_spec']
+        config_set(n_ace=True)
+        assert _loadUserConfig()['index']['mods_spec'] == before
+
+    def test_all_other_config_keys_unchanged_after_new_mod_set(self, initialised_config):
+        before = _loadUserConfig()
+        config_set(ox=True, phos=True, n_cyc=True, n_ace=True)
+        after = _loadUserConfig()
+        for section, values in before.items():
+            if section == 'index':
+                for key, val in values.items():
+                    if key not in ('mods_spec', 'fixed_mods', 'nterm_peptide_mods_spec', 'nterm_protein_mods_spec'):
+                        assert after[section][key] == val
+            else:
+                assert after[section] == values

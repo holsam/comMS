@@ -4,7 +4,7 @@ comMS CLI subcommand for managing configuration files
 
 # -- Import external dependencies
 import typer
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 
 # -- Import internal functions
 from comms.commands import config as configFuncs
@@ -58,34 +58,57 @@ def reset(
 def set(
     iodo: Annotated[
         Optional[bool],
-        typer.Option(
-            '--iodo/--no-iodo',
-            help=('Add (--iodo) or remove (--no-iodo) static carbamidomethylation of cysteine as a static modification.'),
-        ),
+        typer.Option('--iodo/--no-iodo', help='Add (--iodo) or remove (--no-iodo) carbamidomethylation of cysteine as a static modification'),
+    ] = None,
+    ox: Annotated[
+        Optional[bool],
+        typer.Option('--ox/--no-ox', help='Add (--ox) or remove (--no-ox) oxidation of methionine as a variable modification'),
+    ] = None,
+    phos: Annotated[
+        Optional[bool],
+        typer.Option('--phos/--no-phos', help='Add (--phos) or remove (--no-phos) phosphorylation of serine/threonine/tyrosine as a variable modification'),
+    ] = None,
+    n_cyc: Annotated[
+        Optional[bool],
+        typer.Option('--n-cyc/--no-n-cyc', help='Add (--n-cyc) or remove (--no-n-cyc) cyclisation of peptide N-terminal glutamine to pyro-glutamic acid as a variable modification'),
+    ] = None,
+    n_ace: Annotated[
+        Optional[bool],
+        typer.Option('--n-ace/--no-n-ace', help='Add (--n-ace) or remove (--no-n-nace) acetylation of protein N-terminal residue as a variable modification'),
+    ] = None,
+    custom: Annotated[
+        Optional[str],
+        typer.Option('--custom', help='Add a custom variable modification following Tide mods_spec format; can be passed multiple times; pass empty string "" to remove all custom modifications')
+    ] = None,
+    clip_met: Annotated[
+        Optional[bool],
+        typer.Option('--clip-met/--no-clip-met', help="Include (--clip-met) or don't include (--no-clip-met) duplicate N-terminal peptides with clipped N-terminal methionine")
     ] = None,
     low_res: Annotated[
         Optional[bool],
-        typer.Option(
-            '--low-res/--high-res',
-            help=('Set search parameters for low-resolution (--low-res) or high-resolution (--high-res) instruments.'),
-        ),
+        typer.Option('--low-res/--high-res', help='Set search parameters for low-resolution (--low-res) or high-resolution (--high-res) instruments'),
     ] = None,
     organism: Annotated[
-        Optional[list[str]],
-        typer.Option(
-            '--organism', 
-            help='Set organism header patterns for per-organism picked protein FDR [/dim](format: OrganismLabel=Pattern)[/dim].'
-        ),
+        Optional[List[str]],
+        typer.Option('--organism', help='Set organism header patterns for per-organism picked protein FDR [/dim](format: OrganismLabel=Pattern)[/dim]'),
     ] = None,
     mbr: Annotated[
         Optional[bool],
-        typer.Option(
-            '--mbr/--no-mbr',
-            help='Use match between runs option when running LFQ command'
-        ),
+        typer.Option('--mbr/--no-mbr', help='Use match between runs option when running LFQ command'),
     ] = None
 ):
     '''
     Set values in user configuration file
     '''
-    configFuncs.config_set(iodo=iodo, low_res=low_res, organism=organism, mbr=mbr)
+    configFuncs.config_set(
+        iodo=iodo,
+        ox=ox,
+        phos=phos,
+        n_cyc=n_cyc,
+        n_ace=n_ace,
+        custom=custom,
+        clip_met=clip_met,
+        low_res=low_res,
+        organism=organism,
+        mbr=mbr,
+    )

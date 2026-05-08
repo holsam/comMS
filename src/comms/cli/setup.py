@@ -77,6 +77,6 @@ def setup(
             force=force,
         )
     except NotImplementedError:
-        raise typer.Exit(1)
+        raise SystemExit(1)
     except Exception:
-        raise typer.Exit(1)
+        raise SystemExit(1)
