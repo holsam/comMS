@@ -14,6 +14,7 @@
 - [Requirements](#requirements)
     - [Python](#python)
     - [External tools](#external-tools)
+    - [comms report dependencies](#comms-report-dependencies)
 - [Installation](#installation)
     - [Installing external tools](#installing-external-tools)
 - [Quick start](#quick-start)
@@ -27,6 +28,7 @@
     - [Protocol flags](#protocol-flags)
     - [Default search parameters](#default-search-parameters)
     - [Percolator settings](#percolator-settings)
+    - [Report settings](#report-settings)
 - [Output structure](#output-structure)
 - [Limitations](#limitations)
 - [Getting help & contributing](#getting-help--contributing)
@@ -54,6 +56,27 @@ Tool | Purpose | Platform notes
 ---|---|---
 [Crux toolkit][crux-url] | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
 [ThermoRawFileParser][trfp-url] | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
+
+### `comms report` dependencies
+The `report` command requires R (≥ 4.3.0) and a set of R packages. Required R packages can be installed by running:
+```bash
+Rscript src/comms/r/install_deps.R
+```
+If R is not available, `report` will exit with an informative error.
+
+The packages installed are:
+Package | Source
+-- | --
+`tidyverse` | CRAN
+`openxlsx2` | CRAN
+`svglite` | CRAN
+`limma` | Bioconductor
+`ggrepel` | CRAN
+`ggfortify` | CRAN
+`cluster` | CRAN
+`UpSetR` | CRAN
+`pheatmap` | CRAN
+`VennDiagram` | CRAN
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
@@ -160,7 +183,7 @@ Command | Description
 `rescore` | Rescore PSMs using Crux `percolator` with picked-protein FDR
 `lfq` | Run MS1 label-free quantification using grouped fractions
 `quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
-`report` | Generate an HTML report containing visualisations *(not yet implemented)*
+`report` | Generate a static analysis report (SVG figures + Excel workbooks) from `comms quantify` and optionally `comms lfq` output
 
 ### Utilities
 Command | Description
@@ -291,6 +314,14 @@ comms rescore search_dir/ --database combined_proteome.fasta --organism-tags "Or
 ```
 This instructs comMS to split the combined FASTA into one sub-FASTA per organism (with contaminants appended to each), run Percolator separately against each, and merge the rescored PSMs into a single output file per sample.
 
+### Report settings
+#### Pre-processing
+Normalisation is deliberately NOT applied across fractions, due to the genuine differences in protein composition anticipated.
+#### Differential abundance
+For differential abundance, limma with empirical Bayes shrinkage is used to support statistical analysis of samples where *n* = 3 (c.f. Ritchie et al. 2015, doi:10.1093/nar/gkv007). Benjamini-Hochberg false-discovery rate is applied within each fraction independently, as across fraction comparisons are likely to be confounded by run-order influences.
+#### Auxiliary scripts
+An auxiliary script for analysis of EV marker proteins is provided under `r/aux/...`, the contents of which are informed by MISEV 2023 guidelines (c.f. Welsh et al. 2024, doi:10.1002/jev2.12404).
+
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
@@ -300,14 +331,21 @@ comMS accepts an output directory option (defaults to the current working direct
 <out_dir>/
   comms/
     results/
-      convert/      # indexed .mzML files
-      index/        # Crux tide-index output
-      search/       # Crux tide-search target PSM files
-      rescore/      # Merged Percolator rescored PSM files
-        organism_n/ # Percolator rescored PSM files for specific organism
-      lfq/          # MS1 label-free quantification output
-        fraction_n/ # FlashLFQ output for each sample fraction
-      quantify/     # dNSAF spectral-counts output
+      convert/               # indexed .mzML files
+      index/                 # Crux tide-index output
+      search/                # Crux tide-search target PSM files
+      rescore/               # Merged Percolator rescored PSM files
+        organism_n/          # Percolator rescored PSM files for specific organism
+      lfq/                   # MS1 label-free quantification output
+        fraction_n/          # FlashLFQ output for each sample fraction
+      quantify/              # dNSAF spectral-counts output
+      report/                # report output files
+        index.md             # index of all produced files
+        qc/                  # quality check plots and spreadsheet
+        pca/                 # principal component analysis and dendrogram plots
+        da/                  # differential abundance plots and spreadsheet
+        secondary-species/   # secondary species plots and spreadsheet
+        concordance/         # concordance of MS1 LFQ and dNSAF quantification (only if --lfq-dir provided)
 ```
 
 If an output directory for a given command already exists, comMS will not overwrite existing directories and instead add an incremental suffix (e.g. `search-1/`, `search-2/`).
@@ -319,7 +357,7 @@ If an output directory for a given command already exists, comMS will not overwr
 comMS is still being developed and has several known limitations, which are detailed below:
 
 ### Unimplemented commands
-Both `report` and `setup` commands are not implemented at present. Both raise a `NotImplementedException` but should be avoided where possible.
+The `setup` command is not implemented at present, and will raise a `NotImplementedException` but should be avoided where possible.
 
 ### Path resolution
 comMS commands resolve the `bin/` directory relative to the package installation path. This works but is a crude way of resolving the path, and may break in differnt installtion environments. A more robust method of resolving the path to this directory will be implemented in future updates.
