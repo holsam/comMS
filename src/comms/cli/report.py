@@ -14,7 +14,7 @@ from comms.commands import report as reportFuncs
 commsReport = typer.Typer(add_completion=False)
 
 # -- report: invokes the Quarto report (report.qmd) on quantification output
-@commsReport.command(help='Generate an HTML report from quantification output', rich_help_panel='Commands')
+@commsReport.command(help='Generate an HTML report from quantification output', rich_help_panel='Downstream Analysis')
 def report(
     quantification: Annotated[
         Path,

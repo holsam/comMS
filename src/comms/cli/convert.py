@@ -15,7 +15,7 @@ from comms.utils.settings import config
 commsConvert = typer.Typer(add_completion=False)
 
 # -- convert: converts all .RAW files in the input directory to indexed mzML using ThermoRawFileParser
-@commsConvert.command(help='Convert .RAW files to indexed .mzML', rich_help_panel='Commands')
+@commsConvert.command(help='Convert .RAW files to indexed .mzML', rich_help_panel='Protein Identification')
 def convert(
     input: Annotated[
         Path,

@@ -14,7 +14,7 @@ from comms.commands import quantify as quantifyFuncs
 commsQuantify = typer.Typer(add_completion=False)
 
 # -- quantify: runs crux spectral-counts using dNSAF on Percolator output
-@commsQuantify.command(help='Run dNSAF spectral counting on Percolator output', rich_help_panel='Commands')
+@commsQuantify.command(help='Run dNSAF spectral counting on Percolator output', rich_help_panel='Protein Identification')
 def quantify(
     input: Annotated[
         Path,

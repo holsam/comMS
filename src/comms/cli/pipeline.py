@@ -15,7 +15,7 @@ from comms.utils.settings import config
 commsPipeline = typer.Typer(add_completion=False)
 
 # -- pipeline: runs the full comMS pipeline
-@commsPipeline.command(help='Run the comMS pipeline end-to-end', rich_help_panel='Pipeline')
+@commsPipeline.command(help='Run the comMS pipeline end-to-end', rich_help_panel='Pipelines')
 def pipeline(
     sample_sheet: Annotated[
         Path,

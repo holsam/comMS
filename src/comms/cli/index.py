@@ -14,7 +14,7 @@ from comms.commands import index as indexFuncs
 commsIndex = typer.Typer(add_completion=False)
 
 # -- index: builds a peptide index from a pre-merged combined FASTA database using peptide-level reverse decoys and modifications defined in config.toml
-@commsIndex.command(help='Generate a peptide index from a FASTA file', rich_help_panel='Commands')
+@commsIndex.command(help='Generate a peptide index from a FASTA file', rich_help_panel='Protein Identification')
 def index(
     database: Annotated[
         Path,
