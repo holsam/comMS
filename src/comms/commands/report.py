@@ -19,13 +19,14 @@ console = Console()
 
 # -- Define helper dictionary matching sections to R scripts and whether they require LFQ data
 _SECTIONS: dict[str, tuple[str, bool]] = {
+    # Core sections
     'qc': ('qc.R', False),
     'pca': ('pca.R', False),
     'da': ('da.R', False),
-    'primary-species': ('primary-species.R', False),
     'secondary-species': ('secondary-species.R', False),
     'concordance': ('concordance.R', True),
-
+    # Auxiliary sections
+    'ev-markers': ('aux/ev-markers.R', False),
 }
 
 # -- _resolve_r_script: returns Path to R script
