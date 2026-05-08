@@ -30,10 +30,10 @@ loadSampleSheet <- function(sampleSheetPath) {
 }
 
 # calculateNSAF: returns tububle of NSAF values from a single spectral-counts file
-calculateNSAF <- function(spectralCountsFilePath, refInfo, crapInfo) {
+calculateNSAF <- function(spectralCountsFilePath, refInfo, contInfo) {
   result <- read_tsv(file=spectralCountsFilePath, show_col_types=FALSE) %>%
     filter(! `q-value` > 0.01) %>%
-    filter(! ProteinId %in% crapInfo$ProteinId) %>%
+    filter(! ProteinId %in% contInfo$ProteinId) %>%
     rowwise() %>%
     filter(length(str_split_1(peptideIds, pattern=fixed(" "))) > 1) %>%
     ungroup()
@@ -56,10 +56,10 @@ calculateNSAF <- function(spectralCountsFilePath, refInfo, crapInfo) {
 }
 
 # importSpectralCountFiles: loads all spectral count files in a directory and returns a named list of NSAF tibbles
-importSpectralCountFiles <- function(quantifyDir, refInfo, crapInfo) {
+importSpectralCountFiles <- function(quantifyDir, refInfo, contInfo) {
   files <- list.files(path=quantifyDir, pattern='spectral-counts.target', full.names=TRUE)
   if (length(files) == 0) stop("No spectral-counts files found in: ", quantifyDir)
-  nsaf_results <- lapply(files, calculateNSAF, refInfo, crapInfo)
+  nsaf_results <- lapply(files, calculateNSAF, refInfo, contInfo)
   names(nsaf_results) <- word(
     str_remove_all(files, "\\.spectral-counts\\.target\\.txt"),
     start=-1, sep=fixed("/")
