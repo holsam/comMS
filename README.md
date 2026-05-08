@@ -315,6 +315,16 @@ comms rescore search_dir/ --database combined_proteome.fasta --organism-tags "Or
 This instructs comMS to split the combined FASTA into one sub-FASTA per organism (with contaminants appended to each), run Percolator separately against each, and merge the rescored PSMs into a single output file per sample.
 
 ### Report settings
+The `report` command performs several analyses:
+
+Section | Content
+---|---
+`qc` | Per-sample NSAF density plots, total spectral count bar charts, missing-value upset plot, presence/absence heatmap
+`pca` | PCA with k-means clustering overlay, Euclidean distance dendrogram
+`da` | limma-based differential abundance ±treatment within each fraction; volcano plots, DA Venn diagrams
+`secondary-species` | Secondary organism proteins per fraction; Venn diagram, candidate table
+`concordance` | LFQ vs dNSAF log₂FC concordance scatter and Venn diagrams (skipped automatically if no `--lfq-dir` provided)
+
 #### Pre-processing
 Normalisation is deliberately NOT applied across fractions, due to the genuine differences in protein composition anticipated.
 #### Differential abundance
