@@ -268,44 +268,44 @@ def _apply_protocol_flags(
 ) -> dict:
     '''
     Apply protocol flags to a config dictionary and return it
-        iodo — owns the Cys slot in search.mods_spec exclusively
-        ox — adds/removes 1M+15.9949 in search.mods_spec
-        phos — adds/removes 1STY+79.966331 in search.mods_spec
-        n_cyc — adds/removes 1Q-17.027 in search.nterm_peptide_mods_spec
-        n_ace — adds/removes 1X+42.011 in search.nterm_protein_mod_spec
-        low_res — sets search.mz_bin_width and search.score_function
+        iodo — owns the Cys slot in index.fixed_mods exclusivel
+        ox — adds/removes 1M+15.9949 in index.mods_spec
+        phos — adds/removes 1STY+79.966331 in index.mods_spec
+        n_cyc — adds/removes 1Q-17.027 in index.nterm_peptide_mods_spec
+        n_ace — adds/removes 1X+42.011 in index.nterm_protein_mod_spec
+        low_res — sets search.mz_bin_width and index.score_function
         mbr — sets lfq.match_between_runs
     '''
     cfg.setdefault('search', {})
-    cfg['search'].setdefault('fixed_mods', '')
-    cfg['search'].setdefault('nterm_peptide_mods_spec', '')
-    cfg['search'].setdefault('nterm_protein_mods_spec', '')
+    cfg['index'].setdefault('fixed_mods', '')
+    cfg['index'].setdefault('nterm_peptide_mods_spec', '')
+    cfg['index'].setdefault('nterm_protein_mods_spec', '')
     if iodo is not None:
-        cfg['search']['fixed_mods'] = _apply_iodo(cfg['search'].get('fixed_mods', ''), iodo=iodo)
+        cfg['index']['fixed_mods'] = _apply_iodo(cfg['index'].get('fixed_mods', ''), iodo=iodo)
     if ox is not None:
-        spec = cfg['search'].get('mods_spec', '')
+        spec = cfg['index'].get('mods_spec', '')
         if ox:
-            cfg['search']['mods_spec'] = _apply_mod(spec, mod=MET_OX_MOD)
+            cfg['index']['mods_spec'] = _apply_mod(spec, mod=MET_OX_MOD)
         else:
-            cfg['search']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*M\+15\.9949')
+            cfg['index']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*M\+15\.9949')
     if phos is not None:
-        spec = cfg['search'].get('mods_spec', '')
+        spec = cfg['index'].get('mods_spec', '')
         if phos:
-            cfg['search']['mods_spec'] = _apply_mod(spec, mod=PHOSPHO_MOD)
+            cfg['index']['mods_spec'] = _apply_mod(spec, mod=PHOSPHO_MOD)
         else:
-            cfg['search']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*STY\+79\.966331')
+            cfg['index']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*STY\+79\.966331')
     if n_cyc is not None:
-        spec = cfg['search'].get('nterm_peptide_mods_spec', '')
+        spec = cfg['index'].get('nterm_peptide_mods_spec', '')
         if n_cyc:
-            cfg['search']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod=NCYC_MOD)
+            cfg['index']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod=NCYC_MOD)
         else:
-            cfg['search']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*Q\-17\.027')
+            cfg['index']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*Q\-17\.027')
     if n_ace is not None:
-        spec = cfg['search'].get('nterm_protein_mods_spec', '')
+        spec = cfg['index'].get('nterm_protein_mods_spec', '')
         if n_ace:
-            cfg['search']['nterm_protein_mods_spec'] = _apply_mod(spec, mod=NACE_MOD)
+            cfg['index']['nterm_protein_mods_spec'] = _apply_mod(spec, mod=NACE_MOD)
         else:
-            cfg['search']['nterm_protein_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*X\+42\.011')
+            cfg['index']['nterm_protein_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*X\+42\.011')
     if low_res is not None:
         if low_res:
             cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_LOW_RES
