@@ -199,14 +199,45 @@ comms config reset     # overwrite with defaults (prompts for confirmation)
 ```
 ### Protocol flags
 The `config set` command applies experiment-specific presets. Multiple flags can be combined in a single call.
-#### Cysteine alkylation
 
+#### Cysteine alkylation
 ```bash
 comms config set --iodo        # add static carbamidomethylation (C+57.0215 Da)
 comms config set --no-iodo     # remove carbamidomethylation
 ```
-
 Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
+
+#### Methionine oxidation
+```bash
+comms config set --ox          # add variable methionine oxidation (M+15.9949 Da)
+comms config set --no-ox       # remove methionine oxidation
+```
+
+#### Serine/threonine/tyrosine phosphorylation
+```bash
+comms config set --phos        # add variable STY phosphorylation (STY+79.966331 Da)
+comms config set --no-phos     # remove STY phosphorylation
+```
+
+#### N-terminal glutamine cyclisation
+```bash
+comms config set --n-cyc       # add N-terminal Gln → pyro-Glu cyclisation (Q-17.027 Da)
+comms config set --no-n-cyc    # remove N-terminal Gln cyclisation
+```
+
+#### Protein N-terminal acetylation
+```bash
+comms config set --n-ace       # add protein N-terminal acetylation (X+42.011 Da)
+comms config set --no-n-ace    # remove protein N-terminal acetylation
+```
+
+#### Custom modifications
+```bash
+comms config set --custom "1K+28.0313"     # add a custom Tide mods_spec entry
+comms config set --custom "1K+28.0313" --custom "1R+14.0157"  # add multiple entries
+comms config set --custom ""               # remove all custom modifications
+```
+Custom modifications are stored separately and merged with the named-flag modifications at search time. The `config list` command shows both the individual values. Passing a modification that is already managed by a named flag (e.g. `1M+15.9949` for `--ox`) will produce a warning and the entry will not be added, please use the appropriate named flag instead.
 
 #### Instrument resolution
 ```bash
@@ -225,19 +256,22 @@ Sets the label-to-pattern pairs used to split the combined FASTA by organism dur
 ### Default index parameters
 Peptide indices are generated using the following parameters:
 
-Parameter | Default | Description | Crux equivalent parameter
---|--|--|--
-Protease | trypsin | Use tryptic digestion rules | `--enzyme`
-Digestion | full | Completely digest proteins | `--digestion`
-Missed cleavages | 2 | Maximum missed cleavage sites | `--missed-cleavages`
-Leading peptide clipping | True | Duplicate leading peptides with one duplicate lacking N-terminal methionine | `--clip-nterm-methionine`
-Duplicate decoys | True | Allow duplicated decoy proteins | `--allow-dups`
-Number decoys | 1 | Number of decoy peptides per target peptide | `--num-decoys-per-target`
-Decoy strategy | reverse | Generate decoy peptides by reversing residues | `--decoy-format`
-M oxidation | True | Add methionine oxidation as variable modification (`1M+15.9949`) | `--mods-spec`
-STY phosphorylation | False | Add serine/threonine/tyrosine phosphorylation as variable modification (`1STY+79.966331`) | `--mods-spec`
-Peptide N-cyclicisation | True | Add cyclicisation of glutamine to pyro-glutamic acid as variable modification of peptide N-termini (`1Q-17.027`) | `--nterm-peptide-mods-spec`
-Protein N-acetylation | True | Add acetylation of protein N-terminal residue as variable modification (`1X+42.011`) | `--nterm-protein-mod-spec`
+Parameter | Default | Description | Crux equivalent | Config flag
+--|--|--|--|--
+Protease | trypsin | Use tryptic digestion rules | `--enzyme` | —
+Digestion | full | Completely digest proteins | `--digestion` | —
+Missed cleavages | 2 | Maximum missed cleavage sites | `--missed-cleavages` | —
+Leading peptide clipping | True | Duplicate leading peptides with one lacking N-terminal methionine | `--clip-nterm-methionine` | —
+Duplicate decoys | True | Allow duplicated decoy proteins | `--allow-dups` | —
+Number decoys | 1 | Number of decoy peptides per target | `--num-decoys-per-target` | —
+Decoy strategy | reverse | Generate decoy peptides by reversing residues | `--decoy-format` | —
+M oxidation | True | Variable methionine oxidation (`1M+15.9949`) | `--mods-spec` | `--ox` / `--no-ox`
+STY phosphorylation | False | Variable STY phosphorylation (`1STY+79.966331`) | `--mods-spec` | `--phos` / `--no-phos`
+Cys carbamidomethylation | False | Static cysteine carbamidomethylation (`C+57.0215`) | `--fixed-modifications` | `--iodo` / `--no-iodo`
+Peptide N-cyclicisation | True | Cyclisation of Gln to pyro-Glu at peptide N-termini (`1Q-17.027`) | `--nterm-peptide-mods-spec` | `--n-cyc` / `--no-n-cyc`
+Protein N-acetylation | True | Acetylation of protein N-terminal residue (`1X+42.011`) | `--nterm-protein-mod-spec` | `--n-ace` / `--no-n-ace`
+
+It is recommended that any proteomes processed using the `index` command include a contaminant protein sequences, such as those in the [cRAP contaminant protein dataset](https://www.thegpm.org/crap/).
 
 ### Default search parameters
 The default configuration applies the following search parameters, informed by *[Svozil & Baerenfaller, 2017](https://doi.org/10.1016/bs.mie.2016.11.007)*:
@@ -247,12 +281,6 @@ Parameter | Default | Description
 Protease | trypsin | Full tryptic digestion
 Missed cleavages | 2 | Maximum missed cleavage sites
 Precursor tolerance | 10 ppm | Precursor mass window
-Methionine oxidation | `1M+15.9949` | Variable modification
-Glutamine cyclisation | `1Q-17.027` | (N-terminal) Pyro-glutamic acid formation |
-Protein N-terminal acetylation | `1X+42.011` | Variable modification
-Cysteine carbamidomethylation | not set by default | Add with `--iodo` if applicable
-
-It is recommended that any proteomes processed using the `index` command include a contaminant protein sequences, such as those in the [cRAP contaminant protein dataset](https://www.thegpm.org/crap/).
 
 ### Percolator settings
 By default, PSM rescoring uses picked-protein FDR *[Savitski et al., 2015](https://doi.org/10.1021/acs.jproteome.5b00135)* at a 1% PSM-level FDR threshold, requiring at least two unique peptides per protein for confident identification.
