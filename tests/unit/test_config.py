@@ -330,11 +330,11 @@ class TestApplyIodo:
         assert 'someother_mod' in result
 
     def test_no_iodo_on_empty_fixed_mods_returns_empty(self):
-        assert _apply_iodo('', iodo=False) == ''
+        assert _apply_iodo('', iodo=False) == 'C+0'
 
     def test_no_iodo_on_spec_without_carbamidomethyl_is_noop(self):
         spec = 'someother_mod'
-        assert _apply_iodo(spec, iodo=False) == spec
+        assert _apply_iodo(spec, iodo=False) == 'C+0,'+spec
 
     def test_iodo_is_idempotent(self):
         result = _apply_iodo(_apply_iodo('', iodo=True), iodo=True)

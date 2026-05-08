@@ -60,7 +60,6 @@ def tideIndex(crux_bin: Path, database: Path, index_dir: Path, config: dict) -> 
         '--enzyme', 'trypsin',
         '--digestion', 'full-digest',
         '--missed-cleavages', str(config['index']['missed_cleavages']),
-        '--fixed-modifications', config['index']['fixed_mods'],
         '--mods-spec', resolvedModifications(config),
         '--nterm-peptide-mods-spec', config['index']['nterm_peptide_mods_spec'],
         '--nterm-protein-mods-spec', config['index']['nterm_protein_mods_spec'],

@@ -349,9 +349,11 @@ def _apply_iodo(fixed_mods: str, iodo: bool) -> str:
     '''
     # Split on commas, discard empty strings from a blank mods_spec
     entries = [e.strip() for e in fixed_mods.split(',') if e.strip()]
-    entries = [e for e in entries if e != CARBAMIDOMETHYL_MOD]
+    entries = [e for e in entries if e != CARBAMIDOMETHYL_MOD and e != 'C+0']
     if iodo:
         entries = [CARBAMIDOMETHYL_MOD] + entries
+    else:
+        entries = ['C+0'] + entries    # Crux automatically adds cysteine carbamidomethylation unless this string present
     result = ','.join(entries)
     logMsg.debug(f'iodo flag applied — mods_spec updated to: {result}')
     return result

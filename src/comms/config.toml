@@ -15,7 +15,7 @@ metadata = 0    # 0 = JSON metadata capture
 [index]
 missed_cleavages = 2
 clip_n_met = true
-fixed_mods = ""
+fixed_mods = "C+0"
 mods_spec = "1M+15.9949"
 nterm_peptide_mods_spec = "1Q-17.027"
 nterm_protein_mods_spec = "1X+42.011"

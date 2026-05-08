@@ -34,7 +34,10 @@ def resolvedModifications(cfg: dict) -> str:
     '''
     index = cfg.get('index', {})
     mods = set([e.strip() for e in index.get('mods_spec', '').split(',') if e.strip()])
+    fixed = set([e.strip() for e in index.get('fixed_mods', '').split(',') if e.strip()]) 
     custom = [e.strip() for e in index.get('custom_mods', '').split(',') if e.strip()]
+    for entry in fixed:
+        mods.add(entry)
     for entry in custom:
         mods.add(entry)
     return ','.join(mods)
