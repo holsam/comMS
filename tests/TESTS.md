@@ -31,6 +31,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
     - [`tests/integration/test_pipeline.py`](#testsintegrationtest_pipelinepy)
     - [`tests/integration/test_trfp.py`](#testsintegrationtest_tfrppy)
+- [R tests](#r-tests)
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -314,6 +315,17 @@ Function/class | Test description
 Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
 `resolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns empty string; no leading/trailing commas
 
+### `tests/unit/test_report.py`
+Unit tests covering `src/comms/commands/report.py`:
+
+Function/class | Test description
+-- | --
+`_resolve_r_script` | returns a `Path`; path ends with the requested script name
+`_write_index` | creates `index.md`; contains all section names; failed sections marked FAILED; passed sections marked ✓; parameters block is included
+`run_report` | raises `SystemExit` when no spectral-counts files in quantify directory; raises `SystemExit` when output directory exists without `--overwrite`; raises `SystemExit` when Rscript binary is not on PATH; silently drops concordance when `--lfq-dir` absent; creates output directory; writes `index.md`; exits non-zero when any section fails; passes `lfc_threshold` and `fdr_threshold` as positional args to the `da` section; `logMsg` instance is named `'report'`
+
+N.B. `_run_r_section` and `shutil.which` are mocked throughout — no R installation is required.
+
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
 
@@ -380,6 +392,40 @@ Test | Description
 `TestFindTRFP` | returned path exists; suffix is `.exe`; returns `None` for an empty or nonexistent `bin/` directory
 `TestConvertRawFailure` | a deliberately invalid `.RAW` file causes `convertRaw` to return `False`
 `TestConvertRawRealFile` (optional) | verifies that `convertRaw` produces a non-empty `.mzML` file for a real Thermo `.RAW` input
+
+---
+<p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
+
+## R tests
+R unit tests live under `tests/r/` and use the `testthat` framework. Run with:
+```bash
+Rscript -e "testthat::test_dir('tests/r')"
+```
+
+### `tests/r/test_utils_import.R`
+Tests covering `src/comms/r/utils/import.R`. 
+
+Function | Test description
+-- | --
+`loadRefInfo` | returns a `tbl_df`; has `proteinId`, `proteinAnnotation`, and `proteinLength` columns; raises an error for a non-existent path
+`loadContInfo` | returns a tibble with a `proteinId` column
+`loadSpectralCounts` | removes contaminant proteins; retains non-contaminant proteins; attaches `proteinAnnotation` via ref info join; retains the `dNSAF` column
+`mergeResults` | produces a wide tibble with one `dNSAF_<sample>` column per sample; fills proteins absent from a sample with `0`; preserves `proteinId` and `proteinAnnotation` columns
+
+Fixtures used write synthetic files to `tempdir()`
+- `make_sc_file` writes a two-protein spectral-counts file (`Mtrun001`, `Mtrun002`) plus one contaminant (`CONT001`), containing only `proteinId` and `dNSAF` columns as Crux produces.
+- `make_ref_info` covers both non-contaminant protein IDs with full annotation columns.
+- `make_cont_csv` contains `CONT001` only.
+
+---
+
+### `tests/r/test_utils_normalise.R`
+Tests covering `src/comms/r/utils/normalise.R`.
+
+Function | Test description
+-- | --
+`logdNSAF` | returns no `-Inf` values when epsilon is applied to zero entries; non-zero values are log-transformed correctly; accepts a custom epsilon value
+`medianShiftNormalise` | leaves single-sample fractions unchanged; aligns within-fraction medians across two samples; does not modify values belonging to a different fraction
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>

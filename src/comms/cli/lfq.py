@@ -14,7 +14,7 @@ from comms.commands import lfq as lfqFuncs
 commsLfq = typer.Typer(add_completion=False)
 
 # -- index: builds a peptide index from a pre-merged combined FASTA database using peptide-level reverse decoys and modifications defined in config.toml
-@commsLfq.command(help='Run MS1 label-free quantification', rich_help_panel='Commands')
+@commsLfq.command(help='Run MS1 label-free quantification', rich_help_panel='Protein Identification')
 def lfq(
     psm_dir: Annotated[
         Path,

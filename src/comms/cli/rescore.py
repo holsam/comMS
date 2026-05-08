@@ -14,7 +14,7 @@ from comms.commands import rescore as rescoreFuncs
 commsRescore = typer.Typer(add_completion=False)
 
 # -- rescore: rescores PSMs from search using Percolator with picked-protein FDR, requiring at least two unique peptides per protein for confident identification
-@commsRescore.command(help='Rescore PSMs using Percolator', rich_help_panel='Commands')
+@commsRescore.command(help='Rescore PSMs using Percolator', rich_help_panel='Protein Identification')
 def rescore(
     input: Annotated[
         Path,

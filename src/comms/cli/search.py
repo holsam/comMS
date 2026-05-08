@@ -15,7 +15,7 @@ from comms.utils.settings import config
 commsSearch = typer.Typer(add_completion=False)
 
 # -- search: runs Crux Tide-search on all mzML files in the input directory, optionally runs param-medic first to estimate mass tolerances; falls back to config.toml defaults
-@commsSearch.command(help='Match spectra to peptides using tide-search', rich_help_panel='Commands')
+@commsSearch.command(help='Match spectra to peptides using tide-search', rich_help_panel='Protein Identification')
 def search(
     input: Annotated[
         Path,
