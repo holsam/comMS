@@ -12,6 +12,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.settings import config
+from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 from comms.utils import samples as samputil
@@ -31,12 +32,8 @@ def run_lfq(
     if not in_pipeline:
         log = logMsg('lfq')
         log.debug('Starting LFQ command')
-    logMsg.debug('Locating Crux binary')
-    bin_dir = pathutil.repoBinDir()
-    crux_bin = cruxutil.findCrux(bin_dir)
-    if crux_bin is None:
-        logMsg.error(f'Crux binary not found under: {bin_dir}')
-        raise SystemExit(1)
+ 
+    crux_bin, _ = validate(check_crux=True, allow_lfq=True)
 
     logMsg.debug(f'Scanning for rescored PSM files in: {rescore_dir}')
     psm_files = sorted(rescore_dir.glob('*.percolator.target.psms.txt'))

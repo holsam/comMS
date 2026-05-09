@@ -36,6 +36,7 @@ def _find_crux(bin_dir: Path) -> Optional[Path]:
 def _find_trfp(bin_dir: Path) -> Optional[Path]:
     '''Mirrors comms.utils.trfp.findTRFP'''
     matches = list(bin_dir.glob('*/ThermoRawFileParser.exe'))
+    matches += list(bin_dir.glob('*/ThermoRawFileParser'))
     return sorted(matches)[-1] if matches else None
 
 @pytest.fixture(scope='session')
@@ -46,7 +47,7 @@ def crux_bin() -> Path:
     path = _find_crux(BIN_DIR)
     if path is None:
         pytest.skip(
-            f'Crux binary not found under {BIN_DIR}. Run `comms setup crux` to install it, then re-run the tests.'
+            f'Crux binary not found under {BIN_DIR}. Install it, then re-run the tests.'
         )
     return path
 
@@ -58,7 +59,7 @@ def trfp_exe() -> Path:
     path = _find_trfp(BIN_DIR)
     if path is None:
         pytest.skip(
-            f'ThermoRawFileParser.exe not found under {BIN_DIR}. Run `comms setup trfp` to install it, then re-run the tests.'
+            f'ThermoRawFileParser.exe not found under {BIN_DIR}. Install it, then re-run the tests.'
         )
     return path
 

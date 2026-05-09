@@ -23,15 +23,19 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/unit/test_fasta.py`](#testsunittest_fastapy)
     - [`tests/unit/test_parammedic.py`](#testsunittest_parammedicpy)
     - [`tests/unit/test_paths.py`](#testsunittest_pathspy)
+    - [`tests/unit/test_report.py](#testsunittest_reportpy)
     - [`tests/unit/test_rescore.py`](#testsunittest_rescorepy)
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
+    - [`tests/unit/test_validate.py`](#testsunittest_validatepy)
 - [Integration tests](#integration-tests)
     - [`tests/integration/test_convert.py`](#testsintegrationtest_convertpy)
     - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
     - [`tests/integration/test_pipeline.py`](#testsintegrationtest_pipelinepy)
     - [`tests/integration/test_trfp.py`](#testsintegrationtest_tfrppy)
 - [R tests](#r-tests)
+    - [`tests/r/test_utils_import.R`](#testsrtest_utils_importr)
+    - [`tests/r/test_utils_normalise.R`](#testsrtest_utils_normaliser)
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -282,6 +286,19 @@ Function/class | Test description
 
 ---
 
+### `tests/unit/test_report.py`
+Unit tests covering `src/comms/commands/report.py`:
+
+Function/class | Test description
+-- | --
+`_resolve_r_script` | returns a `Path`; path ends with the requested script name
+`_write_index` | creates `index.md`; contains all section names; failed sections marked FAILED; passed sections marked ✓; parameters block is included
+`run_report` | raises `SystemExit` when no spectral-counts files in quantify directory; raises `SystemExit` when output directory exists without `--overwrite`; raises `SystemExit` when Rscript binary is not on PATH; silently drops concordance when `--lfq-dir` absent; creates output directory; writes `index.md`; exits non-zero when any section fails; passes `lfc_threshold` and `fdr_threshold` as positional args to the `da` section; `logMsg` instance is named `'report'`
+
+N.B. `_run_r_section` and `shutil.which` are mocked throughout — no R installation is required.
+
+---
+
 ### `tests/unit/test_rescore.py`
 Unit tests covering helper functions in `src/comms/commands/rescore.py`. No external binaries are required; tests use synthetic PSM files written directly to `tmp_path`.
 
@@ -315,16 +332,22 @@ Function/class | Test description
 Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
 `resolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns empty string; no leading/trailing commas
 
-### `tests/unit/test_report.py`
-Unit tests covering `src/comms/commands/report.py`:
+---
+
+### `tests/unit/test_validate.py`
+Unit tests covering `src/comms/utils/validate.py`:
 
 Function/class | Test description
 -- | --
-`_resolve_r_script` | returns a `Path`; path ends with the requested script name
-`_write_index` | creates `index.md`; contains all section names; failed sections marked FAILED; passed sections marked ✓; parameters block is included
-`run_report` | raises `SystemExit` when no spectral-counts files in quantify directory; raises `SystemExit` when output directory exists without `--overwrite`; raises `SystemExit` when Rscript binary is not on PATH; silently drops concordance when `--lfq-dir` absent; creates output directory; writes `index.md`; exits non-zero when any section fails; passes `lfc_threshold` and `fdr_threshold` as positional args to the `da` section; `logMsg` instance is named `'report'`
-
-N.B. `_run_r_section` and `shutil.which` are mocked throughout — no R installation is required.
+`_parse_version` | parses three-part and two-part dotted version strings; parses a version embedded in a longer string; returns `None` for strings with no digits or empty strings; returns a tuple of `int`; supports comparison with version constraint tuples
+`_find_all_crux` | returns empty list when no installations present; returns single installation; returns multiple installations; returns list of `Path` objects
+`_find_all_trfp` | returns empty list when no installations present; finds legacy `.exe` binary; finds native binary without `.exe` extension; finds both legacy and native together; returns list of `Path` objects
+`_select_best` | returns `None` for empty candidate list; returns `None` when all versions unparseable; returns path and version for a single candidate; selects highest-versioned candidate from multiple; skips candidates with unparseable versions; returns `(Path, tuple)`; result is independent of candidate order
+`_get_crux_version` | parses well-formed `crux version` stdout; returns `None` when no "Crux version" line present; returns `None` when subprocess raises; falls back to stderr when stdout is empty
+`_get_trfp_version` | parses plain version string from stdout; returns `None` when output unparseable; returns `None` when subprocess raises
+`_check_crux` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message printed for single installation; raises `SystemExit` with `allow_lfq=True` when best version is below `_CRUX_MIN_LFQ`; does not raise with `allow_lfq=True` when best version meets `_CRUX_MIN_LFQ`; does not enforce minimum version when `allow_lfq=False`; `_get_crux_version` called once per candidate
+`_check_trfp` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message for single installation; does not raise when version is at Mono threshold; raises `SystemExit` when below Mono threshold on Linux without Mono; does not raise when below threshold on Linux with Mono; does not raise when below threshold on Windows; does not raise when below threshold on macOS with Mono; `_get_trfp_version` called once per candidate
+`validate` | returns `(None, None)` when no checks requested; does not call `_find_all_crux` when no checks requested; returns `crux_bin` and `None` when `check_crux=True` only; returns `None` and `trfp_path` when `check_trfp=True` only; returns both paths when both checks requested; raises `SystemExit` when Crux not found; raises `SystemExit` when TRFP not found; raises `SystemExit` with `allow_lfq=True` and old Crux; does not raise with `allow_lfq=True` and Crux at minimum; raises when old TRFP without Mono on Linux; does not raise when old TRFP with Mono on Linux; does not raise when old TRFP on Windows; `_find_all_crux` not called when `check_crux=False`; `_find_all_trfp` not called when `check_trfp=False`; correct `ERROR` message printed for each failure mode
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -389,7 +412,7 @@ Integration tests covering the comMS wrapper around ThermoRawFileParser. All tes
 
 Test | Description
 -- | -- 
-`TestFindTRFP` | returned path exists; suffix is `.exe`; returns `None` for an empty or nonexistent `bin/` directory
+`TestFindTRFP` | returned path exists; suffix is `.exe` or none; returns `None` for an empty or nonexistent `bin/` directory
 `TestConvertRawFailure` | a deliberately invalid `.RAW` file causes `convertRaw` to return `False`
 `TestConvertRawRealFile` (optional) | verifies that `convertRaw` produces a non-empty `.mzML` file for a real Thermo `.RAW` input
 
