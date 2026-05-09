@@ -52,10 +52,10 @@ comMS requires Python 3.14 or later. The recommended way to manage comMS and its
 ### External tools
 comMS wraps two external binaries that must be available under the `bin/` directory at the repository root. Both tools must currently be downloaded and placed under `bin/` manually. See [Installing external tools](#installing-external-tools) below.
 
-Tool | Purpose | Platform notes
----|---|---
-[Crux toolkit][crux-url] | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
-[ThermoRawFileParser][trfp-url] | `.RAW` → `.mzML` conversion | Requires [Mono](https://mono-project.com) on Linux/macOS
+Tool | Minimum version | Purpose | Platform notes
+---|---|---|---
+[Crux toolkit][crux-url] | 4.0.0 (5.0.0 for `lfq`) | Peptide index, spectrum search, PSM rescoring, quantification | Uses platform-specific binaries
+[ThermoRawFileParser][trfp-url] | 1.4.5 | `.RAW` → `.mzML` conversion | Versions < 2.0.0 require [Mono](https://mono-project.com) on Linux/macOS
 
 ### `comms report` dependencies
 The `report` command requires R (≥ 4.3.0) and a set of R packages. Required R packages can be installed by running:
@@ -106,16 +106,18 @@ comms version
 Download [Crux][crux-url] and [ThermoRawFileParser][trfp-url] and place them under the `bin/` directory at the project root. The expected layout is:
 ```
 bin/
-  crux-4.3.Linux.x86_64/
+  crux-v.v.platform.arch/
     bin/
       crux
-  ThermoRawFileParser-1.4.5/
+  ThermoRawFileParser-v.v.v/  # for versions ≥2.0.0, the subdirectory will have the platform for the given binary - comMS is compatible with this
     ThermoRawFileParser.exe
 ```
 
-comMS locates binaries using regular expressions, so version subdirectories are expected but exact names are flexible.
+comMS locates binaries using regular expressions, so version subdirectories are expected but exact names are flexible. If multiple versions of either tool are installed under `bin/`, comMS will automatically select the most up-to-date installation.
 
-On Linux and macOS, [ThermoRawFileParser][trfp-url] versions below 2.0.0 require [Mono](https://mono-project.com). Install it via your system package manager (e.g. `brew install mono` on macOS or `apt install mono-complete` on Debian/Ubuntu).
+On Linux and macOS, [ThermoRawFileParser][trfp-url] versions <2.0.0 require [Mono](https://mono-project.com). Install it via your system package manager (e.g. `brew install mono` on macOS or `apt install mono-complete` on Debian/Ubuntu). ThermoRawFileParser versions ≥2.0.0 and later are native binaries and do not require Mono.
+
+The `lfq` command requires Crux >= 5.0.0, which introduced the `crux lfq` subcommand wrapping FlashLFQ. All other comMS commands are compatible with Crux >= 4.0.0. comMS will raise an error at startup if the installed Crux version does not meet the requirement for the command being run.
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
@@ -190,7 +192,6 @@ Command | Description
 -- | --
 `config` | Manage a user configuration file
 `license` | Print the comMS license
-`setup` | Verify setup is correct *(not yet implemented)*
 `version` | Print the installed comMS version
 
 ---
@@ -365,9 +366,6 @@ If an output directory for a given command already exists, comMS will not overwr
 
 ## Limitations
 comMS is still being developed and has several known limitations, which are detailed below:
-
-### Unimplemented commands
-The `setup` command is not implemented at present, and will raise a `NotImplementedException` but should be avoided where possible.
 
 ### Path resolution
 comMS commands resolve the `bin/` directory relative to the package installation path. This works but is a crude way of resolving the path, and may break in differnt installtion environments. A more robust method of resolving the path to this directory will be implemented in future updates.
