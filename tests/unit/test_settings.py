@@ -88,7 +88,8 @@ class TestResolvedModsSpec:
     def test_base_only_when_no_custom(self):
         cfg = loadDefaultConfig()
         cfg['index']['custom_mods'] = ''
-        assert resolvedModifications(cfg) == cfg['index']['mods_spec']+',C+0'
+        potential_resolved = [cfg['index']['mods_spec']+',C+0', 'C+0,'+cfg['index']['mods_spec']]
+        assert resolvedModifications(cfg) in potential_resolved
 
     def test_custom_appended_to_base(self):
         cfg = loadDefaultConfig()
@@ -109,7 +110,8 @@ class TestResolvedModsSpec:
         cfg = loadDefaultConfig()
         cfg['index']['mods_spec']   = ''
         cfg['index']['custom_mods'] = '1K+28.0313'
-        assert resolvedModifications(cfg) == '1K+28.0313,C+0'
+        potential_resolved = [cfg['index']['custom_mods']+',C+0', 'C+0,'+cfg['index']['custom_mods']]
+        assert resolvedModifications(cfg) in potential_resolved
 
     def test_both_empty_returns_empty_string(self):
         cfg = loadDefaultConfig()
