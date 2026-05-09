@@ -21,8 +21,8 @@ class TestFindTRFP:
     def test_returns_path_to_existing_exe(self, trfp_exe):
         assert trfp_exe.exists()
 
-    def test_path_ends_with_exe(self, trfp_exe):
-        assert trfp_exe.suffix == '.exe'
+    def test_path_is_exe_or_native_binary(self, trfp_exe):
+        assert trfp_exe.suffix == '.exe' or trfp_exe.name == 'ThermoRawFileParser'
 
     def test_returns_none_for_empty_dir(self, tmp_path):
         result = findTRFP(tmp_path)
@@ -44,7 +44,7 @@ class TestConvertRawFailure:
         fake_raw.write_bytes(b'NOT A THERMO RAW FILE\x00\x01\x02')
         out_dir = tmp_path / 'mzml'
         result = convertRaw(
-            exe_path=trfp_exe,
+            trfp_path=trfp_exe,
             raw_file=fake_raw,
             out_dir=out_dir,
             log_path=tmp_path / 'convert.log',
@@ -65,7 +65,7 @@ class TestConvertRawRealFile:
     def test_produces_mzml_file(self, trfp_exe, tmp_path):
         out_dir = tmp_path / 'mzml'
         ok = convertRaw(
-            exe_path=trfp_exe,
+            trfp_path=trfp_exe,
             raw_file=REAL_RAW_FIXTURE,
             out_dir=out_dir,
             gzip=False,
@@ -78,7 +78,7 @@ class TestConvertRawRealFile:
     def test_produced_mzml_is_non_empty(self, trfp_exe, tmp_path):
         out_dir = tmp_path / 'mzml'
         convertRaw(
-            exe_path=trfp_exe,
+            trfp_path=trfp_exe,
             raw_file=REAL_RAW_FIXTURE,
             out_dir=out_dir,
             gzip=False,

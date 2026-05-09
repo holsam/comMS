@@ -14,6 +14,7 @@ from comms.utils.log import logMsg
 def findTRFP(bin_dir: Path) -> Optional[Path]:
     logMsg.debug(f'Searching for ThermoRawFileParser under: {bin_dir}')
     matches = list(bin_dir.glob('*/ThermoRawFileParser.exe'))
+    matches += list(bin_dir.glob('*/ThermoRawFileParser'))
     if not matches:
         logMsg.warn(f'No ThermoRawFileParser binary found under: {bin_dir}')
         return None
@@ -23,7 +24,7 @@ def findTRFP(bin_dir: Path) -> Optional[Path]:
 
 # -- convertRaw: returns True on successful conversion of a .RAW file to indexed mzML or False on failure
 def convertRaw(
-    exe_path: Path,
+    trfp_path: Path,
     raw_file: Path,
     out_dir: Path,
     output_format: int = 2,
@@ -32,7 +33,7 @@ def convertRaw(
     log_path: Optional[Path] = None,
 ) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [str(exe_path),
+    cmd = [str(trfp_path),
            '--input', str(raw_file),
            '--output', str(out_dir),
            '--format', str(output_format),

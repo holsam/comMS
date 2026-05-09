@@ -36,6 +36,7 @@ def _find_crux(bin_dir: Path) -> Optional[Path]:
 def _find_trfp(bin_dir: Path) -> Optional[Path]:
     '''Mirrors comms.utils.trfp.findTRFP'''
     matches = list(bin_dir.glob('*/ThermoRawFileParser.exe'))
+    matches += list(bin_dir.glob('*/ThermoRawFileParser'))
     return sorted(matches)[-1] if matches else None
 
 @pytest.fixture(scope='session')
