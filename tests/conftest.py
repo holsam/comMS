@@ -47,7 +47,7 @@ def crux_bin() -> Path:
     path = _find_crux(BIN_DIR)
     if path is None:
         pytest.skip(
-            f'Crux binary not found under {BIN_DIR}. Run `comms setup crux` to install it, then re-run the tests.'
+            f'Crux binary not found under {BIN_DIR}. Install it, then re-run the tests.'
         )
     return path
 
@@ -59,7 +59,7 @@ def trfp_exe() -> Path:
     path = _find_trfp(BIN_DIR)
     if path is None:
         pytest.skip(
-            f'ThermoRawFileParser.exe not found under {BIN_DIR}. Run `comms setup trfp` to install it, then re-run the tests.'
+            f'ThermoRawFileParser.exe not found under {BIN_DIR}. Install it, then re-run the tests.'
         )
     return path
 
