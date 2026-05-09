@@ -12,6 +12,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import logMsg
 from comms.utils.settings import config
+from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
@@ -21,13 +22,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
         log = logMsg('rescore')
         log.debug('Starting rescore command')
     
-    logMsg.debug('Locating Crux binary')
-    bin_dir = pathutil.repoBinDir()
-    crux_bin = cruxutil.findCrux(bin_dir)
-    if crux_bin is None:
-        logMsg.error(f'Crux binary not found under: {bin_dir}')
-        print(f'[bold red]ERROR:[/bold red] Crux binary not found under {bin_dir}.')
-        raise SystemExit(1)
+    crux_bin, _ = validate(check_crux=True)
     
     logMsg.debug(f'Scanning for Tide-search PSM files in: {input_dir}')
     target_files = sorted(input_dir.glob('*.tide-search.target.txt'))

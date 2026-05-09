@@ -9,6 +9,7 @@ from rich import print
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.settings import config
+from comms.utils.validate import validate
 from comms.utils import trfp as trfputil
 from comms.utils import paths as pathutil
 
@@ -17,12 +18,7 @@ def run_convert(input_dir: Path, output: Path, gzip: bool, in_pipeline: bool = F
     if not in_pipeline:
         log = logMsg('convert')
         log.debug('Starting convert command')
-    logMsg.debug('Locating ThermoRawFileParser binary')
-    bin_dir = pathutil.repoBinDir()
-    exe_path = trfputil.findTRFP(bin_dir)
-    if exe_path is None:
-        logMsg.error(f'ThermoRawFileParser not found under: {bin_dir}')
-        raise SystemExit(1)
+    _, trfp_path = validate(check_trfp=True)
     logMsg.debug(f'Scanning for .RAW files in: {input_dir}')
     raw_files = sorted(input_dir.glob('*.raw')) + sorted(input_dir.glob('*.RAW'))
     if not raw_files:
@@ -36,7 +32,7 @@ def run_convert(input_dir: Path, output: Path, gzip: bool, in_pipeline: bool = F
     for raw_file in raw_files:
         logMsg.info(f'Converting: {raw_file.name}')
         ok = trfputil.convertRaw(
-            exe_path=exe_path,
+            trfp_path=trfp_path,
             raw_file=raw_file,
             out_dir=out_dir,
             output_format=config['convert']['format'],

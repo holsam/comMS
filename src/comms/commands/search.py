@@ -11,6 +11,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.settings import config
+from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
@@ -19,12 +20,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     if not in_pipeline:
         log = logMsg('search')
         log.debug('Starting search command')
-    logMsg.debug('Locating Crux binary')
-    bin_dir = pathutil.repoBinDir()
-    crux_bin = cruxutil.findCrux(bin_dir)
-    if crux_bin is None:
-        logMsg.error(f'Crux binary not found under: {bin_dir}')
-        raise SystemExit(1)
+    crux_bin, _ = validate(check_crux=True)
     logMsg.debug(f'Scanning for mzML files in: {input_dir}')
     mzml_files = sorted(
         list(input_dir.glob('*.mzML')) + list(input_dir.glob('*.mzML.gz'))
