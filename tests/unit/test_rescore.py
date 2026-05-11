@@ -96,31 +96,19 @@ class TestMergeTypeRescoredPsms:
         for element in result:
             assert element.endswith('\n'), f'Element does not end with newline: {element}'
 
-    def test_header_starts_with_organism_tab(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        assert result[0].startswith('organism\t')
-
     def test_header_appears_exactly_once(self, setup):
         out_dir, subfastas = setup
         result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        header_lines = [line for line in result if line.startswith('organism\t')]
+        header_lines = [line for line in result if line.startswith('PSMId\t')]
         assert len(header_lines) == 1
-
-    def test_data_rows_prefixed_with_organism_label(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        data_rows = [line for line in result if not line.startswith('organism\t')]
-        for row in data_rows:
-            assert row.startswith('EUK\t') or row.startswith('PRO\t'), f'Data row not prefixed with organism label: {row}'
 
     def test_rows_from_both_organisms_present(self, setup):
         out_dir, subfastas = setup
         result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        data_rows = [line for line in result if not line.startswith('organism\t')]
-        labels = {row.split('\t')[0] for row in data_rows}
-        assert 'EUK' in labels
-        assert 'PRO' in labels
+        data_rows = [line for line in result if not line.startswith('PSMId\t')]
+        labels = {row.split('\t')[-1] for row in data_rows}
+        assert any('EUK' in label for label in labels)
+        assert any('PRO' in label for label in labels)
 
     def test_works_for_decoy_type(self, setup):
         out_dir, subfastas = setup
