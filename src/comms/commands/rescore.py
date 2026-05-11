@@ -7,6 +7,7 @@ from pathlib import Path
 from rich import print
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+from typing import Optional
 
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
@@ -17,7 +18,7 @@ from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_rescore: rescores all Tide-search PSM files in input_dir using Percolator and writes results to output
-def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in_pipeline: bool = False):
+def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optional[str], in_pipeline: bool = False):
     if not in_pipeline:
         log = logMsg('rescore')
         log.debug('Starting rescore command')
@@ -25,7 +26,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
     crux_bin, _ = validate(check_crux=True)
     
     logMsg.debug(f'Scanning for Tide-search PSM files in: {input_dir}')
-    target_files = sorted(input_dir.glob('*.tide-search.target.txt'))
+    target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
         logMsg.error(f'No Tide-search target PSM files found in: {input_dir}')
         print(f'[bold red]ERROR:[/bold red] No Tide-search target PSM files found in {input_dir}.')
@@ -51,8 +52,8 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
     print(f'\nRescoring {len(target_files)} PSM file(s) with Percolator using {len(sub_fastas)} organism database(s)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
-        for label, sub_fasta in sub_fastas.items():
-            for target_file in tqdm(target_files, desc='Files rescored'):
+        for label, sub_fasta in tqdm(sub_fastas.items(), desc='Species rescored'):
+            for target_file in tqdm(target_files, desc=f'Files rescored for species {label}'):
                 fileroot = target_file.name.removesuffix('.tide-search.target.txt')
                 filename = f'{fileroot}.{label}'
                 org_out_dir = out_dir / label
@@ -82,7 +83,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in
         ok = _mergeRescoredPsms(file_base, sub_fastas, out_dir)
         if ok:
             merge_n_ok +=1
-            logMsg.debug(f'Percolator output for {file_base} merged to {out_dir / file_base}.percolato.(target/decoy).psms.txt')
+            logMsg.debug(f'Percolator output for {file_base} merged to {out_dir / file_base}.percolator.(target/decoy).psms.txt')
         else:
             logMsg.warn(f'Percolator output for {file_base} could not be merged')
             merge_n_fail += 1
@@ -130,13 +131,11 @@ def _mergeTypeRescoredPsms(match_type: str, file_base: str, subfastas, out_dir):
         file = out_dir / label / f'{file_base}.{label}.percolator.{match_type}.psms.txt'
         with open(file, 'r') as f:
             if not data:
-                header = f'organism\t{f.readline()}'
+                header = f'{f.readline()}'
                 data.append(header)
                 label_data.extend(f.readlines())
             else:
                 label_data.extend(f.readlines()[1:])
-        for i in range(len(label_data)):
-            label_data[i] = f'{label}\t{label_data[i]}'
         data.extend(label_data)
     for i in range(len(data)):
         if not data[i].endswith('\n'):

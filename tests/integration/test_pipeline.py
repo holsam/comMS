@@ -552,7 +552,6 @@ class TestRunLfqOutputDirectories:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         assert (tmp_path / 'comms' / 'results' / 'lfq').exists()
 
@@ -563,7 +562,6 @@ class TestRunLfqOutputDirectories:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_single_fraction,
                 output=tmp_path,
-                mbr=False,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
         subdirs = [p for p in lfq_root.iterdir() if p.is_dir()]
@@ -579,7 +577,6 @@ class TestRunLfqOutputDirectories:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
         assert (lfq_root / 'WCL').exists()
@@ -594,7 +591,6 @@ class TestRunLfqCruxCalls:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         assert mock_lfq.call_count == 3
 
@@ -605,7 +601,6 @@ class TestRunLfqCruxCalls:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         all_psm_files = [c.kwargs['psm_files'] for c in mock_lfq.call_args_list]
         for files in all_psm_files:
@@ -620,7 +615,6 @@ class TestRunLfqCruxCalls:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         assert mock_lfq.call_count == 3
 
@@ -631,33 +625,9 @@ class TestRunLfqCruxCalls:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         fileroots = {c.kwargs['fileroot'] for c in mock_lfq.call_args_list}
         assert fileroots == {'WCL', 'ECF', 'PUR'}
-
-class TestRunLfqMbrFlag:
-    def test_mbr_true_is_forwarded_to_cruxutil(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
-        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
-            run_lfq(
-                rescore_dir=single_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
-                sample_sheet=valid_sample_sheet_single_fraction,
-                output=tmp_path,
-                mbr=True,
-            )
-        assert mock_lfq.call_args.kwargs['match_between_runs'] is True
-
-    def test_mbr_false_is_forwarded_to_cruxutil(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
-        with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
-            run_lfq(
-                rescore_dir=single_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
-                sample_sheet=valid_sample_sheet_single_fraction,
-                output=tmp_path,
-                mbr=False,
-            )
-        assert mock_lfq.call_args.kwargs['match_between_runs'] is False
 
 class TestRunLfqEarlyExit:
     def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
@@ -669,7 +639,6 @@ class TestRunLfqEarlyExit:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
 
     def test_raises_system_exit_when_no_mzml_files(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path):
@@ -681,7 +650,6 @@ class TestRunLfqEarlyExit:
                 mzml_dir=empty_mzml_dir,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
 
 class TestRunLfqWarnings:
@@ -692,7 +660,6 @@ class TestRunLfqWarnings:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         assert 'LFQ failed' in caplog.text or 'failed' in caplog.text.lower()
 
@@ -707,7 +674,6 @@ class TestRunLfqWarnings:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
-                mbr=False,
             )
         assert call_count['n'] == 3
 
@@ -719,7 +685,6 @@ class TestRunLfqLogger:
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_single_fraction,
                 output=tmp_path,
-                mbr=False,
             )
         assert logMsg._instance.logger.name == 'lfq'
 

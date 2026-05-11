@@ -18,7 +18,7 @@ commsLfq = typer.Typer(add_completion=False)
 def lfq(
     psm_dir: Annotated[
         Path,
-        typer.Option('-p', '--psm-dir', help='Path to directory containing PSM files', exists=True, file_okay=False, dir_okay=True, readable=True)
+        typer.Option('-p', '--psm-dir', help='Path to directory containing rescored PSM files', exists=True, file_okay=False, dir_okay=True, readable=True)
     ],
     mzml_dir: Annotated[
         Path,
@@ -32,9 +32,5 @@ def lfq(
         Path | None,
         typer.Option('-o', '--out-dir', help='Path to output directory for quantification results', file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
-    mbr: Annotated[
-        bool,
-        typer.Option('--mbr', help='Group files by fraction to match between runs [dim](default: True)[/dim]')
-    ] = True,
 ):
-    lfqFuncs.run_lfq(psm_dir, mzml_dir, sample_sheet, output, mbr)
+    lfqFuncs.run_lfq(psm_dir, mzml_dir, sample_sheet, output)

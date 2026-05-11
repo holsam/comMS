@@ -22,7 +22,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
         log.debug('Starting quantify command')
     crux_bin, _ = validate(check_crux=True)
     logMsg.debug(f'Scanning for Percolator PSM files in: {input_dir}')
-    psm_files = sorted(input_dir.glob('*.percolator.target.psms.txt'))
+    psm_files = sorted(input_dir.glob('[!.]*.percolator.target.psms.txt'))
     if not psm_files:
         logMsg.warn(f'No Percolator PSM files found in: {input_dir}')
         print(f'[bold red]ERROR:[/bold red] No Percolator PSM files found in {input_dir}.')

@@ -5,7 +5,7 @@ comMS CLI subcommand for rescoring PSMs using Percolator
 # -- Import external dependencies
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import rescore as rescoreFuncs
@@ -25,7 +25,7 @@ def rescore(
         typer.Option('-d', '--database', help='Path to proteome FASTA (required for picked-protein FDR)', exists=True, file_okay=True, dir_okay=False)
     ],
     organism_tags: Annotated[
-        str,
+        Optional[str],
         typer.Option('--organism-tags', help='Patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
     ],
     output: Annotated[

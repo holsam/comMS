@@ -90,7 +90,7 @@ def run_report(
         log = logMsg('report')
         log.debug('Starting report command')
     # Validate inputs
-    sc_files = list(quantify_dir.glob('*.spectral-counts.target.txt'))
+    sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:
         print(f'[bold red]ERROR:[/bold red] no spectral count quantification output files found in {quantify_dir}')
         logMsg.error(f'No spectral count quantification output files found in {quantify_dir}')

@@ -84,6 +84,7 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
+            threads=cfg['search']['threads']
         )
         assert ok, 'tideSearch returned False — check search.log'
         target_file = out_dir / 'synthetic.tide-search.target.txt'
@@ -99,6 +100,7 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
+            threads=cfg['search']['threads']
         )
         target_file = out_dir / 'synthetic.tide-search.target.txt'
         lines = target_file.read_text().splitlines()
@@ -114,6 +116,7 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
+            threads=cfg['search']['threads']
         )
         log = out_dir / 'synthetic.tide-search.log.txt'
         assert log.exists()
@@ -135,6 +138,7 @@ def search_results(crux_bin, built_index, tmp_path_factory):
         out_dir=out_dir,
         fileroot='synthetic',
         config=cfg,
+        threads=cfg['search']['threads']
     )
     if not ok:
         pytest.skip('tideSearch failed — cannot run percolator tests')

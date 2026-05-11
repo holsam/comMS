@@ -20,7 +20,7 @@ def run_convert(input_dir: Path, output: Path, gzip: bool, in_pipeline: bool = F
         log.debug('Starting convert command')
     _, trfp_path = validate(check_trfp=True)
     logMsg.debug(f'Scanning for .RAW files in: {input_dir}')
-    raw_files = sorted(input_dir.glob('*.raw')) + sorted(input_dir.glob('*.RAW'))
+    raw_files = sorted(input_dir.glob('[!.]*.raw')) + sorted(input_dir.glob('[!.]*.RAW'))
     if not raw_files:
         logMsg.warn(f'No .RAW files found in: {input_dir}')
         return
