@@ -5,6 +5,8 @@ comMS wrapper around Crux binary
 # -- Import external dependencies
 import contextlib, shutil, subprocess, tempfile
 from pathlib import Path
+from rich.live import Live
+from rich.text import Text
 from typing import Optional
 
 # -- Import internal functions
@@ -52,13 +54,26 @@ def findCrux(bin_dir: Path) -> Optional[Path]:
     return result
 
 # -- runCrux: returns True if the Crux subcommand completed successfully, False on failure
+# -- runCrux: returns True if the Crux subcommand completed successfully, False on failure
 def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
     cmd = [str(crux_bin), subcommand] + [str(a) for a in args]
     logMsg.debug(f'Running {subcommand}: {" ".join(cmd)}')
     try:
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            logMsg.warn(f'{subcommand} exited with non-zero return code: {result.returncode}')
+        stderr_lines = []
+        with subprocess.Popen(
+            cmd,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            text=True,
+        ) as proc:
+            with Live('', refresh_per_second=10, transient=True) as live:
+                for line in proc.stderr:
+                    line = line.rstrip()
+                    if line:
+                        stderr_lines.append(line)
+                        live.update(Text(line, style='dim'))
+        if proc.returncode != 0:
+            logMsg.warn(f'{subcommand} failed (exit {proc.returncode}) — see log file in output directory for details')
             return False
         return True
     except Exception as e:
