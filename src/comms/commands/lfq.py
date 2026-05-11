@@ -6,8 +6,6 @@ comMS lfq functions
 import pandas as pd
 from pathlib import Path
 from rich import print
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
 from comms.utils.log import logMsg
@@ -23,7 +21,6 @@ def run_lfq(
     mzml_dir: Path,
     sample_sheet: Path,
     output: Path,
-    mbr: bool | None,
     in_pipeline: bool = False
 ):
     '''
@@ -32,28 +29,18 @@ def run_lfq(
     if not in_pipeline:
         log = logMsg('lfq')
         log.debug('Starting LFQ command')
- 
     crux_bin, _ = validate(check_crux=True, allow_lfq=True)
-
     logMsg.debug(f'Scanning for rescored PSM files in: {rescore_dir}')
     psm_files = sorted(rescore_dir.glob('[!.]*.percolator.target.psms.txt'))
     if not psm_files:
         logMsg.warn(f'No rescored PSM files found in {rescore_dir}')
         raise SystemExit(1)
     logMsg.info(f'Found {len(psm_files)} rescored PSM file(s)')
-    
-    logMsg.debug(f'Scanning for mzML files in: {mzml_dir}')
-    mzml_files = sorted(list(mzml_dir.glob('[!.]*.mzML')) + list(mzml_dir.glob('[!.]*.mzML.gz')))
-    if not mzml_files:
-        logMsg.warn(f'No mzML files found in: {mzml_dir}')
-        raise SystemExit(1)
-    logMsg.info(f'Found {len(mzml_files)} mzML file(s)')
-
     samples = samputil.loadSampleSheet(sample_sheet)
     out_dir = pathutil.generateOutputFileStructure(output, 'lfq')
     fraction_groups = _groupPsmsByFraction(psm_files, samples)
     for fraction, fraction_psms in fraction_groups.items():
-        logMsg.info(f'Running LFQ for fraction: {fraction} ({len(fraction_psms)} files(s))')
+        logMsg.info(f'Running LFQ for fraction: {fraction} ({len(fraction_psms)} file(s))')
         out_dir_fraction = out_dir / fraction
         out_dir_fraction.mkdir(parents=True, exist_ok=True)
         ok = cruxutil.lfq(
@@ -63,11 +50,9 @@ def run_lfq(
             out_dir=out_dir_fraction,
             fileroot=fraction,
             config=config,
-            match_between_runs=mbr,
         )
         if not ok:
             logMsg.warn(f'LFQ failed for fraction: {fraction}')
-
 
 # -- _groupPsmsByFraction: return dictionary mapping fraction labels to PSM file paths
 def _groupPsmsByFraction(psm_files: list[Path], samples: pd.DataFrame) -> dict[str, list[Path]]:

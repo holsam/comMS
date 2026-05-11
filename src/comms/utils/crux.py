@@ -3,7 +3,7 @@ comMS wrapper around Crux binary
 '''
 
 # -- Import external dependencies
-import contextlib, shutil, subprocess
+import contextlib, shutil, subprocess, tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +25,20 @@ def _cleanBinaryFasta(dest_dir: Path):
         after = set(Path.cwd().glob('*-binary-fasta'))
         for f in after - before:
             shutil.move(str(f), str(dest_dir / f.name))
+
+# -- _concatPsmFiles: concatenate PSM files, keeping header from first file only
+def _concatPsmFiles(psm_files: list[Path], dest: Path) -> None:
+    '''
+    Concatenate tab-delimited Percolator PSM files into a single file at dest,
+    preserving the header from the first file and stripping headers from the rest.
+    '''
+    with dest.open('w') as out:
+        for i, psm_file in enumerate(psm_files):
+            with psm_file.open('r') as f:
+                for j, line in enumerate(f):
+                    if j == 0 and i > 0:
+                        continue  # skip header for all but first file
+                    out.write(line)
 
 # -- findCrux: returns a Path to the Crux binary under bin_dir/crux*/bin/crux, or None if not found
 def findCrux(bin_dir: Path) -> Optional[Path]:
@@ -144,20 +158,45 @@ def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path
         return runCrux(crux_bin, 'spectral-counts', args)
 
 # -- lfq: returns True if LFQ quantification completed successfully, False on failure
-def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fileroot: str, config: dict, mbr: bool | None = None) -> bool:
-    logMsg.debug(f'Starting label-free quantification with')
-    match_between_runs = mbr or config['lfq']['match_between_runs']
-    logMsg.debug(f'LFQ parameters: psm_files={psm_files}; mzml_dir={mzml_dir}; match_between_runs={match_between_runs}')
+def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
+    logMsg.debug(f'Starting label-free quantification for {len(psm_files)} PSM file(s)')
+    # Resolve mzML files by matching stems to PSM file stems
+    mzml_files = []
+    for psm_file in psm_files:
+        stem = psm_file.name.removesuffix('.percolator.target.psms.txt')
+        matches = list(mzml_dir.glob(f'{stem}.mzML')) + list(mzml_dir.glob(f'{stem}.mzML.gz'))
+        if not matches:
+            logMsg.warn(f'No mzML file found for PSM file: {psm_file.name} — skipping')
+            continue
+        mzml_files.append(matches[0])
+    if not mzml_files:
+        logMsg.warn('No mzML files could be matched to PSM files — aborting LFQ')
+        return False
+    logMsg.debug(f'Matched {len(mzml_files)} mzML file(s) for LFQ')
+    # Concatenate all PSM files for this fraction into a single temp file
+    tmp_psm = out_dir / f'{fileroot}.combined.percolator.target.psms.txt'
+    logMsg.debug(f'Concatenating {len(psm_files)} PSM file(s) into: {tmp_psm.name}')
+    _concatPsmFiles(psm_files, tmp_psm)
     args = [
         '--verbosity', '40',
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
         '--overwrite', 'T',
+        '--use-shared-peptides-for-protein-quant', 'T',
+        '--psm-file-format', 'percolator',
+        '--mods-spec', resolvedModifications(config),
+        '--nterm-peptide-mods-spec', config['index']['nterm_peptide_mods_spec'],
+        '--num-threads', str(config['search']['threads']),
+        str(tmp_psm),
     ]
-    if match_between_runs:
-        args += ['--mbr', 'T']
-    args += [str(file) for file in psm_files] + [str(mzml_dir)]
-    return runCrux(crux_bin, 'lfq', args)
+    args += [str(f) for f in mzml_files]
+    ok = runCrux(crux_bin, 'lfq', args)
+    # Clean up temp PSM file
+    try:
+        tmp_psm.unlink()
+    except OSError as e:
+        logMsg.warn(f'Could not remove temporary PSM file {tmp_psm.name}: {e}')
+    return ok
 
 # -- _tomlToCrux: helper function returning 'T' if True and 'F' if False
 def _tomlToCrux(val: bool):
