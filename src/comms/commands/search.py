@@ -50,6 +50,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
                 out_dir=out_dir,
                 fileroot=fileroot,
                 config=config,
+                threads=threads,
                 precursor_tol=prec_display,
                 mz_bin_width=bin_width_display,
             )

@@ -86,14 +86,14 @@ def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
     return runCrux(crux_bin, 'param-medic', args)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, precursor_tol=None, mz_bin_width=None) -> bool:
+def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, threads, precursor_tol=None, mz_bin_width=None) -> bool:
     logMsg.debug(f'Starting tide-search for: {mzml_file.name}')
     prec = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width = mz_bin_width  or config['search']['mz_bin_width']
     logMsg.debug(f'Using precursor tolerance: {prec} ppm, m/z bin width: {bin_width}')
     args = [
         '--verbosity', '40',
-        '--num-threads', str(config['search']['threads']),
+        '--num-threads', threads,
         '--spectrum-parser', 'pwiz',
         '--precursor-window', str(prec),
         '--precursor-window-type', 'ppm',
