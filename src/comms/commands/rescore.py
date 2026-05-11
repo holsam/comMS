@@ -26,7 +26,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optiona
     crux_bin, _ = validate(check_crux=True)
     
     logMsg.debug(f'Scanning for Tide-search PSM files in: {input_dir}')
-    target_files = sorted(input_dir.glob('*.tide-search.target.txt'))
+    target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
         logMsg.error(f'No Tide-search target PSM files found in: {input_dir}')
         print(f'[bold red]ERROR:[/bold red] No Tide-search target PSM files found in {input_dir}.')

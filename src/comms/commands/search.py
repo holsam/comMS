@@ -23,7 +23,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     crux_bin, _ = validate(check_crux=True)
     logMsg.debug(f'Scanning for mzML files in: {input_dir}')
     mzml_files = sorted(
-        list(input_dir.glob('*.mzML')) + list(input_dir.glob('*.mzML.gz'))
+        list(input_dir.glob('[!.]*.mzML')) + list(input_dir.glob('[!.]*.mzML.gz'))
     )
     if not mzml_files:
         logMsg.warn(f'No mzML files found in: {input_dir}')

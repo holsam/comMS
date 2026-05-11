@@ -36,21 +36,20 @@ def run_lfq(
     crux_bin, _ = validate(check_crux=True, allow_lfq=True)
 
     logMsg.debug(f'Scanning for rescored PSM files in: {rescore_dir}')
-    psm_files = sorted(rescore_dir.glob('*.percolator.target.psms.txt'))
+    psm_files = sorted(rescore_dir.glob('[!.]*.percolator.target.psms.txt'))
     if not psm_files:
         logMsg.warn(f'No rescored PSM files found in {rescore_dir}')
         raise SystemExit(1)
     logMsg.info(f'Found {len(psm_files)} rescored PSM file(s)')
     
     logMsg.debug(f'Scanning for mzML files in: {mzml_dir}')
-    mzml_files = sorted(list(mzml_dir.glob('*.mzML')) + list(mzml_dir.glob('*.mzML.gz')))
+    mzml_files = sorted(list(mzml_dir.glob('[!.]*.mzML')) + list(mzml_dir.glob('[!.]*.mzML.gz')))
     if not mzml_files:
         logMsg.warn(f'No mzML files found in: {mzml_dir}')
         raise SystemExit(1)
     logMsg.info(f'Found {len(mzml_files)} mzML file(s)')
 
     samples = samputil.loadSampleSheet(sample_sheet)
-    psm_files = sorted(rescore_dir.glob('*.percolator.target.psms.txt'))
     out_dir = pathutil.generateOutputFileStructure(output, 'lfq')
     fraction_groups = _groupPsmsByFraction(psm_files, samples)
     for fraction, fraction_psms in fraction_groups.items():
