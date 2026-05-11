@@ -83,7 +83,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optiona
         ok = _mergeRescoredPsms(file_base, sub_fastas, out_dir)
         if ok:
             merge_n_ok +=1
-            logMsg.debug(f'Percolator output for {file_base} merged to {out_dir / file_base}.percolato.(target/decoy).psms.txt')
+            logMsg.debug(f'Percolator output for {file_base} merged to {out_dir / file_base}.percolator.(target/decoy).psms.txt')
         else:
             logMsg.warn(f'Percolator output for {file_base} could not be merged')
             merge_n_fail += 1
@@ -131,13 +131,11 @@ def _mergeTypeRescoredPsms(match_type: str, file_base: str, subfastas, out_dir):
         file = out_dir / label / f'{file_base}.{label}.percolator.{match_type}.psms.txt'
         with open(file, 'r') as f:
             if not data:
-                header = f'organism\t{f.readline()}'
+                header = f'{f.readline()}'
                 data.append(header)
                 label_data.extend(f.readlines())
             else:
                 label_data.extend(f.readlines()[1:])
-        for i in range(len(label_data)):
-            label_data[i] = f'{label}\t{label_data[i]}'
         data.extend(label_data)
     for i in range(len(data)):
         if not data[i].endswith('\n'):
