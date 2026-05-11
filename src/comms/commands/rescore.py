@@ -7,6 +7,7 @@ from pathlib import Path
 from rich import print
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+from typing import Optional
 
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
@@ -17,7 +18,7 @@ from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_rescore: rescores all Tide-search PSM files in input_dir using Percolator and writes results to output
-def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: str, in_pipeline: bool = False):
+def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optional[str], in_pipeline: bool = False):
     if not in_pipeline:
         log = logMsg('rescore')
         log.debug('Starting rescore command')
