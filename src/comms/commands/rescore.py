@@ -52,8 +52,8 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optiona
     print(f'\nRescoring {len(target_files)} PSM file(s) with Percolator using {len(sub_fastas)} organism database(s)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
-        for label, sub_fasta in sub_fastas.items():
-            for target_file in tqdm(target_files, desc='Files rescored'):
+        for label, sub_fasta in tqdm(sub_fastas.items(), desc='Species rescored'):
+            for target_file in tqdm(target_files, desc=f'Files rescored for species {label}'):
                 fileroot = target_file.name.removesuffix('.tide-search.target.txt')
                 filename = f'{fileroot}.{label}'
                 org_out_dir = out_dir / label
