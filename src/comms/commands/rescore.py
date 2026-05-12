@@ -17,7 +17,7 @@ from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_rescore: rescores all Tide-search PSM files in input_dir using Percolator and writes results to output
+# -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then splits output by organism and runs assign-confidence per organism for per-organism q-values
 def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optional[str], in_pipeline: bool = False):
     if not in_pipeline:
         log = logMsg('rescore')
@@ -46,55 +46,135 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optiona
     
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
     log_path = out_dir / 'rescore.log'
-    
+    # Build per-organism sub-FASTAs (used by assign-confidence in round 2)
     sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
-    
-    print(f'\nRescoring {len(target_files)} PSM file(s) with Percolator using {len(sub_fastas)} organism database(s)...')
+
+    # Round 1: Percolator on the full combined database, with one call per sample file
+    print(f'\nRound 1: Rescoring {len(target_files)} PSM file(s) with Percolator (full combined database)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
-        for label, sub_fasta in tqdm(sub_fastas.items(), desc='Species rescored'):
-            for target_file in tqdm(target_files, desc=f'Files rescored for species {label}'):
-                fileroot = target_file.name.removesuffix('.tide-search.target.txt')
-                filename = f'{fileroot}.{label}'
+        for target_file in tqdm(target_files, desc='Files rescored'):
+            fileroot = target_file.name.removesuffix('.tide-search.target.txt')
+            ok = cruxutil.percolator(
+                crux_bin=crux_bin,
+                target_psm_file=target_file,
+                database=database,
+                out_dir=out_dir,
+                fileroot=fileroot,
+                config=config,
+            )
+            if ok:
+                n_ok += 1
+                logMsg.debug(f'Percolator output written to: {out_dir / fileroot}.percolator.target.psms.txt')
+            else:
+                logMsg.warn(f'Percolator failed for: {target_file.name}')
+                n_fail += 1
+    logMsg.info(f'Round 1 complete — {n_ok} succeeded, {n_fail} failed')
+    if n_fail > 0:
+        print(f'[bold yellow]WARNING:[/bold yellow] Percolator failed for {n_fail} file(s). Check {log_path} for details.')
+    # Collect the combined Percolator outputs for splitting
+    combined_target_files = sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
+    if not combined_target_files:
+        logMsg.error('No combined Percolator output files found after round 1 — cannot proceed.')
+        print(f'[bold red]ERROR:[/bold red] No Percolator output found in {out_dir}.')
+        raise SystemExit(1)
+    
+    # Round 2: split Percolator output by organism prefix, then run assign-confidence per organism for per-organism PSM-level q-values
+    print(f'\nRound 2: Splitting and running assign-confidence on {len(combined_target_files)} file(s)...')
+    ac_n_ok, ac_n_fail = 0, 0
+    with logging_redirect_tqdm():
+        for combined_file in tqdm(combined_target_files, desc='Files processed'):
+            fileroot = combined_file.name.removesuffix('.percolator.target.psms.txt')
+            combined_decoy_file = out_dir / f'{fileroot}.percolator.decoy.psms.txt'
+            # Split target and decoy files by organism
+            split_ok = _splitPsmsByOrganism(
+                target_file=combined_file,
+                decoy_file=combined_decoy_file,
+                organism_tags=organism_tags,
+                out_dir=out_dir,
+                fileroot=fileroot,
+            )
+            if not split_ok:
+                logMsg.warn(f'Could not split PSMs for: {combined_file.name}')
+                ac_n_fail += len(sub_fastas)
+                continue
+            # Run assign-confidence on each organism's split target file
+            for label in sub_fastas.keys():
                 org_out_dir = out_dir / label
-                org_out_dir.mkdir(parents=True, exist_ok=True)
-                ok = cruxutil.percolator(
+                org_target = org_out_dir / f'{fileroot}.{label}.percolator.target.psms.txt'
+                if not org_target.exists():
+                    logMsg.warn(f'Split target file not found for {label}: {org_target.name}')
+                    ac_n_fail += 1
+                    continue
+                ac_fileroot = f'{fileroot}.{label}'
+                ok = cruxutil.assignConfidence(
                     crux_bin=crux_bin,
-                    target_psm_file=target_file,
-                    database=sub_fasta,
+                    target_psm_file=org_target,
                     out_dir=org_out_dir,
-                    fileroot=filename,
-                    config=config,
+                    fileroot=ac_fileroot,
                 )
                 if ok:
-                    n_ok += 1
-                    logMsg.debug(f'Percolator output written to: {out_dir / label / filename}.percolator.target.psms.txt')
+                    ac_n_ok += 1
+                    logMsg.debug(
+                        f'assign-confidence output: '
+                        f'{org_out_dir / ac_fileroot}.assign-confidence.target.txt'
+                    )
                 else:
-                    logMsg.warn(f'Percolator failed for: {target_file.name} using {label}')
-                    n_fail += 1
-    logMsg.info(f'Rescoring completed — {n_ok} succeeded, {n_fail} failed')
-    if n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] rescoring failed for {n_fail} file(s). Check {log_path} for details.')
-
-    logMsg.debug(f'Merging organism-specific PSM files')
-    merge_n_ok, merge_n_fail = 0, 0
-    for target_file in tqdm(target_files, desc='Files merged'):
-        file_base = target_file.name.removesuffix('.tide-search.target.txt')
-        ok = _mergeRescoredPsms(file_base, sub_fastas, out_dir)
-        if ok:
-            merge_n_ok +=1
-            logMsg.debug(f'Percolator output for {file_base} merged to {out_dir / file_base}.percolator.(target/decoy).psms.txt')
-        else:
-            logMsg.warn(f'Percolator output for {file_base} could not be merged')
-            merge_n_fail += 1
-    logMsg.info(f'Rescored PSM merging completed - {merge_n_ok} succeeded, {merge_n_fail} failed')
-    if merge_n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] merging failed for {n_fail} file(s). Check {log_path} for details.')
-    
-    print(f'\n[bold green]Rescore finished successfully - summary:[/]')
-    print(f'- Files rescored successfully: {n_ok}')
-    print(f'- Files failed: {n_fail}')
+                    logMsg.warn(f'assign-confidence failed for {label}: {org_target.name}')
+                    ac_n_fail += 1
+    logMsg.info(f'Round 2 complete — {ac_n_ok} succeeded, {ac_n_fail} failed')
+    if ac_n_fail > 0:
+        print(f'[bold yellow]WARNING:[/bold yellow] assign-confidence failed for {ac_n_fail} file(s). Check {log_path} for details.')
+    print(f'\n[bold green]Rescore finished successfully — summary:[/]')
+    print(f'- Round 1 (Percolator): {n_ok} succeeded, {n_fail} failed')
+    print(f'- Round 2 (assign-confidence): {ac_n_ok} succeeded, {ac_n_fail} failed')
     print(f'- Output directory: {out_dir}\n')
+
+# -- _splitPsmsByOrganism: returns True on success, False on any file error
+def _splitPsmsByOrganism(
+    target_file: Path,
+    decoy_file: Path,
+    organism_tags: dict[str, str],
+    out_dir: Path,
+    fileroot: str,
+) -> bool:
+    try:
+        for psm_type, psm_file in [('target', target_file), ('decoy', decoy_file)]:
+            if not psm_file.exists():
+                logMsg.warn(f'PSM file not found, skipping split: {psm_file.name}')
+                continue
+            with psm_file.open('r') as f:
+                header = f.readline()
+                rows = f.readlines()
+            # Partition rows by organism tag
+            buckets: dict[str, list[str]] = {}
+            for row in rows:
+                label = _classifyPsmRow(row, organism_tags)
+                buckets.setdefault(label, []).append(row)
+            # Write each bucket
+            for label, label_rows in buckets.items():
+                label_dir = out_dir / label
+                label_dir.mkdir(parents=True, exist_ok=True)
+                out_file = label_dir / f'{fileroot}.{label}.percolator.{psm_type}.psms.txt'
+                with out_file.open('w') as f:
+                    f.write(header)
+                    f.writelines(label_rows)
+                logMsg.debug(f'Wrote {len(label_rows)} {psm_type} PSMs to: {out_file.name}')
+        return True
+    except Exception as e:
+        logMsg.error(f'Error splitting PSMs for {fileroot}: {e}')
+        return False
+
+# -- _classifyPsmRow: returns the organism label for a single PSM row based on the protein ID column
+def _classifyPsmRow(row: str, organism_tags: dict[str, str]) -> str:
+    parts = row.rstrip('\n').split('\t')
+    if not parts:
+        return 'contaminants'
+    protein_id = parts[-1]
+    for label, tag in organism_tags.items():
+        if tag in protein_id:
+            return label
+    return 'contaminants'
 
 # -- _parseOrganismTags: returns dictionary of strings corresponding to organism tags from comma-separated input
 def _parseOrganismTags(input_string: str):
@@ -109,35 +189,3 @@ def _parseOrganismTags(input_string: str):
         if i % 2:
             tags.update({items[i-1]: items[i]})
     return tags
-
-# -- _mergeRescoredPsms: returns True, but writes concatenated PSM files to output directory
-def _mergeRescoredPsms(file_base, subfastas, out_dir):
-    try:
-        types = ['target', 'decoy']
-        for type in types:
-            merged_data = _mergeTypeRescoredPsms(type, file_base, subfastas, out_dir)
-            out_file = out_dir / f'{file_base}.percolator.{type}.psms.txt'
-            with open(out_file, 'w') as f:
-                f.writelines(merged_data)
-        return True
-    except Exception:
-        return False
-
-# -- _mergeTypeRescoredPsms: returns list of string corresponding to concatenated lines of organism-specific rescored PSMs
-def _mergeTypeRescoredPsms(match_type: str, file_base: str, subfastas, out_dir):
-    data = []
-    for label in subfastas.keys():
-        label_data = []
-        file = out_dir / label / f'{file_base}.{label}.percolator.{match_type}.psms.txt'
-        with open(file, 'r') as f:
-            if not data:
-                header = f'{f.readline()}'
-                data.append(header)
-                label_data.extend(f.readlines())
-            else:
-                label_data.extend(f.readlines()[1:])
-        data.extend(label_data)
-    for i in range(len(data)):
-        if not data[i].endswith('\n'):
-            data[i] = f'{data[i]}\n'
-    return data
