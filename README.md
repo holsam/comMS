@@ -19,6 +19,8 @@
     - [Installing external tools](#installing-external-tools)
 - [Quick start](#quick-start)
 - [Input files](#input-files)
+  - [MS input files](#mass-spectrometry-data-files)
+  - [Sample information](#sample-information)
 - [Commands](#commands)
     - [Pipeline](#pipeline)
     - [Individual commands](#individual-commands)
@@ -26,11 +28,15 @@
 - [Configuration](#configuration)
     - [Viewing and verifying user configuration](#viewing-and-verifying-user-configuration)
     - [Protocol flags](#protocol-flags)
+    - [Default index parameters](#default-index-parameters)
     - [Default search parameters](#default-search-parameters)
     - [Percolator settings](#percolator-settings)
     - [Report settings](#report-settings)
 - [Output structure](#output-structure)
 - [Limitations](#limitations)
+  - [Path resolution](#path-resolution)
+  - [Input file requirements](#input-file-requirements)
+  - [param-medic output parsing](#param-medic-output-parsing)
 - [Getting help & contributing](#getting-help--contributing)
 - [License](#license)
 
@@ -182,7 +188,7 @@ Command | Description
 `convert` | Convert `.RAW` files to indexed `.mzML` files using ThermoRawFileParser
 `index` | Build a tryptic peptide index from a FASTA file using Crux `tide-index`
 `search` | Match spectra to peptides using Crux `tide-search`
-`rescore` | Rescore PSMs using Crux `percolator` with picked-protein FDR
+`rescore` | Rescore PSMs using Crux `percolator` on the full combined database, then split results by organism and run `assign-confidence` per organism for calibrated per-organism FDR
 `lfq` | Run MS1 label-free quantification using grouped fractions
 `quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
 `report` | Generate a static analysis report (SVG figures + Excel workbooks) from `comms quantify` and optionally `comms lfq` output
@@ -345,8 +351,8 @@ comMS accepts an output directory option (defaults to the current working direct
       convert/               # indexed .mzML files
       index/                 # Crux tide-index output
       search/                # Crux tide-search target PSM files
-      rescore/               # Merged Percolator rescored PSM files
-        organism_n/          # Percolator rescored PSM files for specific organism
+      rescore/               # Combined Percolator rescored PSM files
+        organism_n/          # Per-organism split PSMs and assign-confidence output
       lfq/                   # MS1 label-free quantification output
         fraction_n/          # FlashLFQ output for each sample fraction
       quantify/              # dNSAF spectral-counts output
@@ -368,7 +374,11 @@ If an output directory for a given command already exists, comMS will not overwr
 comMS is still being developed and has several known limitations, which are detailed below:
 
 ### Path resolution
-comMS commands resolve the `bin/` directory relative to the package installation path. This works but is a crude way of resolving the path, and may break in differnt installtion environments. A more robust method of resolving the path to this directory will be implemented in future updates.
+comMS commands resolve the `bin/` directory relative to the repository structure, which works in development environments but is likely incompatible with installed versions of comMS. As a temporary workaround, set the `COMMS_BIN_DIR` variable in your shell environment to the absolute path of the appropriate directory:
+```sh
+export COMMS_BIN_DIR=/path/to/comMS/bin
+```
+A more robust method of resolving the path to this directory will be implemented in future updates.
 
 ### Input file requirements
 comMS requires both a sample sheet (in `.tsv` or `.csv` format) and a FASTA file (containing proteomes and contaminants). Additional functionality will be added to validate any such files before beginning processing, and to assist in generating them.
