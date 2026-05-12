@@ -8,7 +8,7 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
@@ -38,6 +38,8 @@ def run_lfq(
     logMsg.info(f'Found {len(psm_files)} rescored PSM file(s)')
     samples = samputil.loadSampleSheet(sample_sheet)
     out_dir = pathutil.generateOutputFileStructure(output, 'lfq')
+    log_path = out_dir / 'lfq.log'
+    configureFileLogging(log_path)
     fraction_groups = _groupPsmsByFraction(psm_files, samples)
     for fraction, fraction_psms in fraction_groups.items():
         logMsg.info(f'Running LFQ for fraction: {fraction} ({len(fraction_psms)} file(s))')

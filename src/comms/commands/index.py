@@ -7,7 +7,7 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
@@ -22,6 +22,7 @@ def run_index(database: Path, output: Path, in_pipeline: bool = False):
     logMsg.info(f'Building Tide peptide index from: {database.name}')
     out_dir = pathutil.generateOutputFileStructure(output, 'index')
     log_path = out_dir / 'index.log'
+    configureFileLogging(log_path)
     ok = cruxutil.tideIndex(
         crux_bin=crux_bin,
         database=database,

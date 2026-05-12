@@ -11,7 +11,7 @@ from typing import Optional
 
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
@@ -46,6 +46,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
     
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
     log_path = out_dir / 'rescore.log'
+    configureFileLogging(log_path)
     # Build per-organism sub-FASTAs (used by assign-confidence in round 2)
     sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
 

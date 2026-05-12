@@ -9,7 +9,7 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
@@ -31,6 +31,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     logMsg.info(f'Found {len(mzml_files)} mzML file(s) — starting search')
     out_dir = pathutil.generateOutputFileStructure(output, 'search')
     log_path = out_dir / 'search.log'
+    configureFileLogging(log_path)
     # -- Optional: param-medic tolerance estimation
     precursor_tol = None
     mz_bin_width  = None

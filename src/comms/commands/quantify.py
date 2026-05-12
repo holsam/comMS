@@ -9,7 +9,7 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
@@ -30,6 +30,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
     logMsg.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
     out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
     log_path = out_dir / 'quantify.log'
+    configureFileLogging(log_path)
     print(f'\nRunning dNSAF spectral counting on {len(psm_files)} file(s)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():

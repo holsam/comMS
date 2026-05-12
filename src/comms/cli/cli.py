@@ -8,7 +8,7 @@ from typing import Annotated
 
 # -- Import internal utility functions
 from comms.utils.settings import initComms
-from comms.utils.log import log_state
+from comms.utils.log import configureStreamLogging, log_state
 
 # -- Import comMS commands
 from comms.cli.convert import commsConvert
@@ -72,3 +72,4 @@ def main(
     else:
         log_level = logging.WARN
     log_state.log_level = log_level
+    configureStreamLogging()

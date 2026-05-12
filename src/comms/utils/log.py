@@ -2,7 +2,7 @@
 Shared utility functions: logging
 '''
 # -- Import external dependencies
-import logging
+import logging, shutil
 from pathlib import Path
 
 # -- Define custom logger class
@@ -16,11 +16,11 @@ class logMsg:
         if cls._instance:
             cls._instance.logger.debug(msg)
     @classmethod
-    def info(cls, msg):
+    def info(cls, msg: str):
         if cls._instance:
             cls._instance.logger.info(msg)
     @classmethod
-    def warn(cls, msg):
+    def warn(cls, msg: str):
         if cls._instance:
             cls._instance.logger.warning(msg)
     @classmethod
@@ -34,42 +34,50 @@ class LogState:
 
 # -- checkUniqueLogFile: returns string corresponding to path to uniquely-named log file
 def checkUniqueLogFile(
-    out_dir: Path,
-) -> str:
+    log_file: Path,
+) -> Path:
     '''
     Build a unique output file path for the comms log file, incrementing a counter suffix if a file with the same name already exists.
     '''
-    out_path = Path(out_dir, "comms/comms.log")
-    if out_path.exists():
-        stem = out_path.stem
-        suffix = out_path.suffix
-        counter = 1
-        while True:
-            out_path = Path(out_dir, f'{stem}-{counter}{suffix}')
-            if not out_path.exists():
-                break
-            counter +=1
-        return str(out_path)
+    stem = log_file.stem
+    suffix = log_file.suffix
+    dir = log_file.parent
+    counter = 0
+    while log_file.exists():
+        counter += 1
+        log_file = dir / f'{stem}-{counter}{suffix}'
+    return(log_file)
 
-# -- configureLogger: returns None but sets up logging configuration
-def configureLogger(out_dir: Path):
+def configureStreamLogging():
+    """Attach a stream handler to the root logger at the current log level."""
     logger = logging.getLogger()
     logger.setLevel(log_state.log_level)
+    # Avoid adding duplicate handlers on repeated calls
+    if any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+           for h in logger.handlers):
+        return
     formatter = logging.Formatter(
         fmt="%(asctime)s | %(name)s | %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
-    # Handler for stdout
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(log_state.log_level)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
-    # Handler for log file
+    handler = logging.StreamHandler()
+    handler.setLevel(log_state.log_level)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+def configureFileLogging(out_dir: Path):
+    """Attach a file handler once out_dir is known."""
+    logger = logging.getLogger()
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(name)s | %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
     log_file = checkUniqueLogFile(out_dir=out_dir)
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(log_state.log_level)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(log_file)
+    handler.setLevel(log_state.log_level)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 # -- Initialise state
 log_state = LogState()

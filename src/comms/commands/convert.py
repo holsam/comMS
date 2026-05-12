@@ -7,7 +7,7 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.settings import config
 from comms.utils.validate import validate
 from comms.utils import trfp as trfputil
@@ -27,6 +27,7 @@ def run_convert(input_dir: Path, output: Path, gzip: bool, in_pipeline: bool = F
     logMsg.info(f'Found {len(raw_files)} .RAW file(s) — starting conversion')
     out_dir = pathutil.generateOutputFileStructure(output, 'convert')
     log_path = out_dir / 'convert.log'
+    configureFileLogging(log_path)
     print(f'\nConverting {len(raw_files)} .RAW file(s) to indexed mzML...')
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
