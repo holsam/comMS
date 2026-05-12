@@ -18,7 +18,7 @@ from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then splits output by organism and runs assign-confidence per organism for per-organism q-values
-def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optional[str], in_pipeline: bool = False):
+def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Optional[str] = None, in_pipeline: bool = False):
     if not in_pipeline:
         log = logMsg('rescore')
         log.debug('Starting rescore command')
@@ -34,8 +34,8 @@ def run_rescore(input_dir: Path, database: Path, output: Path, org_tags: Optiona
     logMsg.info(f'Found {len(target_files)} PSM file(s)')
     
     logMsg.debug('Parsing organism tags')
-    if org_tags:
-        organism_tags = _parseOrganismTags(org_tags)
+    if organism_tags:
+        organism_tags = _parseOrganismTags(organism_tags)
     else:
         if config['organism']:
             organism_tags = config['organism']
