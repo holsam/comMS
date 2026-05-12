@@ -132,7 +132,6 @@ def config_set(
     iodo: bool | None = None,
     low_res: bool | None = None,
     organism: list[str] | None = None,
-    mbr: bool | None = None,
     ox: bool | None = None,
     phos: bool | None = None,
     n_cyc: bool | None = None,
@@ -142,9 +141,9 @@ def config_set(
 ) -> None:
     # Set up logger
     log = logMsg('config')
-    log.debug(f'Applying set flags: iodo={iodo}; ox={ox}; phos={phos}; n_cyc={n_cyc}; n_ace={n_ace}; low_res={low_res}; organism={organism}; mbr={mbr}; custom={custom!r}; clip_met={clip_met}')
+    log.debug(f'Applying set flags: iodo={iodo}; ox={ox}; phos={phos}; n_cyc={n_cyc}; n_ace={n_ace}; low_res={low_res}; organism={organism}; custom={custom!r}; clip_met={clip_met}')
     # Check at least one flag set
-    if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, mbr, custom, clip_met)):
+    if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, custom, clip_met)):
         log.warn(f'No flag supplied to config set.')
         print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]comms config set --help[/bold]/[bold]to see available options.\n')
         raise SystemExit(1)
@@ -170,7 +169,6 @@ def config_set(
         n_cyc=n_cyc,
         n_ace=n_ace,
         low_res=low_res,
-        mbr=mbr,
         clip_met=clip_met
     )
     if organism is not None:
@@ -186,7 +184,7 @@ def config_set(
         print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise SystemExit(1)
     # Print summary
-    _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, mbr=mbr, custom=custom, clip_met=clip_met)
+    _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, custom=custom, clip_met=clip_met)
     print()
 
 
@@ -264,7 +262,6 @@ def _apply_protocol_flags(
     n_ace: bool | None = None,
     clip_met: bool | None = None,
     low_res: bool | None = None,
-    mbr: bool | None = None,
 ) -> dict:
     '''
     Apply protocol flags to a config dictionary and return it
@@ -274,7 +271,6 @@ def _apply_protocol_flags(
         n_cyc — adds/removes 1Q-17.027 in index.nterm_peptide_mods_spec
         n_ace — adds/removes 1X+42.011 in index.nterm_protein_mod_spec
         low_res — sets search.mz_bin_width and index.score_function
-        mbr — sets lfq.match_between_runs
     '''
     cfg.setdefault('search', {})
     cfg['index'].setdefault('fixed_mods', '')
@@ -314,13 +310,9 @@ def _apply_protocol_flags(
             cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_HIGH_RES
             cfg['search']['score_function'] = SCORE_FUNC_HIGH_RES
         logMsg.debug(f'low_res flag applied — mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
-    if mbr is not None:
-        cfg.setdefault('lfq', {})
-        cfg['lfq']['match_between_runs'] = 'true' if mbr else 'false'
-        logMsg.debug(f'mbr flag applied — match_between_runs: {cfg['lfq']['match_between_runs']}')
     if clip_met is not None:
         cfg.setdefault('index', {})
-        cfg['index']['clip_n_met'] = 'true' if mbr else 'false'
+        cfg['index']['clip_n_met'] = 'true' if clip_met else 'false'
         logMsg.debug(f'clip_met flag applied — clip_n_met: {cfg['index']['clip_n_met']}')
     return cfg
 
@@ -431,7 +423,6 @@ def _printSetSummary(
     n_ace: bool | None,
     low_res: bool | None,
     organism: list[str] | None,
-    mbr: bool | None,
     custom: str | None,
     clip_met: bool | None,
 ) -> None:
@@ -460,9 +451,6 @@ def _printSetSummary(
             key = ''.join(key.split())
             pattern = ''.join(pattern.split())
             print(f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]')
-    if mbr is not None:
-        value = 'true' if mbr else 'false'
-        print(f'[bold green]✓[/bold green] Match between runs set: [dim]lfq[/dim] → to [cyan]{value}[/cyan]')
     if clip_met is not None:
         value = 'true' if clip_met else 'false'
         print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]clip_n_met[/dim] → to [cyan]{value}[/cyan]')
