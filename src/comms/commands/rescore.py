@@ -146,10 +146,12 @@ def _splitPsmsByOrganism(
             with psm_file.open('r') as f:
                 header = f.readline()
                 rows = f.readlines()
+            # Get indice for proteinIds column in header
+            id_index = _findProteinIdsIndex(header)
             # Partition rows by organism tag
             buckets: dict[str, list[str]] = {}
             for row in rows:
-                label = _classifyPsmRow(row, organism_tags)
+                label = _classifyPsmRow(row, id_index, organism_tags)
                 buckets.setdefault(label, []).append(row)
             # Write each bucket
             for label, label_rows in buckets.items():
@@ -165,12 +167,17 @@ def _splitPsmsByOrganism(
         logMsg.error(f'Error splitting PSMs for {fileroot}: {e}')
         return False
 
+# -- _findProteinIdsIndex: returns the column indice for the proteinIds column from a PSM file header
+def _findProteinIdsIndex(header: str):
+    header = header.rstrip('\n').split('\t')
+    return [i for i, x in enumerate(header) if x == 'proteinIds'][0]
+
 # -- _classifyPsmRow: returns the organism label for a single PSM row based on the protein ID column
-def _classifyPsmRow(row: str, organism_tags: dict[str, str]) -> str:
+def _classifyPsmRow(row: str, id_index: int, organism_tags: dict[str, str]) -> str:
     parts = row.rstrip('\n').split('\t')
     if not parts:
         return 'contaminants'
-    protein_id = parts[-1]
+    protein_id = parts[id_index]
     for label, tag in organism_tags.items():
         if tag in protein_id:
             return label
