@@ -4,6 +4,29 @@ Shared utility functions: logging
 # -- Import external dependencies
 import logging, shutil, tempfile
 from pathlib import Path
+from rich.console import Console, ConsoleRenderable
+from rich.logging import RichHandler
+from rich.text import Text
+
+# -- Define level colours for RichHandler
+_LEVEL_COLOURS: dict[str, str] = {
+    'DEBUG':    'dim cyan',
+    'INFO':     'green',
+    'WARNING':  'yellow',
+    'ERROR':    'bold red',
+    'CRITICAL': 'bold bright_red',
+}
+
+# -- Define custom RichHandler subclass (CommsRichHandler) to allow custom formatting
+class CommsRichHandler(RichHandler):
+    def render_message(self, record: logging.LogRecord, message: str) -> 'ConsoleRenderable':
+        level_colour = _LEVEL_COLOURS.get(record.levelname, 'white')
+        markup = (
+            f"[dim]{self.formatter.formatTime(record, self.formatter.datefmt)}[/dim] | "
+            f"[bold]{record.name}[/bold] | "
+            f"[{level_colour}]{record.levelname}: {message}[/{level_colour}]"
+        )
+        return Text.from_markup(markup)
 
 # -- Define custom logger class
 class logMsg:
@@ -35,6 +58,16 @@ class LogState:
     _temp_log_path: Path | None = None
     _file_handler: logging.FileHandler | None = None
 
+# -- Define custom logging.Formatter subclas (PlainFormatter) to strip Rich markup before writing to file
+class PlainFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        record = logging.makeLogRecord(record.__dict__)
+        try:
+            record.msg = Text.from_markup(str(record.msg)).plain
+        except Exception:
+            pass  # leave message as-is if markup parsing fails
+        return super().format(record)
+
 # -- checkUniqueLogFile: returns string corresponding to path to uniquely-named log file
 def checkUniqueLogFile(
     log_file: Path,
@@ -51,19 +84,24 @@ def checkUniqueLogFile(
         log_file = dir / f'{stem}-{counter}{suffix}'
     return(log_file)
 
-# -- configureStreamLogging: attach a stream handler to the root logger
+# -- configureStreamLogging: attach a RichHandler stream handler and temp file handler
 def configureStreamLogging():
     logger = logging.getLogger()
     logger.setLevel(log_state.log_level)
-    if any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
-           for h in logger.handlers):
+    if any(isinstance(h, RichHandler) for h in logger.handlers):
         return
-    formatter = _formatter()
-    handler = logging.StreamHandler()
-    handler.setLevel(log_state.log_level)
-    handler.setFormatter(formatter)
+    handler = CommsRichHandler(
+        level=log_state.log_level,
+        console=Console(stderr=True),
+        rich_tracebacks=True,
+        markup=True,
+        show_path=False,
+        show_time=False,
+        show_level=False,
+    )
+    # Formatter is only used for formatTime
+    handler.setFormatter(logging.Formatter(datefmt="%Y-%m-%d %H:%M:%S"))
     logger.addHandler(handler)
-    # Also start buffering to a temp file immediately
     _attachTempFileHandler()
 
 # -- configureFileLogging: flush temp log to its final location under out_dir
@@ -82,15 +120,14 @@ def configureFileLogging(out_dir: Path):
     # Attach a new file handler pointed at the final path
     handler = logging.FileHandler(final_path, mode='a')
     handler.setLevel(log_state.log_level)
-    handler.setFormatter(_formatter())
+    handler.setFormatter(_plainFormatter())
     logger.addHandler(handler)
     log_state._file_handler = handler
-    # Clean up temp file
     _removeTempLog()
 
-# -- _formatter: internal helper to format log messages 
-def _formatter() -> logging.Formatter:
-    return logging.Formatter(
+# -- _plainFormatter: internal helper to format log messages 
+def _plainFormatter() -> PlainFormatter:
+    return PlainFormatter(
         fmt="%(asctime)s | %(name)s | %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
@@ -98,15 +135,13 @@ def _formatter() -> logging.Formatter:
 # -- _attachTempFileHandler: internal helper to attach a temporary file as a file handler until actual log file is known from output directory
 def _attachTempFileHandler():
     if log_state._file_handler is not None:
-        return  # already attached
-    tmp = tempfile.NamedTemporaryFile(
-        prefix='comms_', suffix='.log', delete=False
-    )
+        return
+    tmp = tempfile.NamedTemporaryFile(prefix='comms_', suffix='.log', delete=False)
     log_state._temp_log_file = tmp
     log_state._temp_log_path = Path(tmp.name)
     handler = logging.FileHandler(tmp.name, mode='a')
     handler.setLevel(log_state.log_level)
-    handler.setFormatter(_formatter())
+    handler.setFormatter(_plainFormatter())
     logging.getLogger().addHandler(handler)
     log_state._file_handler = handler
 
