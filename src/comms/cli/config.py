@@ -90,12 +90,8 @@ def set(
     ] = None,
     organism: Annotated[
         Optional[List[str]],
-        typer.Option('--organism', help='Set organism header patterns for per-organism picked protein FDR [/dim](format: OrganismLabel=Pattern)[/dim]'),
+        typer.Option('--organism', help='Set organism header patterns for per-organism picked protein FDR [dim](format: OrganismLabel=Pattern)[/dim]'),
     ] = None,
-    mbr: Annotated[
-        Optional[bool],
-        typer.Option('--mbr/--no-mbr', help='Use match between runs option when running LFQ command'),
-    ] = None
 ):
     '''
     Set values in user configuration file
@@ -110,5 +106,4 @@ def set(
         clip_met=clip_met,
         low_res=low_res,
         organism=organism,
-        mbr=mbr,
     )

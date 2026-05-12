@@ -10,6 +10,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Sample sheet fixtures](#sample-sheet-fixtures)
     - [Config fixtures](#config-fixtures)
     - [Synthetic Percolator results](#synthetic-percolator-results)
+    - [LFQ fixtures](#lfq-fixtures)
     - [Rescore integration fixtures](#rescore-integration-fixtures)
 - [Synthetic fixture generator](#synthetic-fixture-generator)
     - [Running standalone](#running-standalone)
@@ -28,6 +29,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
     - [`tests/unit/test_validate.py`](#testsunittest_validatepy)
+    - [`tests/unit/test_version.py`](#testsunittest_versionpy)
 - [Integration tests](#integration-tests)
     - [`tests/integration/test_convert.py`](#testsintegrationtest_convertpy)
     - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
@@ -119,7 +121,7 @@ Fixture | Description
 
 Fixture | Description
 ---|---
-`synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic Percolator PSM file at the expected path, bypassing the need to run Percolator on synthetic data (which does not provide enough PSMs for Percolator to converge); shared between `test_crux.py` and `test_pipeline.py`
+`synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic assign-confidence PSM file at `rescore/EUK/synthetic.EUK.assign-confidence.target.txt`, matching the per-organism subdirectory structure produced by `run_rescore` round 2 and bypassing the need to run Percolator and assign-confidence on synthetic data (which does not provide enough PSMs for Percolator to converge)
 
 ### LFQ fixtures
 
@@ -304,9 +306,9 @@ Unit tests covering helper functions in `src/comms/commands/rescore.py`. No exte
 
 Function/class | Test description
 -- | --
-`_parseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`
-`_mergeTypeRescoredPsms` | returns a list; all elements end with `\n`; first element is the modified header prefixed with `organism\t`; header appears exactly once; data rows are prefixed with the organism label; rows from both organisms are present; works for both `target` and `decoy` match types
-`_mergeRescoredPsms` | returns `True` on success; returns `False` when an input file is missing; writes both `target` and `decoy` merged files; merged files are non-empty; merged file content is valid text
+`_parseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`; keys and values are strings
+`_classifyPsmRow` | returns the correct organism label for a matching EUK row; returns the correct label for a PRO row; returns `'contaminants'` for an unmatched row; returns a string; returns `'contaminants'` for an empty row; uses the last tab-delimited column as the protein ID; first matching tag wins when multiple tags could match
+`_splitPsmsByOrganism` | returns `True` on success; creates per-organism target files in labelled subdirectories; creates per-organism decoy files; EUK file contains only EUK rows; PRO file contains only PRO rows; contaminant rows go to a `contaminants/` bucket; header is preserved in each output file; returns a bool without raising when the target file is missing; skips a missing decoy file gracefully and still succeeds for the target; output files are non-empty
 
 ---
 
@@ -348,6 +350,15 @@ Function/class | Test description
 `_check_crux` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message printed for single installation; raises `SystemExit` with `allow_lfq=True` when best version is below `_CRUX_MIN_LFQ`; does not raise with `allow_lfq=True` when best version meets `_CRUX_MIN_LFQ`; does not enforce minimum version when `allow_lfq=False`; `_get_crux_version` called once per candidate
 `_check_trfp` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message for single installation; does not raise when version is at Mono threshold; raises `SystemExit` when below Mono threshold on Linux without Mono; does not raise when below threshold on Linux with Mono; does not raise when below threshold on Windows; does not raise when below threshold on macOS with Mono; `_get_trfp_version` called once per candidate
 `validate` | returns `(None, None)` when no checks requested; does not call `_find_all_crux` when no checks requested; returns `crux_bin` and `None` when `check_crux=True` only; returns `None` and `trfp_path` when `check_trfp=True` only; returns both paths when both checks requested; raises `SystemExit` when Crux not found; raises `SystemExit` when TRFP not found; raises `SystemExit` with `allow_lfq=True` and old Crux; does not raise with `allow_lfq=True` and Crux at minimum; raises when old TRFP without Mono on Linux; does not raise when old TRFP with Mono on Linux; does not raise when old TRFP on Windows; `_find_all_crux` not called when `check_crux=False`; `_find_all_trfp` not called when `check_trfp=False`; correct `ERROR` message printed for each failure mode
+
+---
+
+### `tests/unit/test_version.py`
+Unit tests covering `src/comms/commands/version.py`:
+
+Function/class | Test description
+-- | --
+`printVersion` | exits with code zero; prints the installed version string; handles `PackageNotFoundError` gracefully by printing an 'unknown' fallback message
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -392,18 +403,17 @@ Test | Description
 `TestRunSearch` | output directory is created; target PSM file exists; prints search summary; `logMsg` instance is named `'search'`.
 `TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values.
 `TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the terminal summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising.
-`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created for a two-organism run. Both Percolator and `_mergeRescoredPsms` are mocked.
-`TestRunRescoreMergedOutput` | verifies that `<file_base>.percolator.target.psms.txt` and `<file_base>.percolator.decoy.psms.txt` are written at the top level of the rescore directory. Percolator is mocked with a side effect that writes synthetic per-organism PSM files.
-`TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `org_tags` nor config organism is available; uses config organism when `org_tags` is falsy (monkeypatched); verifies Percolator is called exactly once per organism per file.
-`TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails for a file; warning is printed when merge fails; `logMsg` instance is named `'rescore'`.
+`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when the real `_splitPsmsByOrganism` runs on the combined Percolator output. Percolator is mocked with a side effect that writes combined PSM files; `assignConfidence` is also mocked
+`TestRunRescoreAssignConfidence` | verifies that `assignConfidence` is called once per organism (twice for a two-organism run) when both Percolator and `_splitPsmsByOrganism` are mocked with side effects that write the files each round expects to find; verifies that `run_rescore` raises `SystemExit` when Percolator fails and produces no output files, which prevents round 2 from running
+`TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `organism_tags` nor config organism is available (monkeypatched to empty dict); uses config organism when `organism_tags` is falsy; verifies Percolator is called exactly once per file
+`TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails (and `SystemExit` is caught); warning is printed when `_splitPsmsByOrganism` returns `False`; `logMsg` instance is named `'rescore'`
 `TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created
 `TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call
-`TestRunLfqMbrFlag` | `mbr=True` is forwarded as `match_between_runs=True` to `cruxutil.lfq`; `mbr=False` is forwarded as `match_between_runs=False`
-`TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; raises `SystemExit` when the mzML directory contains no mzML files
+TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the mzML directory is empty
 `TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails
 `TestRunLfqLogger` | the `logMsg` instance is named `'lfq'`
-`TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; prints quantify summary; `logMsg` instance is named `'quantify'`.
-`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`.
+`TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; prints quantify summary; `logMsg` instance is named `'quantify'`
+`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
 
 ---
 

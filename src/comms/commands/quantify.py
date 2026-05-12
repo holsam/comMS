@@ -15,17 +15,17 @@ from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_quantify: runs dNSAF spectral counting on all Percolator PSM files in input_dir and writes results to output
+# -- run_quantify: runs dNSAF spectral counting on per-organism assign-confidence PSM files and writes results to output
 def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: bool = False):
     if not in_pipeline:
         log = logMsg('quantify')
         log.debug('Starting quantify command')
     crux_bin, _ = validate(check_crux=True)
-    logMsg.debug(f'Scanning for Percolator PSM files in: {input_dir}')
-    psm_files = sorted(input_dir.glob('[!.]*.percolator.target.psms.txt'))
+    logMsg.debug(f'Scanning for assign-confidence PSM files in organism subdirectories of: {input_dir}')
+    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
     if not psm_files:
-        logMsg.warn(f'No Percolator PSM files found in: {input_dir}')
-        print(f'[bold red]ERROR:[/bold red] No Percolator PSM files found in {input_dir}.')
+        logMsg.warn(f'No assign-confidence PSM files found in organism subdirectories of: {input_dir}')
+        print(f'[bold red]ERROR:[/bold red] No assign-confidence PSM files found under {input_dir}.')
         raise SystemExit(1)
     logMsg.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
     out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
@@ -34,7 +34,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for psm_file in tqdm(psm_files, desc='Files quantified'):
-            fileroot = psm_file.name.removesuffix('.percolator.target.psms.txt')
+            fileroot = psm_file.name.removesuffix('.assign-confidence.target.txt')
             ok = cruxutil.spectralCounts(
                 crux_bin=crux_bin,
                 psm_file=psm_file,

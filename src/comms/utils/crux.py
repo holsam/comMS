@@ -54,7 +54,6 @@ def findCrux(bin_dir: Path) -> Optional[Path]:
     return result
 
 # -- runCrux: returns True if the Crux subcommand completed successfully, False on failure
-# -- runCrux: returns True if the Crux subcommand completed successfully, False on failure
 def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
     cmd = [str(crux_bin), subcommand] + [str(a) for a in args]
     logMsg.debug(f'Running {subcommand}: {" ".join(cmd)}')
@@ -139,7 +138,7 @@ def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, 
     return runCrux(crux_bin, 'tide-search', args)
 
 # -- percolator: returns True if Percolator rescoring completed successfully, False on failure
-def percolator(crux_bin:Path, target_psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
+def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
     logMsg.debug(f'Starting Percolator for: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
@@ -153,6 +152,23 @@ def percolator(crux_bin:Path, target_psm_file: Path, database: Path, out_dir: Pa
     if config['percolator']['picked_protein']:
         args = ['--picked-protein', str(database)] + args
     return runCrux(crux_bin, 'percolator', args)
+
+# -- assignConfidence: returns True if assign-confidence completed successfully, False on failure
+def assignConfidence(crux_bin: Path, target_psm_file: Path, out_dir: Path, fileroot: str) -> bool:
+    '''
+    Run crux assign-confidence on a per-organism split PSM file to estimate per-organism PSM-level q-values using target-decoy competition (TDC)
+    '''
+    logMsg.debug(f'Starting assign-confidence for: {target_psm_file.name}')
+    args = [
+        '--verbosity', '40',
+        '--estimation-method', 'tdc',
+        '--score', 'percolator score',
+        '--output-dir', str(out_dir),
+        '--fileroot', fileroot,
+        '--overwrite', 'T',
+        str(target_psm_file),
+    ]
+    return runCrux(crux_bin, 'assign-confidence', args)
 
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
 def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:

@@ -171,19 +171,20 @@ def isolated_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
 @pytest.fixture()
 def synthetic_percolator_results(tmp_path):
     '''
-    Write a minimal synthetic Percolator PSM file rather than running
-    Percolator, which requires more PSMs than our synthetic data provides.
-    Shared across test_crux.py and test_pipeline.py.
+    Write a minimal synthetic assign-confidence PSM file in the per-organism subdirectory structure produced by run_rescore round 2, bypassing the need to run Percolator and assign-confidence on synthetic data (which does not provide enough PSMs for Percolator to converge)
     '''
     rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
     rescore_dir.mkdir(parents=True)
-    psm_file = rescore_dir / 'synthetic.percolator.target.psms.txt'
-    psm_file.write_text(
+    psm_content = (
         'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
         'synthetic_2_2_1\t1.5\t0.01\t0.001\tK.ACDEFGHIK.L\tSP|PROT1|GENE1\n'
         'synthetic_3_2_1\t1.3\t0.01\t0.002\tR.LMNPQR.S\tSP|PROT1|GENE1\n'
         'synthetic_4_2_1\t1.2\t0.01\t0.003\tK.SAMPLEK.T\tSP|PROT2|GENE2\n'
     )
+    # Per-organism subdirectory with assign-confidence output
+    org_dir = rescore_dir / 'EUK'
+    org_dir.mkdir()
+    (org_dir / 'synthetic.EUK.assign-confidence.target.txt').write_text(psm_content)
     return rescore_dir
 
 @pytest.fixture()

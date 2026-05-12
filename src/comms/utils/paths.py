@@ -3,6 +3,7 @@ comMS output path utility functions
 '''
 
 # -- Import external dependencies
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +12,12 @@ from comms.utils.log import logMsg
 
 # repoBinDir: returns Path to bin/ directory in repo root
 def repoBinDir() -> Path:
-    '''Returns the repo-root bin/ directory, resolved from this file's location.'''
+    '''
+    Returns the repo-root bin/ directory resolved from COMMS_BIN_DIR environment variable if set otherwise walks back up repo
+    '''
+    env_override = os.environ.get('COMMS_BIN_DIR')
+    if env_override:
+        return Path(env_override)
     return Path(__file__).parents[3] / 'bin'
 
 # generateOutputFileStructure: returns Path to expected output directory

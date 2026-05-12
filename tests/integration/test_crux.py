@@ -206,32 +206,30 @@ def search_results(crux_bin, built_index, tmp_path_factory):
 # -- Define tests for running spectral-counts Crux command
 class TestSpectralCounts:
     def test_creates_spectral_counts_file(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
-        psm_file, fasta = synthetic_percolator_results / 'synthetic.percolator.target.psms.txt', synthetic_fasta
+        psm_file = synthetic_percolator_results / 'EUK' / 'synthetic.EUK.assign-confidence.target.txt'
         cfg = loadDefaultConfig()
         out_dir = tmp_path / 'comms' / 'results' / 'quantify'
         ok = spectralCounts(
             crux_bin=crux_bin,
             psm_file=psm_file,
-            database=fasta,
+            database=synthetic_fasta,
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
         )
         assert ok, 'spectralCounts returned False — check quantify.log'
-        counts_file = out_dir / 'synthetic.spectral-counts.target.txt'
-        assert counts_file.exists()
+        assert (out_dir / 'synthetic.spectral-counts.target.txt').exists()
 
     def test_counts_file_has_content(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
-        psm_file, fasta = synthetic_percolator_results / 'synthetic.percolator.target.psms.txt', synthetic_fasta
+        psm_file = synthetic_percolator_results / 'EUK' / 'synthetic.EUK.assign-confidence.target.txt'
         cfg = loadDefaultConfig()
         out_dir = tmp_path / 'comms' / 'results' / 'quantify'
         spectralCounts(
             crux_bin=crux_bin,
             psm_file=psm_file,
-            database=fasta,
+            database=synthetic_fasta,
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
         )
-        counts_file = out_dir / 'synthetic.spectral-counts.target.txt'
-        assert counts_file.stat().st_size > 0
+        assert (out_dir / 'synthetic.spectral-counts.target.txt').stat().st_size > 0

@@ -368,73 +368,91 @@ def synthetic_tide_search_dir(tmp_path):
     return search_dir
 
 # -- Define helper function for rescore PSM files
-def _write_per_organism_psm_files(rescore_dir: Path, file_base: str, labels: list[str]) -> None:
+def _write_combined_percolator_output(rescore_dir: Path, fileroot: str) -> None:
     '''
-    Write synthetic per-organism Percolator output files so that _mergeRescoredPsms has something to read without Percolator running.
+    Write synthetic combined Percolator target and decoy PSM files at the top level of rescore_dir, as cruxutil.percolator produces them
     '''
-    rows = {'EUK': PSM_ROW_MT, 'PRO': PSM_ROW_RI}
+    PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
+    for match_type in ('target', 'decoy'):
+        path = rescore_dir / f'{fileroot}.percolator.{match_type}.psms.txt'
+        path.write_text(
+            PSM_HEADER
+            + 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
+            + 'synthetic_2\t1.2\t0.005\t0.003\tK.SAMPLEK.T\tsp|TP001|GENE1_TESTPRO\n'
+        )
+
+# -- Define helper function to write split-organism PSM files 
+def _write_split_psm_files(rescore_dir: Path, fileroot: str, labels: list[str]) -> bool:
+    PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
+    PSM_ROW = 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
     for label in labels:
         for match_type in ('target', 'decoy'):
-            path = rescore_dir / label / f'{file_base}.{label}.percolator.{match_type}.psms.txt'
+            path = rescore_dir / label / f'{fileroot}.{label}.percolator.{match_type}.psms.txt'
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(PSM_HEADER + rows.get(label, PSM_ROW_MT))
+            path.write_text(PSM_HEADER + PSM_ROW)
+    return True
 
 # -- Define tests for rescore command with per-organism picked-protein FDR
 class TestRunRescoreDirectories:
     def test_creates_rescore_output_directory(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert (tmp_path / 'comms' / 'results' / 'rescore').exists()
 
     def test_creates_per_organism_subdirectories(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         assert (rescore_dir / 'EUK').exists()
         assert (rescore_dir / 'PRO').exists()
 
-class TestRunRescoreMergedOutput:
-    def test_writes_merged_target_psm_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
-        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
-        def _mock_percolator(**kwargs):
-            # Write synthetic per-organism files as a side effect of mocked Percolator
-            _write_per_organism_psm_files(rescore_dir, 'synthetic', ['EUK', 'PRO'])
-            return True
-        with patch('comms.commands.rescore.cruxutil.percolator',
-                   side_effect=_mock_percolator):
-            run_rescore(
-                input_dir=synthetic_tide_search_dir,
-                database=two_organism_fasta,
-                output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
-            )
-        assert (rescore_dir / 'synthetic.percolator.target.psms.txt').exists()
 
-    def test_writes_merged_decoy_psm_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+class TestRunRescoreAssignConfidence:
+    def test_assign_confidence_called_once_per_organism(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         def _mock_percolator(**kwargs):
-            _write_per_organism_psm_files(rescore_dir, 'synthetic', ['EUK', 'PRO'])
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
-        with patch('comms.commands.rescore.cruxutil.percolator',
-                   side_effect=_mock_percolator):
+        def _mock_split(**kwargs):
+            return _write_split_psm_files(rescore_dir, 'synthetic', ['EUK', 'PRO'])
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', side_effect=_mock_split), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True) as mock_ac:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        assert (rescore_dir / 'synthetic.percolator.decoy.psms.txt').exists()
+        assert mock_ac.call_count == 2
+
+    def test_raises_system_exit_when_percolator_produces_no_output(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+        with patch('comms.commands.rescore.cruxutil.percolator', return_value=False):
+            with pytest.raises(SystemExit):
+                run_rescore(
+                    input_dir=synthetic_tide_search_dir,
+                    database=two_organism_fasta,
+                    output=tmp_path,
+                    organism_tags='EUK,TESTEUK,PRO,TESTPRO',
+                )
 
 class TestRunRescoreOrganismTags:
     def test_raises_system_exit_when_no_psm_files(self, crux_bin, two_organism_fasta, tmp_path):
@@ -445,7 +463,7 @@ class TestRunRescoreOrganismTags:
                 input_dir=empty_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
 
     def test_raises_system_exit_when_org_tags_invalid(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
@@ -454,92 +472,123 @@ class TestRunRescoreOrganismTags:
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO',
+                organism_tags='EUK,TESTEUK,PRO',
             )
 
     def test_raises_system_exit_when_no_tags_available(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, monkeypatch):
         import comms.commands.rescore as rescore_mod
-        monkeypatch.setitem(rescore_mod.config, 'organism', None)
+        monkeypatch.setitem(rescore_mod.config, 'organism', {})
         with pytest.raises(SystemExit):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='',
+                organism_tags='',
             )
 
-    def test_uses_config_organism_when_org_tags_falsy(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, monkeypatch):
+    def test_uses_config_organism_when_organism_tags_falsy(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, monkeypatch):
         import comms.commands.rescore as rescore_mod
         monkeypatch.setitem(rescore_mod.config, 'organism', {'EUK': 'TESTEUK', 'PRO': 'TESTPRO'})
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
-            run_rescore(
-                input_dir=synthetic_tide_search_dir,
-                database=two_organism_fasta,
-                output=tmp_path,
-                org_tags='',
-            )
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
-        assert (rescore_dir / 'EUK').exists()
-        assert (rescore_dir / 'PRO').exists()
 
-    def test_percolator_called_once_per_organism_per_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
-        with patch('comms.commands.rescore.cruxutil.percolator',
-                   return_value=True) as mock_perc, \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True) as mock_ac:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='',
             )
-        assert mock_perc.call_count == 2
+        assert mock_ac.call_count == 0
+
+    def test_percolator_called_once_per_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator) as mock_perc, \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+            run_rescore(
+                input_dir=synthetic_tide_search_dir,
+                database=two_organism_fasta,
+                output=tmp_path,
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
+            )
+        assert mock_perc.call_count == 1
+
 
 class TestRunRescoreOutput:
     def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        captured = capsys.readouterr()
-        assert 'Rescore finished successfully' in captured.out
+        assert 'Rescore finished successfully' in capsys.readouterr().out
 
     def test_prints_warning_when_percolator_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=False), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
-            run_rescore(
-                input_dir=synthetic_tide_search_dir,
-                database=two_organism_fasta,
-                output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
-            )
-        captured = capsys.readouterr()
-        assert 'WARNING' in captured.out
+        # Percolator fails → source prints WARNING then exits; catch the exit
+        with patch('comms.commands.rescore.cruxutil.percolator', return_value=False):
+            with pytest.raises(SystemExit):
+                run_rescore(
+                    input_dir=synthetic_tide_search_dir,
+                    database=two_organism_fasta,
+                    output=tmp_path,
+                    organism_tags='EUK,TESTEUK,PRO,TESTPRO',
+                )
+        assert 'WARNING' in capsys.readouterr().out
 
-    def test_prints_warning_when_merge_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=False):
+    def test_prints_warning_when_split_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=False), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        captured = capsys.readouterr()
-        assert 'WARNING' in captured.out
+        assert 'WARNING' in capsys.readouterr().out
 
     def test_logger_is_named_rescore(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=True), \
-             patch('comms.commands.rescore._mergeRescoredPsms', return_value=True):
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+
+        def _mock_percolator(**kwargs):
+            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
-                org_tags='EUK,TESTEUK,PRO,TESTPRO',
+                organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert logMsg._instance.logger.name == 'rescore'
 
@@ -641,16 +690,17 @@ class TestRunLfqEarlyExit:
                 output=tmp_path,
             )
 
-    def test_raises_system_exit_when_no_mzml_files(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_called_per_fraction_even_when_mzml_dir_empty(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path):
         empty_mzml_dir = tmp_path / 'empty_mzml'
         empty_mzml_dir.mkdir()
-        with pytest.raises(SystemExit):
+        with patch('comms.commands.lfq.cruxutil.lfq', return_value=False) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=empty_mzml_dir,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 output=tmp_path,
             )
+        assert mock_lfq.call_count == 3
 
 class TestRunLfqWarnings:
     def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, caplog):

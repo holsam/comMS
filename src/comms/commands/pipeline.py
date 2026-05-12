@@ -69,7 +69,7 @@ def run_pipeline(
     # -- Step 4: Rescore
     log.debug(f'Starting PSM rescoring')
     print(f'\n[bold blue]Step 4/5:[/bold blue] Running Percolator rescoring...')
-    rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, org_tags=org_tags, in_pipeline=True)
+    rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, organism_tags=org_tags, in_pipeline=True)
     rescore_dir = output_dir / 'comms/results/rescore'
     log.debug(f'rescore_dir: {rescore_dir}')
     # -- Step 5: Quantify
@@ -84,7 +84,7 @@ def run_pipeline(
         if not skip_lfq:
             # -- Step 5a: MS1 label free quantification
             print(f'\n\t[bold blue]Step {step}/{num_steps}:[/bold blue] Running MS1 label-free quantification...')
-            lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, output=output_dir, mbr=None, in_pipeline=True)
+            lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, output=output_dir, in_pipeline=True)
             lfq_dir = output_dir / 'comms/results/lfq'
             log.debug(f'lfq_dir: {lfq_dir}')
         if not skip_quantify:
