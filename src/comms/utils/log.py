@@ -2,7 +2,7 @@
 Shared utility functions: logging
 '''
 # -- Import external dependencies
-import logging, shutil
+import logging, shutil, tempfile
 from pathlib import Path
 
 # -- Define custom logger class
@@ -28,9 +28,12 @@ class logMsg:
         if cls._instance:
             cls._instance.logger.error(msg)
 
-# -- Define custom class LogState to define log level
+# -- Define custom class LogState to track log level and temp log file
 class LogState:
     log_level: int = logging.INFO
+    _temp_log_file: tempfile.NamedTemporaryFile | None = None
+    _temp_log_path: Path | None = None
+    _file_handler: logging.FileHandler | None = None
 
 # -- checkUniqueLogFile: returns string corresponding to path to uniquely-named log file
 def checkUniqueLogFile(
@@ -48,36 +51,74 @@ def checkUniqueLogFile(
         log_file = dir / f'{stem}-{counter}{suffix}'
     return(log_file)
 
+# -- configureStreamLogging: attach a stream handler to the root logger
 def configureStreamLogging():
-    """Attach a stream handler to the root logger at the current log level."""
     logger = logging.getLogger()
     logger.setLevel(log_state.log_level)
-    # Avoid adding duplicate handlers on repeated calls
     if any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
            for h in logger.handlers):
         return
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(name)s | %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    formatter = _formatter()
     handler = logging.StreamHandler()
     handler.setLevel(log_state.log_level)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    # Also start buffering to a temp file immediately
+    _attachTempFileHandler()
 
+# -- configureFileLogging: flush temp log to its final location under out_dir
 def configureFileLogging(out_dir: Path):
-    """Attach a file handler once out_dir is known."""
     logger = logging.getLogger()
-    formatter = logging.Formatter(
+    # Remove the temp file handler
+    if log_state._file_handler is not None:
+        logger.removeHandler(log_state._file_handler)
+        log_state._file_handler.close()
+        log_state._file_handler = None
+    # Copy temp log contents to the final path
+    final_path = checkUniqueLogFile(out_dir)
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    if log_state._temp_log_path is not None and log_state._temp_log_path.exists():
+        shutil.copy2(log_state._temp_log_path, final_path)
+    # Attach a new file handler pointed at the final path
+    handler = logging.FileHandler(final_path, mode='a')
+    handler.setLevel(log_state.log_level)
+    handler.setFormatter(_formatter())
+    logger.addHandler(handler)
+    log_state._file_handler = handler
+    # Clean up temp file
+    _removeTempLog()
+
+# -- _formatter: internal helper to format log messages 
+def _formatter() -> logging.Formatter:
+    return logging.Formatter(
         fmt="%(asctime)s | %(name)s | %(levelname)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
-    log_file = checkUniqueLogFile(out_dir=out_dir)
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(log_file)
+
+# -- _attachTempFileHandler: internal helper to attach a temporary file as a file handler until actual log file is known from output directory
+def _attachTempFileHandler():
+    if log_state._file_handler is not None:
+        return  # already attached
+    tmp = tempfile.NamedTemporaryFile(
+        prefix='comms_', suffix='.log', delete=False
+    )
+    log_state._temp_log_file = tmp
+    log_state._temp_log_path = Path(tmp.name)
+    handler = logging.FileHandler(tmp.name, mode='a')
     handler.setLevel(log_state.log_level)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    handler.setFormatter(_formatter())
+    logging.getLogger().addHandler(handler)
+    log_state._file_handler = handler
+
+# -- _removeTempLog: internal helper to remove temporary log file once 
+def _removeTempLog():
+    try:
+        if log_state._temp_log_path and log_state._temp_log_path.exists():
+            log_state._temp_log_path.unlink()
+    except OSError:
+        pass
+    log_state._temp_log_file = None
+    log_state._temp_log_path = None
 
 # -- Initialise state
 log_state = LogState()
