@@ -7,32 +7,21 @@ import pytest
 from pathlib import Path
 
 # -- Import functions under test
-from comms.commands.rescore import _parseOrganismTags, _mergeTypeRescoredPsms, _mergeRescoredPsms
+from comms.commands.rescore import _parseOrganismTags, _classifyPsmRow, _splitPsmsByOrganism
 
 # -- Define constants
 PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
-PSM_ROW_TE = 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
-PSM_ROW_TP = 'synthetic_2\t1.2\t0.005\t0.003\tK.SAMPLEK.T\tsp|TP001|GENE1_TESTPRO\n'
+PSM_ROW_EUK = 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
+PSM_ROW_PRO = 'synthetic_2\t1.2\t0.005\t0.003\tK.SAMPLEK.T\tsp|TP001|GENE1_TESTPRO\n'
+PSM_ROW_CONT = 'synthetic_3\t0.9\t0.01\t0.005\tK.PEPTIDEFK.S\tcRAP|CONT001|CONT\n'
+ORGANISM_TAGS = {'EUK': 'TESTEUK', 'PRO': 'TESTPRO'}
 
-# -- Define helper functions
-def _write_psm_file(path: Path, rows: list[str]) -> None:
-    '''Write a synthetic Percolator file with standard header'''
+# -- Define helper function to write a combined Percolator PSM file
+def _write_combined_psm(path: Path, rows: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(PSM_HEADER + ''.join(rows))
 
-def _make_psm_files(out_dir: Path, file_base: str, subfastas: dict) -> None:
-    '''
-    Write synthetic target and decoy PSM files for each organism label in the directory structure expected by _mergeTypeRescoredPsms:
-        out_dir/<label>/<file_base>.<label>.percolator.<type>.psms.txt
-    '''
-    rows = {'EUK': [PSM_ROW_TE], 'PRO': [PSM_ROW_TP]}
-    for label in subfastas.keys():
-        for match_type in ('target', 'decoy'):
-            path = out_dir / label / f'{file_base}.{label}.percolator.{match_type}.psms.txt'
-            _write_psm_file(path, rows[label])
-
-# -- Define unit tests for _parseOrganismTags helper function
-
+# -- Define tests for _parseOrganismTags helper function
 class TestParseOrganismTags:
     def test_parses_two_organism_string(self):
         result = _parseOrganismTags('EUK,TESTEUK,PRO,TESTPRO')
@@ -76,82 +65,114 @@ class TestParseOrganismTags:
             assert isinstance(k, str)
             assert isinstance(v, str)
 
-# -- Define unit tests for _mergeTypedRescoredPsms helper function
-class TestMergeTypeRescoredPsms:
+
+# -- Define tests for _classifyPsmRow helper function
+class TestClassifyPsmRow:
+    def test_returns_correct_label_for_euk_row(self):
+        assert _classifyPsmRow(PSM_ROW_EUK, ORGANISM_TAGS) == 'EUK'
+
+    def test_returns_correct_label_for_pro_row(self):
+        assert _classifyPsmRow(PSM_ROW_PRO, ORGANISM_TAGS) == 'PRO'
+
+    def test_returns_contaminants_for_unmatched_row(self):
+        assert _classifyPsmRow(PSM_ROW_CONT, ORGANISM_TAGS) == 'contaminants'
+
+    def test_returns_string(self):
+        result = _classifyPsmRow(PSM_ROW_EUK, ORGANISM_TAGS)
+        assert isinstance(result, str)
+
+    def test_returns_contaminants_for_empty_row(self):
+        assert _classifyPsmRow('', ORGANISM_TAGS) == 'contaminants'
+
+    def test_uses_last_column_for_protein_id(self):
+        # Construct a row where only the last column matches
+        row = 'id\t1.0\t0.01\t0.001\tK.PEP.K\tsp|TE001|GENE1_TESTEUK\n'
+        assert _classifyPsmRow(row, ORGANISM_TAGS) == 'EUK'
+
+    def test_first_matching_tag_wins(self):
+        # Row matches both tags if tags overlap; first key in dict wins
+        overlapping_tags = {'EUK': 'TESTEUK', 'ALSO': 'TE001'}
+        result = _classifyPsmRow(PSM_ROW_EUK, overlapping_tags)
+        assert result == 'EUK'
+
+
+# -- Define tests for _splitPsmsByOrganism helper function
+class TestSplitPsmsByOrganism:
     @pytest.fixture()
-    def setup(self, tmp_path):
-        '''Write synthetic PSM files for two organisms and return (out_dir, subfastas).'''
-        subfastas = {'EUK': tmp_path / 'EUK.fa', 'PRO': tmp_path / 'PRO.fa'}
-        _make_psm_files(tmp_path, 'synthetic', subfastas)
-        return tmp_path, subfastas
+    def combined_target(self, tmp_path):
+        path = tmp_path / 'synthetic.percolator.target.psms.txt'
+        _write_combined_psm(path, [PSM_ROW_EUK, PSM_ROW_PRO, PSM_ROW_CONT])
+        return path
 
-    def test_returns_list(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        assert isinstance(result, list)
-
-    def test_all_elements_end_with_newline(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        for element in result:
-            assert element.endswith('\n'), f'Element does not end with newline: {element}'
-
-    def test_header_appears_exactly_once(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        header_lines = [line for line in result if line.startswith('PSMId\t')]
-        assert len(header_lines) == 1
-
-    def test_rows_from_both_organisms_present(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('target', 'synthetic', subfastas, out_dir)
-        data_rows = [line for line in result if not line.startswith('PSMId\t')]
-        labels = {row.split('\t')[-1] for row in data_rows}
-        assert any('EUK' in label for label in labels)
-        assert any('PRO' in label for label in labels)
-
-    def test_works_for_decoy_type(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeTypeRescoredPsms('decoy', 'synthetic', subfastas, out_dir)
-        assert isinstance(result, list)
-        assert len(result) > 0
-
-# -- Define unit tests for _mergeRescoredPsms helper function
-class TestMergeRescoredPsms:
     @pytest.fixture()
-    def setup(self, tmp_path):
-        subfastas = {'EUK': tmp_path / 'EUK.fa', 'PRO': tmp_path / 'PRO.fa'}
-        _make_psm_files(tmp_path, 'synthetic', subfastas)
-        return tmp_path, subfastas
+    def combined_decoy(self, tmp_path):
+        path = tmp_path / 'synthetic.percolator.decoy.psms.txt'
+        _write_combined_psm(path, [PSM_ROW_EUK])
+        return path
 
-    def test_returns_true_on_success(self, setup):
-        out_dir, subfastas = setup
-        result = _mergeRescoredPsms('synthetic', subfastas, out_dir)
+    def test_returns_true_on_success(self, combined_target, combined_decoy, tmp_path):
+        result = _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+        )
         assert result is True
 
-    def test_returns_false_when_input_file_missing(self, tmp_path):
-        subfastas = {'EUK': tmp_path / 'EUK.fa'}
-        result = _mergeRescoredPsms('synthetic', subfastas, tmp_path)
-        assert result is False
+    def test_creates_per_organism_target_files(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').exists()
+        assert (tmp_path / 'PRO' / 'synthetic.PRO.percolator.target.psms.txt').exists()
 
-    def test_writes_target_merged_file(self, setup):
-        out_dir, subfastas = setup
-        _mergeRescoredPsms('synthetic', subfastas, out_dir)
-        assert (out_dir / 'synthetic.percolator.target.psms.txt').exists()
+    def test_creates_per_organism_decoy_files(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.decoy.psms.txt').exists()
 
-    def test_writes_decoy_merged_file(self, setup):
-        out_dir, subfastas = setup
-        _mergeRescoredPsms('synthetic', subfastas, out_dir)
-        assert (out_dir / 'synthetic.percolator.decoy.psms.txt').exists()
+    def test_euk_file_contains_only_euk_rows(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        content = (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').read_text()
+        assert 'TESTEUK' in content
+        assert 'TESTPRO' not in content
 
-    def test_merged_target_file_is_non_empty(self, setup):
-        out_dir, subfastas = setup
-        _mergeRescoredPsms('synthetic', subfastas, out_dir)
-        assert (out_dir / 'synthetic.percolator.target.psms.txt').stat().st_size > 0
+    def test_pro_file_contains_only_pro_rows(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        content = (tmp_path / 'PRO' / 'synthetic.PRO.percolator.target.psms.txt').read_text()
+        assert 'TESTPRO' in content
+        assert 'TESTEUK' not in content
 
-    def test_merged_file_is_readable_text(self, setup):
-        out_dir, subfastas = setup
-        _mergeRescoredPsms('synthetic', subfastas, out_dir)
-        content = (out_dir / 'synthetic.percolator.target.psms.txt').read_text()
-        assert isinstance(content, str)
-        assert len(content) > 0
+    def test_contaminant_rows_go_to_contaminants_bucket(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        cont_file = tmp_path / 'contaminants' / 'synthetic.contaminants.percolator.target.psms.txt'
+        assert cont_file.exists()
+        assert 'CONT' in cont_file.read_text()
+
+    def test_header_is_preserved_in_each_output_file(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        for label in ('EUK', 'PRO'):
+            content = (tmp_path / label / f'synthetic.{label}.percolator.target.psms.txt').read_text()
+            assert content.startswith('PSMId\t')
+
+    def test_returns_bool_when_target_file_missing(self, tmp_path):
+        missing = tmp_path / 'nonexistent.percolator.target.psms.txt'
+        decoy = tmp_path / 'nonexistent.percolator.decoy.psms.txt'
+        result = _splitPsmsByOrganism(missing, decoy, ORGANISM_TAGS, tmp_path, 'nonexistent')
+        assert isinstance(result, bool)
+
+    def test_skips_decoy_file_gracefully_when_absent(self, combined_target, tmp_path):
+        missing_decoy = tmp_path / 'synthetic.percolator.decoy.psms.txt'
+        result = _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=missing_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+        )
+        assert result is True
+        assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').exists()
+
+    def test_output_files_are_non_empty(self, combined_target, combined_decoy, tmp_path):
+        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        for label in ('EUK', 'PRO'):
+            path = tmp_path / label / f'synthetic.{label}.percolator.target.psms.txt'
+            assert path.stat().st_size > 0
