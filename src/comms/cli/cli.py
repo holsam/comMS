@@ -8,7 +8,7 @@ from typing import Annotated
 
 # -- Import internal utility functions
 from comms.utils.settings import initComms
-from comms.utils.log import configureStreamLogging, log_state
+from comms.utils.log import configureStreamLogging, log_state, PROGRESS
 
 # -- Import comMS commands
 from comms.cli.convert import commsConvert
@@ -68,8 +68,8 @@ def main(
     if debug:
         log_level = logging.DEBUG
     elif verbose:
-        log_level = logging.INFO
+        log_level = PROGRESS
     else:
-        log_level = logging.WARN
+        log_level = logging.INFO
     log_state.log_level = log_level
     configureStreamLogging()
