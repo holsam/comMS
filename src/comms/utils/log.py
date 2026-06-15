@@ -10,12 +10,23 @@ from rich.text import Text
 
 # -- Define level colours for RichHandler
 _LEVEL_COLOURS: dict[str, str] = {
-    'DEBUG':    'dim cyan',
-    'INFO':     'green',
-    'WARNING':  'yellow',
-    'ERROR':    'bold red',
-    'CRITICAL': 'bold bright_red',
+    'DEBUG':    'color(67)',
+    'PROGRESS': 'color(75)',
+    'INFO':     'color(33)',
+    'WARNING':  'color(178)',
+    'ERROR':    'color(160)',
+    'CRITICAL': 'color(124)',
 }
+
+# -- Register custom PROGRESS logging level
+PROGRESS = 15
+logging.addLevelName(PROGRESS, 'PROGRESS')
+
+def _progress(self, message, *args, **kwargs):
+    if self.isEnabledFor(PROGRESS):
+        self._log(PROGRESS, message, args, **kwargs)
+
+logging.Logger.progress = _progress
 
 # -- Define custom RichHandler subclass (CommsRichHandler) to allow custom formatting
 class CommsRichHandler(RichHandler):
@@ -24,7 +35,7 @@ class CommsRichHandler(RichHandler):
         markup = (
             f"[dim]{self.formatter.formatTime(record, self.formatter.datefmt)}[/dim] | "
             f"[bold]{record.name}[/bold] | "
-            f"[{level_colour}]{record.levelname}: {message}[/{level_colour}]"
+            f"[bold {level_colour}]{record.levelname}[/] | [white]{message}[/]"
         )
         return Text.from_markup(markup)
 
@@ -38,6 +49,10 @@ class logMsg:
     def debug(cls, msg: str):
         if cls._instance:
             cls._instance.logger.debug(msg)
+    @classmethod
+    def progress(cls, msg:str):
+        if cls._instance:
+            cls._instance.logger.progress(msg)
     @classmethod
     def info(cls, msg: str):
         if cls._instance:
@@ -145,7 +160,7 @@ def _attachTempFileHandler():
     logging.getLogger().addHandler(handler)
     log_state._file_handler = handler
 
-# -- _removeTempLog: internal helper to remove temporary log file once 
+# -- _removeTempLog: internal helper to remove temporary log file once
 def _removeTempLog():
     try:
         if log_state._temp_log_path and log_state._temp_log_path.exists():
