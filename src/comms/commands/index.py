@@ -16,13 +16,16 @@ from comms.utils import paths as pathutil
 # -- run_index: builds a Tide peptide index from database and writes it to output
 def run_index(database: Path, output: Path, in_pipeline: bool = False):
     if not in_pipeline:
-        log = logMsg('index')
-        log.debug('Starting index command')
+        logMsg('index')
+    logMsg.debug('Started command: index')
     crux_bin, _ = validate(check_crux=True)
-    logMsg.info(f'Building Tide peptide index from: {database.name}')
+    logMsg.info(f'Indexing database {database.name}')
     out_dir = pathutil.generateOutputFileStructure(output, 'index')
+    logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'index.log'
     configureFileLogging(log_path)
+    logMsg.debug(f'Output log file: {log_path}')
+    logMsg.progress(f'Building Tide peptide index')
     ok = cruxutil.tideIndex(
         crux_bin=crux_bin,
         database=database,
@@ -30,9 +33,7 @@ def run_index(database: Path, output: Path, in_pipeline: bool = False):
         config=config,
     )
     if not ok:
-        logMsg.error(f'tide-index failed — see: {log_path}')
+        logMsg.error(f'tide-index failed, see {log_path}')
         raise SystemExit(1)
-    logMsg.info(f'Peptide index written to: {out_dir}')
-    print(f'\n[bold green]Index finished successfully - summary:[/]')
-    print(f'- Source database: {database}')
-    print(f'- Output: {out_dir}')
+    logMsg.info(f'Indexing complete: peptide index saved to {out_dir}')
+    logMsg.debug(f'Finished command: index')

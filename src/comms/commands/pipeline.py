@@ -25,35 +25,33 @@ def run_pipeline(
     threads: int,
     org_tags: str
 ):
-    log = logMsg('pipeline')
+    logMsg('pipeline')
+    logMsg.debug(f'Started command: pipeline')
     START = datetime.datetime.now()
     # -- Load sample sheet
-    log.debug('Importing sample sheet')
     try:
         samples = loadSampleSheet(sample_sheet)
     except ValueError as e:
-        log.error(f'Error importing sample sheet: {e}')
+        logMsg.error(f'Could not load sample sheet: {e}')
         raise SystemExit(1)
-    log.debug(f"Sample sheet loaded: {len(samples)} sample(s); {samples['treatment'].nunique()} treatment(s)")
+    logMsg.debug(f"Sample sheet loaded: {len(samples)} sample(s); {samples['treatment'].nunique()} treatment(s)")
+    logMsg.info(f'Running comMS pipeline: {len(samples)} sample(s), {samples['treatment'].nunique()} treatment(s)')
     # -- Step 1: Convert (optional)
     if not skip_convert:
-        log.debug(f'Starting .RAW conversion')
-        log.progress(f'[bold blue]Step 1/5:[/bold blue] Converting .RAW files...')
+        logMsg.progress(f'Step 1/5: converting .RAW files')
         convert.run_convert(input_dir=input_dir, output=output_dir, gzip=True, in_pipeline=True)
         mzml_dir = output_dir / 'comms/results/convert'
     else:
-        log.progress(f'[dim]Step 1/5: Skipping .RAW conversion (--skip-convert).[/dim]')
+        logMsg.progress(f'Step 1/5: skipping .RAW conversion')
         mzml_dir = input_dir
-    log.debug(f'mzml_dir: {mzml_dir}')
+    logMsg.debug(f'mzml_dir: {mzml_dir}')
     # -- Step 2: Build index
-    log.debug(f'Starting peptide indexing')
-    log.progress(f'[bold blue]Step 2/5:[/bold blue] Building peptide index...')
+    logMsg.progress(f'Step 2/5: building peptide index')
     index.run_index(database=database, output=output_dir, in_pipeline=True)
     index_dir = output_dir / 'comms/results/index'
-    log.debug(f'index_dir: {index_dir}')
+    logMsg.debug(f'index_dir: {index_dir}')
     # -- Step 3: Search
-    log.debug(f'Starting peptide-spectra matching')
-    log.progress(f'[bold blue]Step 3/5:[/bold blue] Running Tide-search...')
+    logMsg.progress(f'Step 3/5: searching spectra')
     search.run_search(
         input_dir=mzml_dir,
         index_dir=index_dir,
@@ -63,34 +61,31 @@ def run_pipeline(
         in_pipeline=True
     )
     search_dir = output_dir / 'comms/results/search'
-    log.debug(f'search_dir: {search_dir}')
+    logMsg.debug(f'search_dir: {search_dir}')
     # -- Step 4: Rescore
-    log.debug(f'Starting PSM rescoring')
-    log.progress(f'[bold blue]Step 4/5:[/bold blue] Running Percolator rescoring...')
+    logMsg.progress(f'Step 4/5: rescoring PSMs')
     rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, organism_tags=org_tags, in_pipeline=True)
     rescore_dir = output_dir / 'comms/results/rescore'
-    log.debug(f'rescore_dir: {rescore_dir}')
+    logMsg.debug(f'rescore_dir: {rescore_dir}')
     # -- Step 5: Quantify
     if skip_lfq and skip_quantify:
-        log.debug('Both quantification methods skipped')
-        log.progress(f'[bold blue]Step 5/5:[/bold blue] skipping quantification...')
+        logMsg.progress(f'Step 5/5: quantification skipped')
     else:
-        log.debug('Starting quantification')
-        log.progress(f'[bold blue]Step 5/5:[/bold blue] Running quantification...')
+        logMsg.progress(f'Step 5/5: quantifying peptides/proteins')
         num_steps = int(not skip_lfq) + int(not skip_quantify)
         step = 1
         if not skip_lfq:
             # -- Step 5a: MS1 label free quantification
-            log.progress(f'\t[bold blue]Step {step}/{num_steps}:[/bold blue] Running MS1 label-free quantification...')
+            logMsg.progress(f'\tStep {step}/{num_steps}: quantifying with MS1 label-free quantification')
             lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, output=output_dir, in_pipeline=True)
             lfq_dir = output_dir / 'comms/results/lfq'
-            log.debug(f'lfq_dir: {lfq_dir}')
+            logMsg.debug(f'lfq_dir: {lfq_dir}')
         if not skip_quantify:
             # -- Step 5b: dNSAF spectral counting
-            log.progress(f'\t[bold blue]Step {step}/{num_steps}:[/bold blue] Running dNSAF spectral counting...')
+            logMsg.progress(f'\tStep {step}/{num_steps}: quantifying with dNSAF spectral counting...')
             quantify.run_quantify(input_dir=rescore_dir, database=database, output=output_dir, in_pipeline=True)
             quantify_dir = output_dir / 'comms/results/quantify'
-            log.debug(f'quantify_dir: {quantify_dir}')
+            logMsg.debug(f'quantify_dir: {quantify_dir}')
     END = datetime.datetime.now()
-    log.info(f'\n[bold green]Pipeline complete.[/bold green] Runtime: {END - START}')
-    log.info(f'All results written to: {output_dir}\n')
+    logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {output_dir}')
+    logMsg.debug(f'Finished command: pipeline')

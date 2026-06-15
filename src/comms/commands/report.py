@@ -49,9 +49,9 @@ def _run_r_section(
     logMsg.debug(f'Running {section}: {" ".join(cmd)}')
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        console.print(f'[red][bold]{section}[/bold] failed to run: [dim]{result.stderr}[/dim][/red]')
+        logMsg.warn(f'Section {section} failed: {result.stderr}')
         return False
-    console.print(f'[green][bold]{section}[/bold] ran successfully[/green]')
+    logMsg.debug(f'Section {section} completed')
     return True
 
 # -- _write_index: return none, but write index
@@ -87,41 +87,41 @@ def run_report(
     in_pipeline: bool
 ) -> None:
     if not in_pipeline:
-        log = logMsg('report')
-        log.debug('Starting report command')
+        logMsg('report')
+    logMsg.debug('Started command: report')
     # Validate inputs
     sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:
-        logMsg.error(f'No spectral count quantification output files found in {quantify_dir}')
+        logMsg.error(f'No quantification output files found in {quantify_dir}')
         raise SystemExit(1)
     try:
         loadSampleSheet(sample_sheet)
     except ValueError as e:
-        logMsg.error(f'Error loading sample sheet: {e}')
+        logMsg.error(f'Could not load sample sheet: {e}')
         raise SystemExit(1)
     if ref_info is not None and not ref_info.is_file():
-        logMsg.error(f'--ref-into path {ref_info} not found')
+        logMsg.error(f'--ref-info not found: {ref_info}')
         raise SystemExit(1)
     if cont_csv is not None and not cont_csv.is_file():
-        logMsg.error(f'--cont-csv path {cont_csv} not found')
+        logMsg.error(f'--cont-csv not found: {cont_csv}')
         raise SystemExit(1)
     if output_dir.exists() and not overwrite:
-        logMsg.error(f'Output directory {output_dir} already exists')
+        logMsg.error(f'Output directory already exists: {output_dir}')
         raise SystemExit(1)
     output_dir.mkdir(parents=True, exist_ok=True)
     # Drop concordance if no LFQ data
     if 'concordance' in sections and lfq_dir is None:
-        logMsg.warn('No --lfq-dir provided: skipping concordance section')
+        logMsg.warn('No --lfq-dir provided, skipping concordance section')
         sections = [s for s in sections if s != 'concordance']
     if lfq_dir is not None and not lfq_dir.is_dir():
-        logMsg.error(f'--lfq-dir {lfq_dir} not found')
+        logMsg.error(f'--lfq-dir not found: {lfq_dir}')
         raise SystemExit(1)
     # Check Rscript is available
     if shutil.which(rscript) is None:
-        logMsg.error(f'Rscript {rscript} not callable')
+        logMsg.error(f'Rscript not callable: {rscript}')
         raise SystemExit(1)
     # Run command
-    logMsg.info(f'Starting report generation with {len(sections)} section(s)')
+    logMsg.info(f'Generating report: {len(sections)} section(s)')
     # Define arguments passed to every R script
     common_args = [
         str(quantify_dir),
@@ -133,6 +133,7 @@ def run_report(
     ]
     results: dict[str, bool] = {}
     for sec in sections:
+        logMsg.progress(f'Running section: {sec}')
         script, needs_lfq = _SECTIONS[sec]
         extra: list[str] = []
         if sec == 'da':
@@ -160,10 +161,5 @@ def run_report(
         results)
     n_ok = sum(results.values())
     n_fail = len(results) - n_ok
-    logMsg.info(f'Report completed - {n_ok} succeeded, {n_fail} failed')
-    if n_fail > 0:
-        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] report generation failed for {n_fail} section(s).')
-    print(f'\n[bold green]Report finished successfully - summary:[/]')
-    print(f'- Sections written successfully: {n_ok}')
-    print(f'- Sections failed: {n_fail}')
-    print(f'- Output directory: {output_dir}\n')
+    logMsg.info(f'Report complete: {n_ok} succeeded, {n_fail} failed')
+    logMsg.debug(f'Finished command: report')

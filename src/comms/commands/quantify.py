@@ -18,21 +18,24 @@ from comms.utils import paths as pathutil
 # -- run_quantify: runs dNSAF spectral counting on per-organism assign-confidence PSM files and writes results to output
 def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: bool = False):
     if not in_pipeline:
-        log = logMsg('quantify')
-        log.debug('Starting quantify command')
+        logMsg('quantify')
+    logMsg.debug('Started command: quantify')
     crux_bin, _ = validate(check_crux=True)
-    logMsg.debug(f'Scanning for assign-confidence PSM files in organism subdirectories of: {input_dir}')
+    logMsg.debug(f'Scanning {input_dir} subdirectories for assign-confidence PSMs')
     psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
     if not psm_files:
-        logMsg.error(f'No assign-confidence PSM files found in organism subdirectories of: {input_dir}')
+        logMsg.error(f'No assign-confidence PSM files found in {input_dir}')
         raise SystemExit(1)
-    logMsg.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
+    logMsg.info(f'Quantifying {len(psm_files)} PSM file(s)')
     out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
+    logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'quantify.log'
     configureFileLogging(log_path)
+    logMsg.debug(f'Output log file: {log_path}')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for psm_file in tqdm(psm_files, desc='Files quantified'):
+            logMsg.progress(f'Quantifying {psm_file.name}')
             fileroot = psm_file.name.removesuffix('.assign-confidence.target.txt')
             ok = cruxutil.spectralCounts(
                 crux_bin=crux_bin,
@@ -45,12 +48,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
             if ok:
                 n_ok += 1
             else:
-                logMsg.warn(f'spectral-counts failed for: {psm_file.name}')
+                logMsg.warn(f'Quantification failed for {psm_file.name}')
                 n_fail += 1
-    logMsg.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
-    if n_fail > 0:
-        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} file(s). Check {log_path} for details.')
-    print(f'\n[bold green]Quantify finished successfully - summary:[/]')
-    print(f'- Files quantified successfully: {n_ok}')
-    print(f'- Files failed: {n_fail}')
-    print(f'- Output directory: {out_dir}\n')
+    logMsg.info(f'Quantification complete: {n_ok} succeeded, {n_fail} failed')
+    logMsg.debug('Finished command: quantify')
