@@ -145,20 +145,17 @@ def config_set(
     # Check at least one flag set
     if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, custom, clip_met)):
         log.warn(f'No flag supplied to config set.')
-        print(f'\n[bold yellow]WARNING:[/bold yellow] No flag supplied. Use [bold]comms config set --help[/bold]/[bold]to see available options.\n')
         raise SystemExit(1)
     # Check if user config exists
     config_path = userConfigPath()
     if not config_path.exists():
         log.debug(f'No user config found — creating from defaults at: {config_path}')
-        print(f'\n[dim]No user config found — creating one from defaults at [cyan]{config_path}[/cyan][/dim]')
         _writeConfig(loadDefaultConfig())
     # Load user config
     try:
         cfg = _loadUserConfig()
     except Exception as e:
         log.error(f'Failed to read user config: {e}')
-        print(f'\n[bold red]ERROR:[/bold red] Could not read user config: {e}\n')
         raise SystemExit(1)
     # Apply any passed flags
     cfg = _apply_protocol_flags(
@@ -181,7 +178,6 @@ def config_set(
         _writeConfig(cfg)
     except Exception as e:
         log.error(f'Failed to write user config: {e}')
-        print(f'\n[bold red]ERROR:[/bold red] Could not write user config: {e}\n')
         raise SystemExit(1)
     # Print summary
     _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, custom=custom, clip_met=clip_met)

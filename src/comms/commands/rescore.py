@@ -29,7 +29,6 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
     target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
         logMsg.error(f'No Tide-search target PSM files found in: {input_dir}')
-        print(f'[bold red]ERROR:[/bold red] No Tide-search target PSM files found in {input_dir}.')
         raise SystemExit(1)
     logMsg.info(f'Found {len(target_files)} PSM file(s)')
     
@@ -41,7 +40,6 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
             organism_tags = config['organism']
         else:
             logMsg.error(f'No organism tag data found in user config file.')
-            print(f'[bold red]ERROR:[/bold red] No organism tag data found in user config file. Set for one command only using [bold]--organism-tags[/] or set in user config using [bold]comms config set --organism[/bold].')
             raise SystemExit(1)
     
     out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
@@ -51,7 +49,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
     sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
 
     # Round 1: Percolator on the full combined database, with one call per sample file
-    print(f'\nRound 1: Rescoring {len(target_files)} PSM file(s) with Percolator (full combined database)...')
+    logMsg.progress(f'Round 1: Rescoring {len(target_files)} PSM file(s) with Percolator (full combined database)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for target_file in tqdm(target_files, desc='Files rescored'):
@@ -72,16 +70,15 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
                 n_fail += 1
     logMsg.info(f'Round 1 complete — {n_ok} succeeded, {n_fail} failed')
     if n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] Percolator failed for {n_fail} file(s). Check {log_path} for details.')
+        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] Percolator failed for {n_fail} file(s). Check {log_path} for details.')
     # Collect the combined Percolator outputs for splitting
     combined_target_files = sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
     if not combined_target_files:
         logMsg.error('No combined Percolator output files found after round 1 — cannot proceed.')
-        print(f'[bold red]ERROR:[/bold red] No Percolator output found in {out_dir}.')
         raise SystemExit(1)
     
     # Round 2: split Percolator output by organism prefix, then run assign-confidence per organism for per-organism PSM-level q-values
-    print(f'\nRound 2: Splitting and running assign-confidence on {len(combined_target_files)} file(s)...')
+    logMsg.progress(f'\nRound 2: Splitting and running assign-confidence on {len(combined_target_files)} file(s)...')
     ac_n_ok, ac_n_fail = 0, 0
     with logging_redirect_tqdm():
         for combined_file in tqdm(combined_target_files, desc='Files processed'):
@@ -125,7 +122,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
                     ac_n_fail += 1
     logMsg.info(f'Round 2 complete — {ac_n_ok} succeeded, {ac_n_fail} failed')
     if ac_n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] assign-confidence failed for {ac_n_fail} file(s). Check {log_path} for details.')
+        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] assign-confidence failed for {ac_n_fail} file(s). Check {log_path} for details.')
     print(f'\n[bold green]Rescore finished successfully — summary:[/]')
     print(f'- Round 1 (Percolator): {n_ok} succeeded, {n_fail} failed')
     print(f'- Round 2 (assign-confidence): {ac_n_ok} succeeded, {ac_n_fail} failed')

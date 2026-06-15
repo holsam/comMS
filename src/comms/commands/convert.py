@@ -24,11 +24,10 @@ def run_convert(input_dir: Path, output: Path, gzip: bool, in_pipeline: bool = F
     if not raw_files:
         logMsg.warn(f'No .RAW files found in: {input_dir}')
         return
-    logMsg.info(f'Found {len(raw_files)} .RAW file(s) — starting conversion')
+    logMsg.info(f'Found {len(raw_files)} .RAW file(s). Starting conversion to indexed mzML')
     out_dir = pathutil.generateOutputFileStructure(output, 'convert')
     log_path = out_dir / 'convert.log'
     configureFileLogging(log_path)
-    print(f'\nConverting {len(raw_files)} .RAW file(s) to indexed mzML...')
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
         logMsg.info(f'Converting: {raw_file.name}')

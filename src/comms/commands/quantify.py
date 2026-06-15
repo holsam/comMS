@@ -24,14 +24,12 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
     logMsg.debug(f'Scanning for assign-confidence PSM files in organism subdirectories of: {input_dir}')
     psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
     if not psm_files:
-        logMsg.warn(f'No assign-confidence PSM files found in organism subdirectories of: {input_dir}')
-        print(f'[bold red]ERROR:[/bold red] No assign-confidence PSM files found under {input_dir}.')
+        logMsg.error(f'No assign-confidence PSM files found in organism subdirectories of: {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Found {len(psm_files)} PSM file(s) — starting spectral counting')
     out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
     log_path = out_dir / 'quantify.log'
     configureFileLogging(log_path)
-    print(f'\nRunning dNSAF spectral counting on {len(psm_files)} file(s)...')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for psm_file in tqdm(psm_files, desc='Files quantified'):
@@ -51,7 +49,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
                 n_fail += 1
     logMsg.info(f'Complete — {n_ok} succeeded, {n_fail} failed')
     if n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} file(s). Check {log_path} for details.')
+        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] quantification failed for {n_fail} file(s). Check {log_path} for details.')
     print(f'\n[bold green]Quantify finished successfully - summary:[/]')
     print(f'- Files quantified successfully: {n_ok}')
     print(f'- Files failed: {n_fail}')

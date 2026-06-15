@@ -92,44 +92,36 @@ def run_report(
     # Validate inputs
     sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:
-        print(f'[bold red]ERROR:[/bold red] no spectral count quantification output files found in {quantify_dir}')
         logMsg.error(f'No spectral count quantification output files found in {quantify_dir}')
         raise SystemExit(1)
     try:
         loadSampleSheet(sample_sheet)
     except ValueError as e:
-        print(f'[bold red]ERROR:[/bold red] {e}')
         logMsg.error(f'Error loading sample sheet: {e}')
         raise SystemExit(1)
     if ref_info is not None and not ref_info.is_file():
-        print(f'[bold red]ERROR:[/bold red] --ref-info path {ref_info} not found')
         logMsg.error(f'--ref-into path {ref_info} not found')
         raise SystemExit(1)
     if cont_csv is not None and not cont_csv.is_file():
-        print(f'[bold red]ERROR:[/bold red] --cont-csv path {cont_csv} not found')
         logMsg.error(f'--cont-csv path {cont_csv} not found')
         raise SystemExit(1)
     if output_dir.exists() and not overwrite:
-        print(f'[bold red]ERROR:[/bold red] Output directory {output_dir} already exists, use --overwrite')
         logMsg.error(f'Output directory {output_dir} already exists')
         raise SystemExit(1)
     output_dir.mkdir(parents=True, exist_ok=True)
     # Drop concordance if no LFQ data
     if 'concordance' in sections and lfq_dir is None:
-        print('[dim]No --lfq-dir provided: skipping concordance section[/dim]')
+        logMsg.warn('No --lfq-dir provided: skipping concordance section')
         sections = [s for s in sections if s != 'concordance']
     if lfq_dir is not None and not lfq_dir.is_dir():
-        print(f'[bold red]ERROR:[/bold red] --lfq-dir {lfq_dir} not found')
         logMsg.error(f'--lfq-dir {lfq_dir} not found')
         raise SystemExit(1)
     # Check Rscript is available
     if shutil.which(rscript) is None:
-        print(f'[bold red]ERROR:[/bold red] Rscript {rscript} not callable')
         logMsg.error(f'Rscript {rscript} not callable')
         raise SystemExit(1)
     # Run command
     logMsg.info(f'Starting report generation with {len(sections)} section(s)')
-    print(f'\nStarting report generation with {len(sections)} section(s)\n')
     # Define arguments passed to every R script
     common_args = [
         str(quantify_dir),
@@ -170,7 +162,7 @@ def run_report(
     n_fail = len(results) - n_ok
     logMsg.info(f'Report completed - {n_ok} succeeded, {n_fail} failed')
     if n_fail > 0:
-        print(f'[bold yellow]WARNING:[/bold yellow] report generation failed for {n_fail} section(s).')
+        logMsg.warn(f'[bold yellow]WARNING:[/bold yellow] report generation failed for {n_fail} section(s).')
     print(f'\n[bold green]Report finished successfully - summary:[/]')
     print(f'- Sections written successfully: {n_ok}')
     print(f'- Sections failed: {n_fail}')
