@@ -6,7 +6,6 @@ comMS binary validation utility functions
 import platform, re, shutil, subprocess
 from pathlib import Path
 from typing import Optional
-from rich import print
 
 # -- Import internal functions
 from comms.utils.log import logMsg
