@@ -41,7 +41,7 @@ def splitFastaByOrganism(fasta_path: Path, out_dir: Path, organism_tags: dict[st
     '''Partition a combined FASTA into per-organism sub-FASTAs'''
     subfastas = {}
     fasta = readFasta(fasta_path)
-    logMsg.debug(f'Read FASTA file contents from {fasta_path}')
+    logMsg.debug(f'Read FASTA from {fasta_path}')
     # Split FASTA file into organism-specific and contaminant sub-FASTAs
     for entry in fasta:
         if _searchHeaderForTag(subfastas, organism_tags, entry):
@@ -57,12 +57,13 @@ def splitFastaByOrganism(fasta_path: Path, out_dir: Path, organism_tags: dict[st
                 subfastas[subfasta_key].append(contaminant)
         # Remove contaminants sub-FASTA now it's been added to all others
         del subfastas['contaminants']
+    logMsg.debug(f'Partitioned into {len(subfastas)} organisms')
     # Write all sub-FASTAs
     outputs = {}
     for subfasta_key in subfastas.keys():
         out_file = out_dir / f"{subfasta_key}.fa"
         writeFasta(data=subfastas[subfasta_key], out_file=out_file)
-        logMsg.debug(f'Wrote organism-specific FASTA file to {out_file}')
+        logMsg.debug(f'Wrote organism FASTA: {out_file}')
         outputs.update({subfasta_key: out_file})
     # Return dictionary of strings
     return outputs

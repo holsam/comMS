@@ -16,9 +16,9 @@ def repoBinDir() -> Path:
     Returns the repo-root bin/ directory resolved from COMMS_BIN_DIR environment variable if set otherwise walks back up repo
     '''
     env_override = os.environ.get('COMMS_BIN_DIR')
-    if env_override:
-        return Path(env_override)
-    return Path(__file__).parents[3] / 'bin'
+    bin_dir = Path(env_override) if env_override else Path(__file__).parents[3] / 'bin'
+    logMsg.debug(f'Using bin directory: {bin_dir}')
+    return bin_dir
 
 # generateOutputFileStructure: returns Path to expected output directory
 def generateOutputFileStructure(out_dir: Path, command: str) -> Path:
@@ -32,13 +32,13 @@ def generateOutputFileStructure(out_dir: Path, command: str) -> Path:
     base = Path(out_dir, expected)
     if not base.exists():
         base.mkdir(parents=True, exist_ok=True)
-        logMsg.debug(f'Output directory created: {base}')
+        logMsg.debug(f'Created output directory: {base}')
         return base
     # Increment until we find an unused directory
     counter = 1
     while True:
         candidate = Path(out_dir, f'comms/results/{command}-{counter}')
-        logMsg.debug(f'Output directory already exists, incrementing: {candidate}')
+        logMsg.debug(f'Output directory exists, trying {candidate}')
         if not candidate.exists():
             candidate.mkdir(parents=True, exist_ok=True)
             return candidate
@@ -71,7 +71,7 @@ def checkUniqueFileName(
         counter = 1
         while True:
             out_path = Path(out_dir, f'{stem}-{counter}{suffix}')
-            logMsg.debug(f'Output filename already exists, incrementing: {out_path}')
+            logMsg.debug(f'Output filename exists, trying {out_path}')
             if not out_path.exists():
                 break
             counter += 1

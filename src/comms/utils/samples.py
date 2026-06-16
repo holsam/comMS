@@ -23,7 +23,7 @@ REQUIRED_COLUMNS = {'sample_id', 'raw_file', 'treatment', 'fraction', 'replicate
 
 # -- loadSampleSheet: returns dataframe of sample sheet contents
 def loadSampleSheet(path: Path) -> pandas.DataFrame:
-    logMsg.debug(f'Loading sample sheet: {path.name}')
+    logMsg.debug(f'Loading sample sheet {path.name}')
     sep = '\t' if path.suffix.lower() in {'.tsv', '.txt'} else ','
     try:
         df = pandas.read_csv(path, sep=sep)
@@ -40,18 +40,18 @@ def loadSampleSheet(path: Path) -> pandas.DataFrame:
         raise ValueError(f'Sample sheet ({path.name}) contains duplicate sample_id values.')
     fractions = df['fraction'].unique()
     if len(fractions) < 2:
-        logMsg.warn(f'Only one fraction found in sample sheet {fractions[0]}. Fraction-aware grouping will have no effect.')
+        logMsg.warn(f'Only one fraction found in sample sheet ({fractions[0]}), fraction-aware grouping has no effect')
     logMsg.debug(f'Sample sheet loaded: {len(df)} rows; {df["treatment"].nunique()} treatment(s); {len(fractions)} fraction(s)')
     return df
 
 # -- getSamplesByTreatment: returns dataframe of a subset of input dataframe giving samples with a specific treatment value
 def getSamplesByTreatment(df: pandas.DataFrame, treatment: str) -> pandas.DataFrame:
-    logMsg.debug(f'Filtering samples for treatment: {treatment}')
+    logMsg.debug(f'Filtering samples for treatment {treatment}')
     return df[df['treatment'].str.upper() == treatment.upper()].copy()
 
 # -- getSamplesByFraction: returns dataframe of a subset of input dataframe giving samples with a specific fraction value
 def getSamplesByFraction(df: pandas.DataFrame, fraction: str) -> pandas.DataFrame:
-    logMsg.debug(f'Filtering samples for fraction: {fraction}')
+    logMsg.debug(f'Filtering samples for fraction {fraction}')
     return df[df['fraction'].str.upper() == fraction.upper()].copy()
 
 # -- getRawFileMap: returns dictionary of Paths for each sample_id in sample sheet
