@@ -4,6 +4,7 @@ comMS experiment GUI — sample sheet table model
 
 # -- Import external dependencies
 from dataclasses import dataclass
+from pathlib import Path
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal
 
 # -- Define dataclass SampleRow to hold a sample sheet row
@@ -22,6 +23,8 @@ COLUMNS = ['sample_id', 'raw_file', 'treatment', 'fraction', 'replicate', 'batch
 COL_SAMPLE_ID, COL_RAW, COL_TREATMENT, COL_FRACTION, COL_REPLICATE, COL_BATCH = range(6)
 _EDITABLE = {COL_SAMPLE_ID, COL_TREATMENT, COL_FRACTION, COL_REPLICATE, COL_BATCH}
 
+# -- Display labels differ from the written column names (which the loader requires verbatim)
+_HEADER_LABELS = {'batch': 'batch (optional)'}
 
 # -- Define class SampleTableModel to hold an editable table model backed by a list of SampleRow
 class SampleTableModel(QAbstractTableModel):
@@ -44,7 +47,8 @@ class SampleTableModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
-            return COLUMNS[section]
+            name = COLUMNS[section]
+            return _HEADER_LABELS.get(name, name)
         return section + 1
 
     def flags(self, index):
@@ -95,6 +99,30 @@ class SampleTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._rows = rows
         self.endResetModel()
+        self._renumber_replicates()
+        self.contentChanged.emit()
+
+    # -- add_files: append a SampleRow per path, skipping files already present
+    def add_files(self, paths) -> None:
+        existing = {r.raw_file for r in self._rows}
+        new = [Path(p) for p in paths if Path(p).name not in existing]
+        if not new:
+            return
+        start = len(self._rows)
+        self.beginInsertRows(QModelIndex(), start, start + len(new) - 1)
+        for p in new:
+            self._rows.append(SampleRow(sample_id=p.stem, raw_file=p.name))
+        self.endInsertRows()
+        self._renumber_replicates()
+        self.contentChanged.emit()
+
+    # -- remove_rows: delete the given row indices
+    def remove_rows(self, rows) -> None:
+        for i in sorted(set(rows), reverse=True):
+            if 0 <= i < len(self._rows):
+                self.beginRemoveRows(QModelIndex(), i, i)
+                del self._rows[i]
+                self.endRemoveRows()
         self._renumber_replicates()
         self.contentChanged.emit()
 
