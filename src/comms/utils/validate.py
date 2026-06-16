@@ -6,7 +6,6 @@ comMS binary validation utility functions
 import platform, re, shutil, subprocess
 from pathlib import Path
 from typing import Optional
-from rich import print
 
 # -- Import internal functions
 from comms.utils.log import logMsg
@@ -87,29 +86,23 @@ def _check_crux(bin_dir: Path, allow_lfq: bool) -> Path:
     '''
     Locate all Crux installations, select the most up-to-date, enforce any version constraints, and return the path to the selected binary
     '''
-    logMsg.debug('validate: checking Crux binary')
-    print('validate: checking Crux binary')
+    logMsg.progress('Locating Crux binary')
     crux_candidates = _find_all_crux(bin_dir)
-    print(crux_candidates)
     if not crux_candidates:
-        logMsg.error(f'Crux binary not found under: {bin_dir}')
-        print(f'\n[bold red]ERROR:[/bold red] Crux binary not found under [cyan]{bin_dir}[/cyan].\n')
+        logMsg.error(f'Crux binary not found in {bin_dir}')
         raise SystemExit(1)
     result = _select_best(crux_candidates, _get_crux_version)
     if result is None:
         logMsg.error('Could not determine version for any Crux installation')
-        print('\n[bold red]ERROR:[/bold red] Could not determine Crux version for any installation found - please check any Crux installations.\n')
         raise SystemExit(1)
     crux_bin, version = result
     version_str = '.'.join(str(v) for v in version)
     if len(crux_candidates) > 1:
-        logMsg.info(f'{len(crux_candidates)} Crux installations found. Using most recent: v{version_str} at {crux_bin}')
-        print(f'[dim]Found {len(crux_candidates)} Crux installations. Using most recent: v{version_str} ([cyan]{crux_bin}[/cyan])[/dim]')
-    logMsg.debug(f'Crux version: {version_str} at {crux_bin}')
+        logMsg.info(f'{len(crux_candidates)} Crux installations found, using v{version_str} from {crux_bin}')
+    logMsg.debug(f'Crux v{version_str} from {crux_bin}')
     if allow_lfq and version < _CRUX_MIN_LFQ:
         min_str = '.'.join(str(v) for v in _CRUX_MIN_LFQ)
-        logMsg.error(f'Crux {version_str} does not support lfq (requires >= {min_str})')
-        print(f'\n[bold red]ERROR:[/bold red] The [bold]lfq[/bold] command requires Crux >= [cyan]{min_str}[/cyan], but the most recent installed version is [cyan]{version_str}[/cyan].\n')
+        logMsg.error(f'Crux v{version_str} does not support lfq (requires >= {min_str})')
         raise SystemExit(1)
     return crux_bin
 
@@ -118,28 +111,24 @@ def _check_trfp(bin_dir: Path) -> Path:
     '''
     Locate all ThermoRawFileParser installations, select the most up-to-date, check for Mono if needed, and return the path to the selected binary
     '''
-    logMsg.debug('validate: checking ThermoRawFileParser binary')
+    logMsg.progress('Locating ThermoRawFileParser binary')
     trfp_candidates = _find_all_trfp(bin_dir)
     if not trfp_candidates:
-        logMsg.error(f'ThermoRawFileParser not found under: {bin_dir}')
-        print(f'\n[bold red]ERROR:[/bold red] ThermoRawFileParser not found under [cyan]{bin_dir}[/cyan].\n')
+        logMsg.error(f'ThermoRawFileParser not found in {bin_dir}')
         raise SystemExit(1)
     result = _select_best(trfp_candidates, _get_trfp_version)
     if result is None:
-        logMsg.error('Could not determine version for any ThermoRawFileParser installation')
-        print('\n[bold red]ERROR:[/bold red] Could not determine ThermoRawFileParser version for any installation found - please check any ThermoRawFileParser installations.\n')
+        logMsg.error('Could not determine version for any ThermoRawFileParser installations')
         raise SystemExit(1)
     trfp_path, version = result
     version_str = '.'.join(str(v) for v in version)
     if len(trfp_candidates) > 1:
-        logMsg.info(f'{len(trfp_candidates)} ThermoRawFileParser installations found; using most recent: v{version_str} at {trfp_path}')
-        print(f'[dim]Found {len(trfp_candidates)} ThermoRawFileParser installations. Using most recent: v{version_str} ([cyan]{trfp_path}[/cyan])[/dim]')
-    logMsg.debug(f'ThermoRawFileParser version: {version_str} at {trfp_path}')
+        logMsg.info(f'{len(trfp_candidates)} ThermoRawFileParser installations found, using v{version_str} from {trfp_path}')
+    logMsg.debug(f'ThermoRawFileParser v{version_str} from {trfp_path}')
     if version < _TRFP_MIN_MONO and platform.system() != 'Windows':
-        logMsg.debug('TRFP < 2.0.0 on non-Windows: checking for Mono')
+        logMsg.debug('TRFP versio. < 2.0.0 on non-Windows, checking for Mono')
         if shutil.which('mono') is None:
-            logMsg.error(f'Mono not found; required for ThermoRawFileParser {version_str} on non-Windows')
-            print(f'\n[bold red]ERROR:[/bold red] ThermoRawFileParser [cyan]{version_str}[/cyan] requires [bold]Mono[/bold] on Linux/macOS, but Mono was not found on PATH.\nInstall it with [bold]brew install mono[/bold] (macOS) or [bold]apt install mono-complete[/bold] (Debian/Ubuntu), or upgrade to ThermoRawFileParser >= 2.0.0.\n')
+            logMsg.error(f'Mono not found, but required by ThermoRawFileParser v{version_str} on non-Windows OS')
             raise SystemExit(1)
     return trfp_path
 
@@ -157,25 +146,19 @@ def _get_crux_version(crux_bin: Path) -> Optional[tuple[int, ...]]:
         )
         output = result.stdout + result.stderr
     except Exception as e:
-        logMsg.error(f'Failed to run crux version: {e}')
+        logMsg.warn(f'Could not run crux version: {e}')
         return None
     # Match the canonical "Crux version X.Y.Z" line; ignore the build suffix
     match = re.search(r'Crux version\s+(\d+\.\d+(?:\.\d+)*)', output, re.IGNORECASE)
     if not match:
-        logMsg.warn(f'Could not find "Crux version" line in output:\n{output[:400]}')
+        logMsg.warn(f'Could not find "Crux version" line in output:\n{output[:200]}')
         return None
     return _parse_version(match.group(1))
 
 # -- _get_crux_version: returns a tuple of ints corresponding to parsed version number
 def _get_trfp_version(trfp_path: Path) -> Optional[tuple[int, ...]]:
     '''
-    Run ThermoRawFileParser with no arguments and parse the version from
-    its output.  On non-Windows, direct invocation is attempted first
-    (works for native builds >= 2.0.0); if that yields no parseable
-    version, falls back to invoking via Mono.
-
-    Example output:
-        1.4.5
+    Run ThermoRawFileParser with no arguments and parse the version from its output.  On non-Windows, direct invocation is attempted first (works for native builds >= 2.0.0); if that yields no parseable version, falls back to invoking via Mono
     '''
     def _run(cmd: list[str]) -> Optional[str]:
         try:

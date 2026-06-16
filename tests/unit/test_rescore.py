@@ -69,30 +69,30 @@ class TestParseOrganismTags:
 # -- Define tests for _classifyPsmRow helper function
 class TestClassifyPsmRow:
     def test_returns_correct_label_for_euk_row(self):
-        assert _classifyPsmRow(PSM_ROW_EUK, ORGANISM_TAGS) == 'EUK'
+        assert _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS) == 'EUK'
 
     def test_returns_correct_label_for_pro_row(self):
-        assert _classifyPsmRow(PSM_ROW_PRO, ORGANISM_TAGS) == 'PRO'
+        assert _classifyPsmRow(row=PSM_ROW_PRO, id_index=5, organism_tags=ORGANISM_TAGS) == 'PRO'
 
     def test_returns_contaminants_for_unmatched_row(self):
-        assert _classifyPsmRow(PSM_ROW_CONT, ORGANISM_TAGS) == 'contaminants'
+        assert _classifyPsmRow(row=PSM_ROW_CONT, id_index=5, organism_tags=ORGANISM_TAGS) == 'contaminants'
 
     def test_returns_string(self):
-        result = _classifyPsmRow(PSM_ROW_EUK, ORGANISM_TAGS)
+        result = _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS)
         assert isinstance(result, str)
 
     def test_returns_contaminants_for_empty_row(self):
-        assert _classifyPsmRow('', ORGANISM_TAGS) == 'contaminants'
+        assert _classifyPsmRow(row='', id_index=5, organism_tags=ORGANISM_TAGS) == 'contaminants'
 
     def test_uses_last_column_for_protein_id(self):
         # Construct a row where only the last column matches
         row = 'id\t1.0\t0.01\t0.001\tK.PEP.K\tsp|TE001|GENE1_TESTEUK\n'
-        assert _classifyPsmRow(row, ORGANISM_TAGS) == 'EUK'
+        assert _classifyPsmRow(row=row, id_index=5, organism_tags=ORGANISM_TAGS) == 'EUK'
 
     def test_first_matching_tag_wins(self):
         # Row matches both tags if tags overlap; first key in dict wins
         overlapping_tags = {'EUK': 'TESTEUK', 'ALSO': 'TE001'}
-        result = _classifyPsmRow(PSM_ROW_EUK, overlapping_tags)
+        result = _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=overlapping_tags)
         assert result == 'EUK'
 
 

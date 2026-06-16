@@ -44,20 +44,20 @@ def _concatPsmFiles(psm_files: list[Path], dest: Path) -> None:
 
 # -- findCrux: returns a Path to the Crux binary under bin_dir/crux*/bin/crux, or None if not found
 def findCrux(bin_dir: Path) -> Optional[Path]:
-    logMsg.debug(f'Searching for Crux binary under: {bin_dir}')
+    logMsg.debug(f'Searching for Crux binary in {bin_dir}')
     matches = list(bin_dir.glob('crux*/bin/crux'))
     if not matches:
-        logMsg.warn(f'No Crux binary found under: {bin_dir}')
+        logMsg.warn(f'No Crux binary found in {bin_dir}')
         return None
     result = sorted(matches)[-1]
-    logMsg.debug(f'Crux binary found: {result}')
+    logMsg.debug(f'Selected Crux binary: {result}')
     return result
 
 # -- runCrux: returns True if the Crux subcommand completed successfully, False on failure
 def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
     cmd = [str(crux_bin), subcommand] + [str(a) for a in args]
-    logMsg.debug(f'Running {subcommand}: {" ".join(cmd)}')
     try:
+        logMsg.debug(f'Running {subcommand}: {" ".join(cmd)}')
         stderr_lines = []
         with subprocess.Popen(
             cmd,
@@ -72,16 +72,16 @@ def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
                         stderr_lines.append(line)
                         live.update(Text(line, style='dim'))
         if proc.returncode != 0:
-            logMsg.warn(f'{subcommand} failed (exit {proc.returncode}) — see log file in output directory for details')
+            logMsg.warn(f'{subcommand} exited {proc.returncode}); last stderr: {stderr_lines[-1] if stderr_lines else "none"}')
             return False
         return True
     except Exception as e:
-        logMsg.error(f'Unexpected error running {subcommand}: {e}')
+        logMsg.warn(f'Unexpected error running {subcommand}: {e}')
         return False
 
 # -- tideIndex: returns True if the Tide peptide index was built successfully, False on failure
 def tideIndex(crux_bin: Path, database: Path, index_dir: Path, config: dict) -> bool:
-    logMsg.debug(f'Starting tide-index for database: {database.name}')
+    logMsg.debug(f'tide-index: {database.name}')
     args = [
         '--verbosity', '40',
         '--memory-limit', '8',
@@ -105,7 +105,7 @@ def tideIndex(crux_bin: Path, database: Path, index_dir: Path, config: dict) -> 
 
 # -- paramMedic: returns True if param-medic completed successfully, False on failure
 def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
-    logMsg.debug(f'Running param-medic on: {mzml_file.name}')
+    logMsg.debug(f'param-medic for {mzml_file.name}')
     args = [
         '--verbosity', '40',
         '--output-dir', str(out_dir),
@@ -115,10 +115,10 @@ def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
 def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, threads, precursor_tol=None, mz_bin_width=None) -> bool:
-    logMsg.debug(f'Starting tide-search for: {mzml_file.name}')
+    logMsg.debug(f'tide-search: {mzml_file.name}')
     prec = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width = mz_bin_width  or config['search']['mz_bin_width']
-    logMsg.debug(f'Using precursor tolerance: {prec} ppm, m/z bin width: {bin_width}')
+    logMsg.debug(f'Precursor tolerance {prec} ppm, m/z bin width {bin_width}')
     args = [
         '--verbosity', '40',
         '--num-threads', threads,
@@ -139,7 +139,7 @@ def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, 
 
 # -- percolator: returns True if Percolator rescoring completed successfully, False on failure
 def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
-    logMsg.debug(f'Starting Percolator for: {target_psm_file.name}')
+    logMsg.debug(f'percolator: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
         '--protein-enzyme', config['percolator']['protein_enzyme'],
@@ -158,7 +158,7 @@ def assignConfidence(crux_bin: Path, target_psm_file: Path, out_dir: Path, filer
     '''
     Run crux assign-confidence on a per-organism split PSM file to estimate per-organism PSM-level q-values using target-decoy competition (TDC)
     '''
-    logMsg.debug(f'Starting assign-confidence for: {target_psm_file.name}')
+    logMsg.debug(f'assign-confidence: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
         '--estimation-method', 'tdc',
@@ -172,7 +172,7 @@ def assignConfidence(crux_bin: Path, target_psm_file: Path, out_dir: Path, filer
 
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
 def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
-    logMsg.debug(f'Starting spectral-counts for: {psm_file.name}')
+    logMsg.debug(f'spectral-counts: {psm_file.name}')
     args = [
         '--verbosity', '40',
         '--measure', config['quantify']['measure'],
@@ -190,23 +190,23 @@ def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path
 
 # -- lfq: returns True if LFQ quantification completed successfully, False on failure
 def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
-    logMsg.debug(f'Starting label-free quantification for {len(psm_files)} PSM file(s)')
+    logMsg.debug(f'lfq for {len(psm_files)} PSM file(s)')
     # Resolve mzML files by matching stems to PSM file stems
     mzml_files = []
     for psm_file in psm_files:
         stem = psm_file.name.removesuffix('.percolator.target.psms.txt')
         matches = list(mzml_dir.glob(f'{stem}.mzML')) + list(mzml_dir.glob(f'{stem}.mzML.gz'))
         if not matches:
-            logMsg.warn(f'No mzML file found for PSM file: {psm_file.name} — skipping')
+            logMsg.warn(f'No mzML for PSM file, skipping {psm_file.name}')
             continue
         mzml_files.append(matches[0])
     if not mzml_files:
-        logMsg.warn('No mzML files could be matched to PSM files — aborting LFQ')
+        logMsg.warn('No mzML files matched any PSM file, aborting lfq')
         return False
-    logMsg.debug(f'Matched {len(mzml_files)} mzML file(s) for LFQ')
+    logMsg.debug(f'Matched {len(mzml_files)} mzML file(s)')
     # Concatenate all PSM files for this fraction into a single temp file
     tmp_psm = out_dir / f'{fileroot}.combined.percolator.target.psms.txt'
-    logMsg.debug(f'Concatenating {len(psm_files)} PSM file(s) into: {tmp_psm.name}')
+    logMsg.debug(f'Concatenating {len(psm_files)} PSM file(s) into {tmp_psm.name}')
     _concatPsmFiles(psm_files, tmp_psm)
     args = [
         '--verbosity', '40',
