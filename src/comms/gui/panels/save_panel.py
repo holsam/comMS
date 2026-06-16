@@ -53,8 +53,8 @@ class SavePanel(QWidget):
 
     # -- refresh: rebuild the summary and re-evaluate the save button
     def refresh(self) -> None:
-        out_dir = self._header.output_dir()
-        name = self._header.experiment_name() or '(unnamed)'
+        out_dir = self._experiment.output_dir()
+        name = self._experiment.experiment_name() or '(unnamed)'
         self._exp_label.setText(
             f'{name}  →  {out_dir}' if out_dir else f'{name}  →  (no directory set)')
         self._sample_label.setText(self._sample.summary())
@@ -65,22 +65,22 @@ class SavePanel(QWidget):
             '' if self._all_complete() else 'Complete all three tabs before saving')
 
     def _all_complete(self) -> bool:
-        return (self._header.is_valid()
+        return (self._experiment.is_valid()
                 and self._sample.is_complete()
                 and self._config.is_complete())
 
     def _save_all(self) -> None:
-        out_dir = self._header.output_dir()
+        out_dir = self._experiment.output_dir()
         if out_dir is None:
             return
         out_dir.mkdir(parents=True, exist_ok=True)
         sheet_path = self._sample.write(out_dir)
         config_path = self._config.write(out_dir)
-        meta_path = self._header.write_metadata(
+        meta_path = self._experiment.write_metadata(
             out_dir,
             files={'sample_sheet': sheet_path, 'config': config_path},
         )
-        self._header.tracker.mark_saved()
+        self._experiment.tracker.mark_saved()
         self._sample.tracker.mark_saved()
         self._config.tracker.mark_saved()
         self.saved.emit()
