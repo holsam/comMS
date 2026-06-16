@@ -194,12 +194,15 @@ def _loadUserConfig() -> dict:
     with config_path.open('rb') as f:
         return tomllib.load(f)
 
+# -- _writeConfigTo: writes a config dict to a given path
+def _writeConfigTo(config: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('wb') as f:
+        tomli_w.dump(config, f)
+
 # -- _writeConfig: writes config dict to the user config path
 def _writeConfig(config: dict):
-    config_path = userConfigPath()
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    with config_path.open('wb') as f:
-        tomli_w.dump(config, f)
+    _writeConfigTo(config, userConfigPath())
 
 # -- _flatten: returns a flat dict from a nested dict, with dot-separated keys
 def _flatten(d: dict, prefix: str = '') -> dict:
