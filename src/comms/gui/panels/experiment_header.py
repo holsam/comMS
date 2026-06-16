@@ -18,12 +18,15 @@ class ExperimentHeaderPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         form = QFormLayout(self)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         # Add experiment name field
         self._name = QLineEdit()
+        self._name.setMinimumWidth(360)
         self._name.setPlaceholderText('name for experiment')
         self._name.textChanged.connect(self.changed)
         # Add output directory field
         self._dir = QLineEdit()
+        self._dir.setMinimumWidth(360)
         self._dir.setPlaceholderText('directory to save experiment to')
         self._dir.textChanged.connect(self.changed)
         browse = QPushButton('Select Directory')
