@@ -3,7 +3,7 @@ Unit tests for src/comms/utils/validate.py
 '''
 
 # -- Import external dependencies
-import contextlib, pytest
+import contextlib, logging, pytest
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -21,6 +21,9 @@ from comms.utils.validate import (
     _CRUX_MIN_LFQ,
     _TRFP_MIN_MONO,
 )
+
+# -- Import logMsg from utils/log.py
+from comms.utils.log import logMsg
 
 # -- Define helper functions
 # -- _crux_version_output: returns a string mocking crux version command
@@ -225,12 +228,17 @@ class TestGetTrfpVersion:
 
 # -- Define tests for _check_crux helper function
 class TestCheckCrux:
+    '''Define ficture to initialise logging'''
+    @pytest.fixture(autouse=True)
+    def init_logmsg(self):
+        logMsg('validate')
+
     def _patches(
         self,
         bin_dir: Path,
         candidates: list[Path],
         versions: dict[str, tuple | None],
-    ):
+    ):  
         '''Return an ExitStack with all necessary patches applied.'''
         def _get_v(p):
             return versions.get(p.name)
@@ -263,21 +271,20 @@ class TestCheckCrux:
             result = _check_crux(tmp_path, allow_lfq=False)
         assert result == new
 
-    def test_prints_info_message_when_multiple_found(self, tmp_path, capsys):
+    def test_logs_info_message_when_multiple_found(self, tmp_path, caplog):
         old = _fake_bin(tmp_path, 'crux_old')
         new = _fake_bin(tmp_path, 'crux_new')
-        with self._patches(tmp_path, [old, new], {'crux_old': (4, 3, 2), 'crux_new': (5, 0, 0)}):
+        with self._patches(tmp_path, [old, new], {'crux_old': (4, 3, 2), 'crux_new': (5, 0, 0)}), \
+             caplog.at_level(logging.INFO):
             _check_crux(tmp_path, allow_lfq=False)
-        captured = capsys.readouterr()
-        assert '2' in captured.out
-        assert '5.0.0' in captured.out
+        assert '2 Crux installations found' in caplog.text
 
-    def test_no_message_printed_when_single_installation(self, tmp_path, capsys):
+    def test_no_log_message_for_single_installation(self, tmp_path, caplog):
         candidate = _fake_bin(tmp_path, 'crux')
-        with self._patches(tmp_path, [candidate], {'crux': (4, 3, 2)}):
+        with self._patches(tmp_path, [candidate], {'crux': (4, 3, 2)}), \
+             caplog.at_level(logging.INFO):
             _check_crux(tmp_path, allow_lfq=False)
-        captured = capsys.readouterr()
-        assert 'installations' not in captured.out.lower()
+        assert 'Crux installations found' not in caplog.text
 
     def test_allow_lfq_raises_when_best_version_below_minimum(self, tmp_path):
         candidate = _fake_bin(tmp_path, 'crux')
@@ -304,6 +311,11 @@ class TestCheckCrux:
 
 # -- Define tests for _check_trfp helper function
 class TestCheckTrfp:
+    '''Define ficture to initialise logging'''
+    @pytest.fixture(autouse=True)
+    def init_logmsg(self):
+        logMsg('validate')    
+
     def _patches(
         self,
         bin_dir: Path,
@@ -346,17 +358,15 @@ class TestCheckTrfp:
             result = _check_trfp(tmp_path)
         assert result == new
 
-    def test_prints_info_message_when_multiple_found(self, tmp_path, capsys):
+    def test_logs_info_message_when_multiple_found(self, tmp_path, caplog):
         old = _fake_bin(tmp_path, 'ThermoRawFileParser.exe')
         new = _fake_bin(tmp_path, 'ThermoRawFileParser')
         versions = {'ThermoRawFileParser.exe': (1, 4, 5), 'ThermoRawFileParser': (2, 0, 0)}
-        with self._patches(tmp_path, [old, new], versions):
+        with self._patches(tmp_path, [old, new], versions), caplog.at_level(logging.INFO):
             _check_trfp(tmp_path)
-        captured = capsys.readouterr()
-        assert '2' in captured.out
-        assert '2.0.0' in captured.out
+        assert '2 ThermoRawFileParser installations found' in caplog.text
 
-    def test_no_message_printed_when_single_installation(self, tmp_path, capsys):
+    def test_no_message_logged_when_single_installation(self, tmp_path, capsys):
         candidate = _fake_bin(tmp_path, 'ThermoRawFileParser')
         with self._patches(tmp_path, [candidate], {'ThermoRawFileParser': (2, 0, 0)}):
             _check_trfp(tmp_path)
@@ -412,6 +422,11 @@ class TestCheckTrfp:
 
 # -- Define tests for validate function
 class TestValidate:
+    '''Define ficture to initialise logging'''
+    @pytest.fixture(autouse=True)
+    def init_logmsg(self):
+        logMsg('validate')
+
     def _patches(
         self,
         crux_candidates: list[Path] | None = None,
@@ -516,26 +531,26 @@ class TestValidate:
                 validate(check_crux=True)
         mock_find.assert_not_called()
 
-    def test_error_message_printed_on_crux_not_found(self, capsys):
-        with self._patches(crux_candidates=None):
+    def test_error_message_logged_on_crux_not_found(self, caplog):
+        with self._patches(crux_candidates=None), caplog.at_level(logging.ERROR):
             with pytest.raises(SystemExit):
                 validate(check_crux=True)
-        assert 'ERROR' in capsys.readouterr().out
+        assert any(r.levelno >= logging.ERROR for r in caplog.records)
 
-    def test_error_message_printed_on_lfq_version_too_old(self, capsys):
+    def test_error_message_logged_on_lfq_version_too_old(self, caplog):
         fake_crux = Path('/fake/bin/crux')
-        with self._patches(crux_candidates=[fake_crux], crux_version=(4, 3, 2)):
+        with self._patches(crux_candidates=[fake_crux], crux_version=(4, 3, 2)), \
+             caplog.at_level(logging.ERROR):
             with pytest.raises(SystemExit):
                 validate(check_crux=True, allow_lfq=True)
-        captured = capsys.readouterr()
-        assert 'ERROR' in captured.out
-        assert 'lfq' in captured.out.lower()
-
-    def test_error_message_printed_on_mono_absent(self, capsys):
+        assert any(r.levelno >= logging.ERROR for r in caplog.records)
+        assert 'not support lfq' in caplog.text
+        
+    def test_error_message_logged_on_mono_absent(self, caplog):
         fake_trfp = Path('/fake/bin/ThermoRawFileParser')
-        with self._patches(trfp_candidates=[fake_trfp], trfp_version=(1, 4, 5), system='Linux', mono=None):
+        with self._patches(trfp_candidates=[fake_trfp], trfp_version=(1, 4, 5), system='Linux', mono=None), \
+             caplog.at_level(logging.ERROR):
             with pytest.raises(SystemExit):
                 validate(check_trfp=True)
-        captured = capsys.readouterr()
-        assert 'ERROR' in captured.out
-        assert 'mono' in captured.out.lower()
+        assert any(r.levelno >= logging.ERROR for r in caplog.records)
+        assert 'Mono not found' in caplog.text

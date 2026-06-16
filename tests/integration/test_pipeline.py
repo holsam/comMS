@@ -31,10 +31,10 @@ class TestRunIndex:
         index_dir = tmp_path / 'comms' / 'results' / 'index'
         assert any(index_dir.iterdir()), 'Index directory is empty after run_index'
 
-    def test_prints_success_message(self, crux_bin, synthetic_fasta, tmp_path, capsys):
-        run_index(database=synthetic_fasta, output=tmp_path)
-        captured = capsys.readouterr()
-        assert 'SUCCESS' in captured.out or 'index' in captured.out.lower()
+    def test_logs_completion(self, crux_bin, synthetic_fasta, tmp_path, caplog):
+        with caplog.at_level(logging.DEBUG):
+            run_index(database=synthetic_fasta, output=tmp_path)
+        assert 'Finished command: index' in caplog.text
 
     def test_comms_logger_is_index(self, crux_bin, synthetic_fasta, tmp_path):
         run_index(database=synthetic_fasta, output=tmp_path)
@@ -80,17 +80,17 @@ class TestRunSearch:
         psm_files = list(search_dir.glob('*.tide-search.target.txt'))
         assert psm_files, 'No target PSM file found after run_search'
 
-    def test_prints_search_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+    def test_logs_completion(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
         index_dir, _ = pipeline_index
-        run_search(
-            input_dir=synthetic_mzml.parent,
-            index_dir=index_dir,
-            output=tmp_path,
-            param_medic=False,
-            threads=1,
-        )
-        captured = capsys.readouterr()
-        assert 'Search finished successfully - summary:' in captured.out
+        with caplog.at_level(logging.DEBUG):
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=False,
+                threads=1,
+            )
+        assert 'Finished command: search' in caplog.text
 
     def test_comms_logger_is_search(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
         index_dir, _ = pipeline_index
@@ -150,7 +150,7 @@ class TestRunSearchParamMedic:
         pm_dir = tmp_path / 'comms' / 'results' / 'param-medic'
         assert pm_dir.exists()
  
-    def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+    def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
         '''
         When param-medic cannot estimate tolerances (as expected for synthetic data), run_search should fall back to config defaults and report those values in the terminal summary.
         '''
@@ -159,16 +159,16 @@ class TestRunSearchParamMedic:
         expected_prec = str(cfg['search']['precursor_tolerance_ppm'])
         expected_bw = str(cfg['search']['mz_bin_width'])
         index_dir, _ = pipeline_index
-        run_search(
-            input_dir=synthetic_mzml.parent,
-            index_dir=index_dir,
-            output=tmp_path,
-            param_medic=True,
-            threads=1,
-        )
-        captured = capsys.readouterr()
-        assert expected_prec in captured.out
-        assert expected_bw in captured.out
+        with caplog.at_level(logging.DEBUG):
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        assert expected_prec in caplog.text
+        assert expected_bw in caplog.text
  
     def test_warns_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
         '''
@@ -187,18 +187,18 @@ class TestRunSearchParamMedic:
         warning_text = caplog.text.lower()
         assert 'falling back' in warning_text or 'no usable' in warning_text
  
-    def test_search_summary_reports_numeric_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+    def test_search_reports_numeric_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
         index_dir, _ = pipeline_index
-        run_search(
-            input_dir=synthetic_mzml.parent,
-            index_dir=index_dir,
-            output=tmp_path,
-            param_medic=True,
-            threads=1,
-        )
-        captured = capsys.readouterr()
-        assert 'precursor tolerance' in captured.out
-        assert 'bin width' in captured.out
+        with caplog.at_level(logging.DEBUG):
+            run_search(
+                input_dir=synthetic_mzml.parent,
+                index_dir=index_dir,
+                output=tmp_path,
+                param_medic=True,
+                threads=1,
+            )
+        assert 'Precursor tolerance' in caplog.text
+        assert 'm/z bin width' in caplog.text
  
     def test_produces_same_output_as_no_param_medic_when_estimates_unavailable(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
         '''
@@ -234,8 +234,8 @@ class TestRunSearchParamMedicMocked:
     '''
     Tests that verify run_search correctly uses numeric tolerance values returned by _runParamMedic, by mocking _runParamMedic to return known values and checking those values appear in the terminal summary.
     '''
-    def test_uses_mocked_precursor_tolerance_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
-        with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02),):
+    def test_uses_mocked_precursor_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+        with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02)), caplog.at_level(logging.DEBUG):
             index_dir, _ = pipeline_index
             run_search(
                 input_dir=synthetic_mzml.parent,
@@ -244,11 +244,10 @@ class TestRunSearchParamMedicMocked:
                 param_medic=True,
                 threads=1,
             )
-        captured = capsys.readouterr()
-        assert '7.5' in captured.out
+        assert '7.5 ppm' in caplog.text
 
-    def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
-        with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)):
+    def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+        with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)), caplog.at_level(logging.DEBUG):
             index_dir, _ = pipeline_index
             run_search(
                 input_dir=synthetic_mzml.parent,
@@ -257,16 +256,15 @@ class TestRunSearchParamMedicMocked:
                 param_medic=True,
                 threads=1,
             )
-        captured = capsys.readouterr()
-        assert '0.035' in captured.out
+        assert '0.035 Da' in caplog.text
  
-    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, capsys):
+    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
         '''
         If _runParamMedic returns (None, None), run_search should fall back to config defaults without raising.
         '''
         from comms.utils.settings import loadDefaultConfig
         cfg = loadDefaultConfig()
-        with patch('comms.commands.search._runParamMedic', return_value=(None, None)):
+        with patch('comms.commands.search._runParamMedic', return_value=(None, None)), caplog.at_level(logging.DEBUG):
             index_dir, _ = pipeline_index
             run_search(
                 input_dir=synthetic_mzml.parent,
@@ -275,9 +273,8 @@ class TestRunSearchParamMedicMocked:
                 param_medic=True,
                 threads=1,
             )
-        captured = capsys.readouterr()
-        assert str(cfg['search']['precursor_tolerance_ppm']) in captured.out
-        assert str(cfg['search']['mz_bin_width']) in captured.out
+        assert f'{str(cfg['search']['precursor_tolerance_ppm'])} ppm' in caplog.text
+        assert f'{str(cfg['search']['mz_bin_width'])} Da' in caplog.text
 
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
@@ -313,14 +310,14 @@ class TestRunRescore:
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         assert rescore_dir.exists()
 
-    def test_prints_rescore_summary(self, crux_bin, pipeline_search, tmp_path, capsys):
+    def test_log_success(self, crux_bin, pipeline_search, tmp_path, caplog):
         search_dir, fasta, _ = pipeline_search
         try:
-            run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+            with caplog.at_level(logging.DEBUG):
+                run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+            assert 'Finished command: rescore' in caplog.text
         except SystemExit:
             pass
-        captured = capsys.readouterr()
-        assert 'Rescore summary' in captured.out
 
     def test_log_file_is_written(self, crux_bin, pipeline_search, tmp_path):
         search_dir, fasta, _ = pipeline_search
@@ -526,7 +523,7 @@ class TestRunRescoreOrganismTags:
 
 
 class TestRunRescoreOutput:
-    def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
+    def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -535,18 +532,19 @@ class TestRunRescoreOutput:
 
         with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
              patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
-             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True), \
+             caplog.at_level(logging.DEBUG):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        assert 'Rescore finished successfully' in capsys.readouterr().out
+        assert 'Finished command: rescore' in caplog.text
 
-    def test_prints_warning_when_percolator_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
+    def test_logs_warning_when_percolator_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
         # Percolator fails → source prints WARNING then exits; catch the exit
-        with patch('comms.commands.rescore.cruxutil.percolator', return_value=False):
+        with patch('comms.commands.rescore.cruxutil.percolator', return_value=False), caplog.at_level(logging.WARNING):
             with pytest.raises(SystemExit):
                 run_rescore(
                     input_dir=synthetic_tide_search_dir,
@@ -554,9 +552,9 @@ class TestRunRescoreOutput:
                     output=tmp_path,
                     organism_tags='EUK,TESTEUK,PRO,TESTPRO',
                 )
-        assert 'WARNING' in capsys.readouterr().out
+        assert any(r.levelno >= logging.WARNING for r in caplog.records)
 
-    def test_prints_warning_when_split_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, capsys):
+    def test_prints_warning_when_split_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -565,14 +563,15 @@ class TestRunRescoreOutput:
 
         with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
              patch('comms.commands.rescore._splitPsmsByOrganism', return_value=False), \
-             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True), \
+             caplog.at_level(logging.WARNING):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 output=tmp_path,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        assert 'WARNING' in capsys.readouterr().out
+        assert any(r.levelno >= logging.WARNING for r in caplog.records)
 
     def test_logger_is_named_rescore(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
@@ -753,11 +752,11 @@ class TestRunQuantify:
         counts_files = list(quantify_dir.glob('*.spectral-counts.target.txt'))
         assert counts_files, 'No spectral-counts file found after run_quantify'
 
-    def test_prints_quantify_summary(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, capsys):
+    def test_logs_completion(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, caplog):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
-        captured = capsys.readouterr()
-        assert 'Quantify finished successfully - summary:' in captured.out
+        with caplog.at_level(logging.DEBUG):
+            run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+        assert 'Finished command: quantify' in caplog.text
 
     def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
