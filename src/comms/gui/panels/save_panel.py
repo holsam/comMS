@@ -40,7 +40,6 @@ class SavePanel(QWidget):
         preview_layout = QVBoxLayout(preview_box)
         self._preview = QPlainTextEdit()
         self._preview.setReadOnly(True)
-        self._preview.setFont(QFont('monospace'))
         preview_layout.addWidget(self._preview)
         layout.addWidget(preview_box, 1)
 
