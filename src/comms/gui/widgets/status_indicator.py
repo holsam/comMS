@@ -1,10 +1,10 @@
 '''
-comMS experiment GUI: status indicator glyph
+comMS experiment GUI — status glyph painting (widget + icon)
 '''
 
 # -- Import external dependencies
 from PySide6.QtCore import Qt, QSize, QRectF, QPointF
-from PySide6.QtGui import QPainter, QColor, QPen
+from PySide6.QtGui import QPainter, QColor, QPen, QPixmap, QIcon
 from PySide6.QtWidgets import QWidget
 
 # -- Import internal functions
@@ -14,12 +14,73 @@ from comms.gui.status import PanelStatus
 _RED = QColor('#d9534f')
 _AMBER = QColor('#f0ad4e')
 _GREEN = QColor('#5cb85c')
+_WHITE = QColor('white')
 
-# -- Define class StatusIndicator as a small colour glyph reflecting a PanelStatus
+
+# -- _draw_cross: white cross inset within a filled disc
+def _draw_cross(p: QPainter, box: QRectF) -> None:
+    pen = QPen(_WHITE, max(box.width() * 0.12, 1.4))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    p.setPen(pen)
+    inset = box.adjusted(
+        box.width() * 0.30, box.height() * 0.30,
+        -box.width() * 0.30, -box.height() * 0.30
+    )
+    p.drawLine(inset.topLeft(), inset.bottomRight())
+    p.drawLine(inset.bottomLeft(), inset.topRight())
+
+
+# -- _draw_tick: white tick inset within a filled disc
+def _draw_tick(p: QPainter, box: QRectF) -> None:
+    pen = QPen(_WHITE, max(box.width() * 0.12, 1.4))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    p.setPen(pen)
+    w, h, x0, y0 = box.width(), box.height(), box.left(), box.top()
+    p.drawPolyline([
+        QPointF(x0 + w * 0.28, y0 + h * 0.52),
+        QPointF(x0 + w * 0.44, y0 + h * 0.68),
+        QPointF(x0 + w * 0.72, y0 + h * 0.34),
+    ])
+
+
+# -- paint_status: render the glyph for a PanelStatus into a rect
+def paint_status(p: QPainter, box: QRectF, status: PanelStatus) -> None:
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    if status is PanelStatus.UNEDITED:
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(_RED)
+        p.drawEllipse(box)
+        _draw_cross(p, box)
+    elif status is PanelStatus.INCOMPLETE:
+        p.setPen(QPen(_AMBER, 1.5))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(box)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(_AMBER)
+        p.drawPie(box, 90 * 16, 180 * 16)
+    else:
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(_GREEN)
+        p.drawEllipse(box)
+        _draw_tick(p, box)
+
+
+# -- status_icon: render a PanelStatus glyph as a QIcon (for tab icons)
+def status_icon(status: PanelStatus, size: int = 16) -> QIcon:
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    paint_status(painter, QRectF(0, 0, size, size).adjusted(1, 1, -1, -1), status)
+    painter.end()
+    return QIcon(pixmap)
+
+
+# -- StatusIndicator: small widget showing the glyph for a PanelStatus
 class StatusIndicator(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._status = PanelStatus.UNEDITED
+        self._status = PanelStatus.PRISTINE
         self.setFixedSize(18, 18)
 
     def sizeHint(self) -> QSize:
@@ -32,53 +93,5 @@ class StatusIndicator(QWidget):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        box = QRectF(self.rect()).adjusted(2, 2, -2, -2)
-        if self._status is PanelStatus.UNEDITED:
-            self._paint_cross(painter, box)
-        elif self._status is PanelStatus.INCOMPLETE:
-            self._paint_half(painter, box)
-        else:
-            self._paint_tick(painter, box)
+        paint_status(painter, QRectF(self.rect()).adjusted(2, 2, -2, -2), self._status)
         painter.end()
-
-    def _paint_cross(self, p: QPainter, box: QRectF) -> None:
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(_RED)
-        p.drawEllipse(box)
-        pen = QPen(QColor('white'), 2.0)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pen)
-        w, h, x0, y0 = box.width(), box.height(), box.left(), box.top()
-        p.drawLine(
-            QPointF(x0 + w*0.28,y0 + h*0.28),
-            QPointF(x0 + w*0.72,y0 + h*0.72),
-        )
-        p.drawLine(
-            QPointF(x0 + w*0.28,y0 + h*0.72),
-            QPointF(x0 + w*0.72,y0 + h*0.28),
-        )
-
-    def _paint_half(self, p: QPainter, box: QRectF) -> None:
-        p.setPen(QPen(_AMBER, 1.5))
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawEllipse(box)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(_AMBER)
-        p.drawPie(box, 90*16, 180*16)
-
-    def _paint_tick(self, p: QPainter, box: QRectF) -> None:
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(_GREEN)
-        p.drawEllipse(box)
-        pen = QPen(QColor('white'), 2.0)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        p.setPen(pen)
-        w, h, x0, y0 = box.width(), box.height(), box.left(), box.top()
-        p.drawPolyline([
-            QPointF(x0 + w*0.28, y0 + h*0.52),
-            QPointF(x0 + w*0.44, y0 + h*0.68),
-            QPointF(x0 + w*0.72, y0 + h*0.34),
-        ])
