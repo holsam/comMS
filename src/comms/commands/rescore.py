@@ -168,7 +168,7 @@ def _findProteinIdsIndex(header: str):
 # -- _classifyPsmRow: returns the organism label for a single PSM row based on the protein ID column
 def _classifyPsmRow(row: str, id_index: int, organism_tags: dict[str, str]) -> str:
     parts = row.rstrip('\n').split('\t')
-    if not parts:
+    if not parts or parts == ['']:
         return 'contaminants'
     protein_id = parts[id_index]
     for label, tag in organism_tags.items():
