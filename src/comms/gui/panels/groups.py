@@ -30,6 +30,7 @@ class _GroupList(QGroupBox):
         layout.addLayout(entry_row)
 
         self._list = QListWidget()
+        self._list.setMaximumHeight(96)
         layout.addWidget(self._list)
         remove_btn = QPushButton('Remove selected')
         remove_btn.clicked.connect(self._on_remove)
