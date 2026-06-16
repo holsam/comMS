@@ -1,5 +1,5 @@
 '''
-comMS experiment GUI: samples subpanel
+comMS experiment GUI: groups subpanel
 '''
 
 # -- Import external dependencies
@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (
 # -- Import internal functions
 from comms.gui.models.experiment_state import ExperimentState
 
-# -- Define class _SampleList to define a labelled add/list/remove control for one group type
-class _SampleList(QGroupBox):
+# -- Define class _GroupList to define a labelled add/list/remove control for one group type
+class _GroupList(QGroupBox):
     def __init__(self, title, add_cb, remove_cb, items_cb, parent=None):
         super().__init__(title, parent)
         self._add_cb = add_cb
@@ -50,17 +50,17 @@ class _SampleList(QGroupBox):
         self._list.addItems(self._items_cb())
 
 
-# -- Define class SamplesSubPanel to hold two _SampleList controls for treatments and fractions
-class SamplesSubPanel(QWidget):
+# -- Define class GroupsSubPanel to hold two _GroupList classes for treatments and fractions
+class GroupsSubPanel(QWidget):
     def __init__(self, state: ExperimentState, parent=None):
         super().__init__(parent)
         self._state = state
         layout = QHBoxLayout(self)
-        self._treatments = _SampleList(
+        self._treatments = _GroupList(
             'Treatments', state.add_treatment, state.remove_treatment,
             lambda: state.treatments,
         )
-        self._fractions = _SampleList(
+        self._fractions = _GroupList(
             'Fractions', state.add_fraction, state.remove_fraction,
             lambda: state.fractions,
         )
