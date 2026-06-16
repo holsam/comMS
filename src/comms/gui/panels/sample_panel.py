@@ -15,7 +15,7 @@ from comms.gui.panels.files import FilesSubPanel
 from comms.gui.status import PanelStateTracker
 
 
-# -- Define class SampleInformationPanel to hold Groups/Files/Preview tabs + status tracking
+# -- Define class SamplePanel to hold Groups/Files/Preview tabs + status tracking
 class SamplePanel(QWidget):
     contentChanged = Signal()
 
