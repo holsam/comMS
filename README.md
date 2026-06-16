@@ -33,6 +33,9 @@
     - [Percolator settings](#percolator-settings)
     - [Report settings](#report-settings)
 - [Output structure](#output-structure)
+- [Logging information](#logging-information)
+    - [Log levels](#log-levels)
+    - [Log files](#log-files)
 - [Limitations](#limitations)
   - [Path resolution](#path-resolution)
   - [Input file requirements](#input-file-requirements)
@@ -366,6 +369,24 @@ comMS accepts an output directory option (defaults to the current working direct
 ```
 
 If an output directory for a given command already exists, comMS will not overwrite existing directories and instead add an incremental suffix (e.g. `search-1/`, `search-2/`).
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
+
+## Logging information
+### Log levels
+comMS uses various log levels to provide information while running. Errors, warnings and high-level information are also enabled however verbosity flags can be used to enable more-detailed descriptions:
+
+Level | Enabled with flag | Used to provide
+-- | -- | --
+`debug` | `-vv` | Detailed program state useful for debugging: e.g. command invoked, paths scanned, resolved parameters, per-item internal detail
+`progress` | `-v` | Step-wise progress: per-file and per-stage markers
+`info` | *n/a (always enabled)* | High-level overview: i.e. command processing counts, final results
+`warn` | *n/a (always enabled)* | Warning that part of a command did not succeed, but comMS has continued: e.g. a single item failed, an optional input was missing, a fallback value was used.
+`error` | *n/a (always enabled)* | Warning that part of a command did not succeed, and comMS was unable to continue.
+
+### Log files
+comMS logs to both stdout (i.e. the terminal used to run a comMS command) and a file named after the run command (e.g. `comms convert` will be logged to `convert.log`). The log file will be saved to the same output directory as any files, so multiple runs of the same command will not overwrite existing log files.
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
