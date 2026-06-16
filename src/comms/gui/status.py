@@ -9,12 +9,12 @@ from PySide6.QtCore import QObject, Signal
 # -- Define class PanelStatus to define the four states a savable panel can be in:
 # --    - UNEDITED: no change since window opened
 # --    - INCOMPLETE: edited, required fields still missing
-# --    - COMPLETE_UNSAVED: all required fields present, not yet saved
-# --    - SAVED: saved and unchanged since
+# --    - COMPLETE: all required fields present
+# --    - SAVED: file is saved (for backwards compatibility - does not affect visuals)
 class PanelStatus(Enum):
     UNEDITED = auto()
     INCOMPLETE = auto()
-    COMPLETE_UNSAVED = auto()
+    COMPLETE = auto()
     SAVED = auto()
 
 # -- Define class PanelStateTracker to record edited/complete/saved state and report a PanelStatus
@@ -46,9 +46,9 @@ class PanelStateTracker(QObject):
                 and self._current_signature == self._saved_signature):
             return PanelStatus.SAVED
         if self._complete:
-            return PanelStatus.COMPLETE_UNSAVED
+            return PanelStatus.COMPLETE
         return PanelStatus.INCOMPLETE
 
     @property
     def is_saveable(self) -> bool:
-        return self.status in (PanelStatus.COMPLETE_UNSAVED, PanelStatus.SAVED)
+        return self.status in (PanelStatus.COMPLETE, PanelStatus.SAVED)
