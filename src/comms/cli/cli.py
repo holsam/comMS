@@ -10,7 +10,7 @@ from typing import Annotated
 from comms.utils.settings import initComms
 from comms.utils.log import configureStreamLogging, log_state, PROGRESS
 
-# -- Import comMS commands
+# -- Import comMS CLI typers
 from comms.cli.convert import commsConvert
 from comms.cli.index import commsIndex
 from comms.cli.lfq import commsLfq
@@ -22,6 +22,9 @@ from comms.cli.pipeline import commsPipeline
 from comms.cli.config import commsConfig
 from comms.cli.license import commsLicense
 from comms.cli.version import commsVersion
+
+# Import comMS experiment functions
+from comms.commands import experiment as experimentFuncs
 
 # -- Print startup splash
 initComms()
@@ -36,7 +39,6 @@ comms = typer.Typer(
     no_args_is_help=True,
 )
 
-
 # -- Register (sub)Typer classes for each command
 comms.add_typer(commsPipeline)
 comms.add_typer(commsConvert)
@@ -50,6 +52,11 @@ comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', r
 comms.add_typer(commsLicense)
 comms.add_typer(commsVersion)
 
+# -- Register experiment command
+@comms.command(rich_help_panel='Utilities')
+def experiment():
+    '''Launch the experiment setup GUI to build a sample sheet and config'''
+    experimentFuncs.launch_experiment_gui()
 
 # ====================
 # Top-level callback: --verbose / --debug flags
