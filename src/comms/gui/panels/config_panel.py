@@ -4,9 +4,10 @@ comMS experiment GUI: comMS configuration panel
 
 # -- Import external dependencies
 from pathlib import Path
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QCheckBox, QComboBox, QLineEdit, QPushButton, QTableWidget,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QCheckBox,
+    QComboBox, QLineEdit, QPushButton, QTableWidget,
 )
 
 # -- Import internal functions
@@ -16,8 +17,7 @@ from comms.commands.config import (
     _apply_protocol_flags, _apply_organism, _apply_custom_mod, _writeConfigTo,
 )
 
-
-# -- Define class ConfigPanel to define a structured form mirroring `comms config set`
+# -- Define class ConfigPanel to define a structured form mirroring `comms config set` with an additional analysis type activating the organism table
 class ConfigPanel(QWidget):
     changed = Signal()
 
@@ -26,10 +26,15 @@ class ConfigPanel(QWidget):
         self.tracker = PanelStateTracker(self)
         # Define layout
         layout = QVBoxLayout(self)
-        layout.addWidget(self._build_mods_box())
-        layout.addWidget(self._build_resolution_box())
+        top_row = QHBoxLayout()
+        top_row.addWidget(self._build_mods_box(), 1, Qt.AlignmentFlag.AlignTop)
+        top_row.addWidget(self._build_resolution_box(), 0, Qt.AlignmentFlag.AlignTop)
+        top_row.addWidget(self._build_analysis_type_box(), 0, Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(top_row)
         layout.addWidget(self._build_organism_box())
         layout.addStretch(1)
+
+        self._update_organism_enabled()
 
     # -- form construction --
     def _build_mods_box(self) -> QGroupBox:
@@ -63,24 +68,44 @@ class ConfigPanel(QWidget):
         form.addRow('Mode', self._res)
         return box
 
+    def _build_analysis_type_box(self) -> QGroupBox:
+        box = QGroupBox('Analysis type')
+        form = QFormLayout(box)
+        self._analysis = QComboBox()
+        self._analysis.addItems(['Single species', 'Multispecies'])
+        self._analysis.currentIndexChanged.connect(self._on_analysis_changed)
+        form.addRow('Mode', self._analysis)
+        return box
+
     def _build_organism_box(self) -> QGroupBox:
-        box = QGroupBox('Organism patterns (per-organism FDR)')
-        layout = QVBoxLayout(box)
+        self._org_box = QGroupBox('Organism patterns (per-organism FDR)')
+        layout = QVBoxLayout(self._org_box)
         self._org_table = QTableWidget(0, 2)
         self._org_table.setHorizontalHeaderLabels(['Label', 'Pattern'])
         self._org_table.horizontalHeader().setStretchLastSection(True)
         self._org_table.itemChanged.connect(self._on_changed)
         layout.addWidget(self._org_table)
         buttons = QHBoxLayout()
-        add_btn = QPushButton('Add organism')
-        add_btn.clicked.connect(self._add_org_row)
-        remove_btn = QPushButton('Remove selected')
-        remove_btn.clicked.connect(self._remove_org_row)
+        self._add_org_btn = QPushButton('Add organism')
+        self._add_org_btn.clicked.connect(self._add_org_row)
+        self._remove_org_btn = QPushButton('Remove selected')
+        self._remove_org_btn.clicked.connect(self._remove_org_row)
         buttons.addStretch(1)
-        buttons.addWidget(add_btn)
-        buttons.addWidget(remove_btn)
+        buttons.addWidget(self._add_org_btn)
+        buttons.addWidget(self._remove_org_btn)
         layout.addLayout(buttons)
-        return box
+        return self._org_box
+
+    # -- analysis type --
+    def _is_multispecies(self) -> bool:
+        return self._analysis.currentIndex() == 1
+
+    def _on_analysis_changed(self, *args) -> None:
+        self._update_organism_enabled()
+        self._on_changed()
+
+    def _update_organism_enabled(self) -> None:
+        self._org_box.setEnabled(self._is_multispecies())
 
     # -- organism table helpers --
     def _add_org_row(self) -> None:
@@ -105,7 +130,12 @@ class ConfigPanel(QWidget):
 
     # -- _organisms_complete: a row is valid only if both label and pattern are set (or both empty)
     def _organisms_complete(self) -> bool:
-        return all(bool(label) == bool(pattern) for label, pattern in self._organism_rows())
+        if not self._is_multispecies():
+            return True
+        rows = self._organism_rows()
+        if not any(label and pattern for label, pattern in rows):
+            return False
+        return all(bool(label) == bool(pattern) for label, pattern in rows)
 
     # -- state --
     def _signature(self):
@@ -136,10 +166,15 @@ class ConfigPanel(QWidget):
         if self._n_ace.isChecked():
             mods.append('N-term acetyl')
         res = 'low-res' if self._res.currentIndex() == 1 else 'high-res'
-        orgs = [label for label, pattern in self._organism_rows() if label and pattern]
-        return (f'Resolution: {res}; '
-                f'mods: {", ".join(mods) if mods else "none"}; '
-                f'organisms: {", ".join(orgs) if orgs else "none"}')
+        if self._is_multispecies():
+            orgs = [label for label, pattern in self._organism_rows() if label and pattern]
+            org_text = ', '.join(orgs) if orgs else 'none'
+            mode = 'multispecies'
+        else:
+            org_text = 'n/a (single species)'
+            mode = 'single species'
+        return (f'Type: {mode}; resolution: {res}; '
+                f'mods: {", ".join(mods) if mods else "none"}; organisms: {org_text}')
 
     # -- build config file and save --
     def _build_config(self) -> dict:
@@ -154,9 +189,11 @@ class ConfigPanel(QWidget):
             clip_met=self._clip_met.isChecked(),
             low_res=(self._res.currentIndex() == 1),
         )
-        organisms = {
-            label: pattern for label, pattern in self._organism_rows() if label and pattern
-        }
+        organisms = {}
+        if self._is_multispecies():
+            organisms = {
+                label: pattern for label, pattern in self._organism_rows() if label and pattern
+            }
         cfg = _apply_organism(cfg, organisms)
         cfg.setdefault('search', {})
         cfg['search']['custom_mods'] = ''
