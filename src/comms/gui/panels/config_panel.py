@@ -173,7 +173,7 @@ class ConfigPanel(QWidget):
         else:
             org_text = 'n/a (single species)'
             mode = 'single species'
-        return (f'Type: {mode}; resolution: {res}; '
+        return (f'{mode}; resolution: {res}; '
                 f'mods: {", ".join(mods) if mods else "none"}; organisms: {org_text}')
 
     # -- build config file and save --
