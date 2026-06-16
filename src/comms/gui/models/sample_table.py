@@ -158,12 +158,12 @@ class SampleTableModel(QAbstractTableModel):
         self.endResetModel()
         self.contentChanged.emit()
 
-    # -- render_sample_sheet: build the TSV text for a list of SampleRow
-    def render_sample_sheet(rows) -> str:
-        lines = ['\t'.join(COLUMNS)]
-        for r in rows:
-            replicate = '' if r.replicate is None else str(r.replicate)
-            lines.append('\t'.join(
-                [r.sample_id, r.raw_file, r.treatment, r.fraction, replicate, r.batch]
-            ))
-        return '\n'.join(lines) + '\n'
+# -- render_sample_sheet: build the TSV text for a list of SampleRow
+def render_sample_sheet(rows) -> str:
+    lines = ['\t'.join(COLUMNS)]
+    for r in rows:
+        replicate = '' if r.replicate is None else str(r.replicate)
+        lines.append('\t'.join(
+            [r.sample_id, r.raw_file, r.treatment, r.fraction, replicate, r.batch]
+        ))
+    return '\n'.join(lines) + '\n'
