@@ -48,6 +48,10 @@ class SamplePanel(QWidget):
         return (f'{n} sample(s); {len(self._state.treatments)} treatment(s); '
                 f'{len(self._state.fractions)} fraction(s)')
 
+    # sync_tracker: refresh the tracker from current content (used before unified save)
+    def sync_tracker(self) -> None:
+        self._on_content_changed()
+
     def write(self, out_dir: Path) -> Path:
         path = out_dir / 'sample_sheet.tsv'
         path.write_text(self.sample_sheet_text(), encoding='utf-8')

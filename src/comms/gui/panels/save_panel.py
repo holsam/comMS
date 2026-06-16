@@ -74,6 +74,8 @@ class SavePanel(QWidget):
         if out_dir is None:
             return
         out_dir.mkdir(parents=True, exist_ok=True)
+        for panel in (self._experiment, self._sample, self._config):
+            panel.sync_tracker()
         sheet_path = self._sample.write(out_dir)
         config_path = self._config.write(out_dir)
         meta_path = self._experiment.write_metadata(

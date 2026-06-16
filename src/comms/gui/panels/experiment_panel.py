@@ -76,6 +76,10 @@ class ExperimentPanel(QWidget):
     def output_dir(self) -> Path | None:
         base = self.base_dir()
         return base / 'comms' if base else None
+    
+    # sync_tracker: refresh the tracker from current content (used before unified save)
+    def sync_tracker(self) -> None:
+        self._on_changed()
 
     # -- write_metadata: write experiment.toml, recording name, timestamp and output paths
     def write_metadata(self, out_dir: Path, files: dict | None = None) -> Path:

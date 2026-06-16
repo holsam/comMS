@@ -203,6 +203,10 @@ class ConfigPanel(QWidget):
                 cfg['search']['custom_mods'] = _apply_custom_mod(
                     cfg['search']['custom_mods'], entry)
         return cfg
+    
+    # sync_tracker: refresh the tracker from current content (used before unified save)
+    def sync_tracker(self) -> None:
+        self._on_changed()
 
     def write(self, out_dir: Path) -> Path:
         path = out_dir / 'config.toml'
