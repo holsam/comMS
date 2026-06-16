@@ -11,6 +11,9 @@ from PySide6.QtWidgets import (
     QWidget, QFormLayout, QLineEdit, QHBoxLayout, QPushButton, QFileDialog,
 )
 
+# Import PanelStateTracker class
+from comms.gui.status import PanelStateTracker
+
 # -- Define class ExperimentHeaderPanel to collect experiment name and base output directory
 class ExperimentHeaderPanel(QWidget):
     changed = Signal()
@@ -40,6 +43,13 @@ class ExperimentHeaderPanel(QWidget):
         # Add fields
         form.addRow('Experiment', self._name)
         form.addRow('Save Directory', dir_row)
+        # Add status tracker
+        self.tracker = PanelStateTracker(self)
+        self.changed.connect(self._on_changed)
+
+    def _on_changed(self) -> None:
+        signature = (self.experiment_name(), str(self.base_dir()))
+        self.tracker.mark_changed(signature, self.is_valid())
 
     def _browse(self) -> None:
         chosen = QFileDialog.getExistingDirectory(self, 'Select experiment output directory')
