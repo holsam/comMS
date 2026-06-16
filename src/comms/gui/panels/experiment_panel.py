@@ -8,19 +8,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QWidget, QFormLayout, QLineEdit, QHBoxLayout, QPushButton, QFileDialog,
+    QWidget, QFormLayout, QLineEdit, QHBoxLayout, QPushButton, QFileDialog, QVBoxLayout,
 )
 
 # Import PanelStateTracker class
 from comms.gui.status import PanelStateTracker
 
-# -- Define class ExperimentHeaderPanel to collect experiment name and base output directory
-class ExperimentHeaderPanel(QWidget):
+# -- Define class ExperimentPanel to collect experiment name and base output directory
+class ExperimentPanel(QWidget):
     changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        form = QFormLayout(self)
+        # Add status tracker
+        self.tracker = PanelStateTracker(self)
+        form_widget = QWidget()
+        form = QFormLayout(form_widget)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         # Add experiment name field
         self._name = QLineEdit()
@@ -32,7 +35,7 @@ class ExperimentHeaderPanel(QWidget):
         self._dir.setMinimumWidth(360)
         self._dir.setPlaceholderText('directory to save experiment to')
         self._dir.textChanged.connect(self.changed)
-        browse = QPushButton('Select Directory')
+        browse = QPushButton('Select directory')
         browse.clicked.connect(self._browse)
         # Create output directory field layout
         dir_row = QWidget()
@@ -42,9 +45,16 @@ class ExperimentHeaderPanel(QWidget):
         dir_layout.addWidget(browse)
         # Add fields
         form.addRow('Experiment', self._name)
-        form.addRow('Save Directory', dir_row)
-        # Add status tracker
-        self.tracker = PanelStateTracker(self)
+        form.addRow('Save to', dir_row)
+        # Organise layout
+        centre_row = QHBoxLayout()
+        centre_row.addStretch(1)
+        centre_row.addWidget(form_widget)
+        centre_row.addStretch(1)
+        outer = QVBoxLayout(self)
+        outer.addStretch(1)
+        outer.addLayout(centre_row)
+        outer.addStretch(1)
         self.changed.connect(self._on_changed)
 
     def _on_changed(self) -> None:

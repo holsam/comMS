@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 # -- Import internal functions
-from comms.gui.panels.experiment_header import ExperimentHeaderPanel
+from comms.gui.panels.experiment_panel import ExperimentPanel
 from comms.gui.panels.sample_panel import SamplePanel
 from comms.gui.panels.config_panel import ConfigPanel
 
@@ -18,9 +18,9 @@ from comms.gui.panels.config_panel import ConfigPanel
 class SavePanel(QWidget):
     saved = Signal()
 
-    def __init__(self, header: ExperimentHeaderPanel, sample: SamplePanel, config: ConfigPanel, parent=None):
+    def __init__(self, experiment: ExperimentPanel, sample: SamplePanel, config: ConfigPanel, parent=None):
         super().__init__(parent)
-        self._header = header
+        self._experiment = experiment
         self._sample = sample
         self._config = config
 
@@ -31,9 +31,9 @@ class SavePanel(QWidget):
         self._exp_label = QLabel()
         self._sample_label = QLabel()
         self._config_label = QLabel()
-        form.addRow('1. Experiment', self._exp_label)
-        form.addRow('2. Samples', self._sample_label)
-        form.addRow('3. Analysis', self._config_label)
+        form.addRow('Experiment Information:', self._exp_label)
+        form.addRow('Sample Information:', self._sample_label)
+        form.addRow('Analysis Information:', self._config_label)
         layout.addWidget(summary_box)
 
         preview_box = QGroupBox('Sample sheet preview')
