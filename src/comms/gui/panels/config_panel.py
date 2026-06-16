@@ -3,14 +3,13 @@ comMS experiment GUI: comMS configuration panel
 '''
 
 # -- Import external dependencies
+from pathlib import Path
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QCheckBox,
-    QComboBox, QLineEdit, QPushButton, QTableWidget, QMessageBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QCheckBox, QComboBox, QLineEdit, QPushButton, QTableWidget,
 )
 
 # -- Import internal functions
-from comms.gui.panels.experiment_header import ExperimentHeaderPanel
-from comms.gui.widgets.panel_title_bar import PanelTitleBar
 from comms.gui.status import PanelStateTracker
 from comms.utils.settings import loadDefaultConfig
 from comms.commands.config import (
@@ -20,30 +19,17 @@ from comms.commands.config import (
 
 # -- Define class ConfigPanel to define a structured form mirroring `comms config set`
 class ConfigPanel(QWidget):
-    def __init__(self, header: ExperimentHeaderPanel, parent=None):
+    changed = Signal()
+
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self._header = header
         self.tracker = PanelStateTracker(self)
-
+        # Define layout
         layout = QVBoxLayout(self)
-        self._title = PanelTitleBar('Experiment Configuration')
-        layout.addWidget(self._title)
-
         layout.addWidget(self._build_mods_box())
         layout.addWidget(self._build_resolution_box())
         layout.addWidget(self._build_organism_box())
-
-        save_row = QHBoxLayout()
-        save_row.addStretch(1)
-        self.save_button = QPushButton('Save configuration')
-        self.save_button.setEnabled(False)
-        self.save_button.clicked.connect(self._save)
-        save_row.addWidget(self.save_button)
-        layout.addLayout(save_row)
         layout.addStretch(1)
-
-        self.tracker.statusChanged.connect(self._title.set_status)
-        header.changed.connect(self._refresh_save_button)
 
     # -- form construction --
     def _build_mods_box(self) -> QGroupBox:
@@ -132,13 +118,28 @@ class ConfigPanel(QWidget):
 
     def _on_changed(self, *args) -> None:
         self.tracker.mark_changed(self._signature(), self._organisms_complete())
-        self._refresh_save_button()
+        self.changed.emit()
 
-    def _refresh_save_button(self) -> None:
-        valid_header = self._header.is_valid()
-        self.save_button.setEnabled(self._organisms_complete() and valid_header)
-        self.save_button.setToolTip(
-            '' if valid_header else 'Set an experiment name and directory first')
+    def is_complete(self) -> bool:
+        return self._organisms_complete()
+
+    def summary(self) -> str:
+        mods = []
+        if self._iodo.isChecked():
+            mods.append('carbamidomethyl (C)')
+        if self._ox.isChecked():
+            mods.append('ox (M)')
+        if self._phos.isChecked():
+            mods.append('phospho (STY)')
+        if self._n_cyc.isChecked():
+            mods.append('Gln cyclisation')
+        if self._n_ace.isChecked():
+            mods.append('N-term acetyl')
+        res = 'low-res' if self._res.currentIndex() == 1 else 'high-res'
+        orgs = [label for label, pattern in self._organism_rows() if label and pattern]
+        return (f'Resolution: {res}; '
+                f'mods: {", ".join(mods) if mods else "none"}; '
+                f'organisms: {", ".join(orgs) if orgs else "none"}')
 
     # -- build config file and save --
     def _build_config(self) -> dict:
@@ -166,12 +167,7 @@ class ConfigPanel(QWidget):
                     cfg['search']['custom_mods'], entry)
         return cfg
 
-    def _save(self) -> None:
-        out_dir = self._header.output_dir()
-        if out_dir is None:
-            return
+    def write(self, out_dir: Path) -> Path:
         path = out_dir / 'config.toml'
         _writeConfigTo(self._build_config(), path)
-        self._header.write_metadata()
-        self.tracker.mark_saved()
-        QMessageBox.information(self, 'Saved', f'Configuration written to:\n{path}')
+        return path
