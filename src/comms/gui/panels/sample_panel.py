@@ -62,5 +62,6 @@ class SamplePanel(QWidget):
         path = out_dir / 'sample_sheet.tsv'
         path.write_text(
             render_sample_sheet(self._state.sample_model.rows()), encoding='utf-8')
+        self._header.write_metadata()
         self.tracker.mark_saved()
         QMessageBox.information(self, 'Saved', f'Sample sheet written to:\n{path}')

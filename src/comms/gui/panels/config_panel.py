@@ -172,5 +172,6 @@ class ConfigPanel(QWidget):
             return
         path = out_dir / 'config.toml'
         _writeConfigTo(self._build_config(), path)
+        self._header.write_metadata()
         self.tracker.mark_saved()
         QMessageBox.information(self, 'Saved', f'Configuration written to:\n{path}')

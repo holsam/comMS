@@ -3,6 +3,8 @@ comMS experiment GUI: header panel
 '''
 
 # -- Import external dependencies
+import tomli_w
+from datetime import datetime, timezone
 from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -51,6 +53,21 @@ class ExperimentHeaderPanel(QWidget):
     def output_dir(self) -> Path | None:
         base = self.base_dir()
         return base / 'comms' if base else None
+
+    def write_metadata(self) -> Path | None:
+        out_dir = self.output_dir()
+        if out_dir is None:
+            return None
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / 'experiment.toml'
+        meta = {
+            'experiment': {
+                'name': self.experiment_name(),
+                'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            }
+        }
+        with path.open('wb') as f:
+            tomli_w.dump(meta, f)
 
     def is_valid(self) -> bool:
         return bool(self.experiment_name()) and self.base_dir() is not None
