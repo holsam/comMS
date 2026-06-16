@@ -42,7 +42,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
         precursor_tol, mz_bin_width = _runParamMedic(crux_bin=crux_bin, mzml_files=mzml_files, out_dir=out_dir)
     prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
     bin_width_display = mz_bin_width or config['search']['mz_bin_width']
-    logMsg.debug(f'Precursor tolerance {prec_display} ppm, m/z bin width {bin_width_display}')
+    logMsg.debug(f'Precursor tolerance {prec_display} ppm, m/z bin width {bin_width_display} Da')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for mzml_file in tqdm(mzml_files, desc='Files searched'):
