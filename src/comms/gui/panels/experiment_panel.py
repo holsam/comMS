@@ -77,10 +77,8 @@ class ExperimentPanel(QWidget):
         base = self.base_dir()
         return base / 'comms' if base else None
 
-    def write_metadata(self) -> Path | None:
-        out_dir = self.output_dir()
-        if out_dir is None:
-            return None
+    # -- write_metadata: write experiment.toml, recording name, timestamp and output paths
+    def write_metadata(self, out_dir: Path, files: dict | None = None) -> Path:
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / 'experiment.toml'
         meta = {
@@ -89,8 +87,11 @@ class ExperimentPanel(QWidget):
                 'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'),
             }
         }
+        if files:
+            meta['files'] = {key: str(value) for key, value in files.items()}
         with path.open('wb') as f:
             tomli_w.dump(meta, f)
+        return path
 
     def is_valid(self) -> bool:
         return bool(self.experiment_name()) and self.base_dir() is not None

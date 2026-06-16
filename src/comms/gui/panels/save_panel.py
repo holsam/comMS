@@ -74,13 +74,19 @@ class SavePanel(QWidget):
         if out_dir is None:
             return
         out_dir.mkdir(parents=True, exist_ok=True)
-        meta_path = self._header.write_metadata()
         sheet_path = self._sample.write(out_dir)
         config_path = self._config.write(out_dir)
+        meta_path = self._header.write_metadata(
+            out_dir,
+            files={'sample_sheet': sheet_path, 'config': config_path},
+        )
         self._header.tracker.mark_saved()
         self._sample.tracker.mark_saved()
         self._config.tracker.mark_saved()
         self.saved.emit()
         QMessageBox.information(
             self, 'Experiment saved',
-            f'Saved:\n\u2022 {sheet_path}\n\u2022 {config_path}\n\u2022 {meta_path}')
+            'Experiment saved.\n\n'
+            f'Sample sheet: {sheet_path}\n'
+            f'Configuration: {config_path}\n'
+            f'Metadata: {meta_path}')
