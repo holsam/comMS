@@ -3,7 +3,7 @@ comMS experiment GUI: combo-box delegate to read live group options
 '''
 
 # -- Import external dependencies
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QStyledItemDelegate, QComboBox
 
 
@@ -17,6 +17,7 @@ class GroupComboDelegate(QStyledItemDelegate):
         combo = QComboBox(parent)
         combo.addItem('')
         combo.addItems(self._options_provider())
+        QTimer.singleShot(0, combo.showPopup)
         return combo
 
     def setEditorData(self, editor, index):

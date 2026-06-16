@@ -6,7 +6,7 @@ comMS experiment GUI: files subpanel (to import files and assign metadata)
 from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTableView, QFileDialog, QHeaderView,
+    QTableView, QFileDialog, QHeaderView, QAbstractItemView,
 )
 
 # -- Import internal functions
@@ -34,6 +34,7 @@ class FilesSubPanel(QWidget):
 
         self._table = QTableView()
         self._table.setModel(state.sample_model)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.SelectedClicked | QAbstractItemView.EditTrigger.CurrentChanged)
         self._table.setItemDelegateForColumn(
             COL_TREATMENT, GroupComboDelegate(lambda: state.treatments, self._table))
         self._table.setItemDelegateForColumn(
