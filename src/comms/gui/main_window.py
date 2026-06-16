@@ -13,12 +13,13 @@ from comms.gui.panels.sample_panel import SamplePanel
 from comms.gui.panels.config_panel import ConfigPanel
 from comms.gui.panels.save_panel import SavePanel
 from comms.gui.widgets.status_indicator import status_icon
-
+from comms.utils.log import logMsg
 
 # -- MainWindow: four numbered tabs with per-tab status icons
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._log = logMsg('experiment')
         self.setWindowTitle('comms experiment')
         self.resize(1100, 720)
 
@@ -59,3 +60,7 @@ class MainWindow(QMainWindow):
     def _on_tab_changed(self, index: int) -> None:
         if index == self._save_index:
             self.save.refresh()
+    
+    def closeEvent(self, event) -> None:
+    self._log.info('Closed experiment setup GUI')
+    super().closeEvent(event)
