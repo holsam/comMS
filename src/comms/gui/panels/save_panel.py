@@ -1,0 +1,87 @@
+'''
+comMS experiment GUI: save experiment tab (for summary + unified save)
+'''
+
+# -- Import external dependencies
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QPushButton, QPlainTextEdit, QMessageBox,
+)
+
+# -- Import internal functions
+from comms.gui.panels.experiment_header import ExperimentHeaderPanel
+from comms.gui.panels.sample_panel import SamplePanel
+from comms.gui.panels.config_panel import ConfigPanel
+
+# -- Define class SavePanel to summarises the three tabs and writes all outputs at once
+class SavePanel(QWidget):
+    saved = Signal()
+
+    def __init__(self, header: ExperimentHeaderPanel, sample: SamplePanel, config: ConfigPanel, parent=None):
+        super().__init__(parent)
+        self._header = header
+        self._sample = sample
+        self._config = config
+
+        layout = QVBoxLayout(self)
+
+        summary_box = QGroupBox('Summary')
+        form = QFormLayout(summary_box)
+        self._exp_label = QLabel()
+        self._sample_label = QLabel()
+        self._config_label = QLabel()
+        form.addRow('1. Experiment', self._exp_label)
+        form.addRow('2. Samples', self._sample_label)
+        form.addRow('3. Analysis', self._config_label)
+        layout.addWidget(summary_box)
+
+        preview_box = QGroupBox('Sample sheet preview')
+        preview_layout = QVBoxLayout(preview_box)
+        self._preview = QPlainTextEdit()
+        self._preview.setReadOnly(True)
+        self._preview.setFont(QFont('monospace'))
+        preview_layout.addWidget(self._preview)
+        layout.addWidget(preview_box, 1)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        self.save_button = QPushButton('Save Experiment')
+        self.save_button.setEnabled(False)
+        self.save_button.clicked.connect(self._save_all)
+        button_row.addWidget(self.save_button)
+        layout.addLayout(button_row)
+
+    # -- refresh: rebuild the summary and re-evaluate the save button
+    def refresh(self) -> None:
+        out_dir = self._header.output_dir()
+        name = self._header.experiment_name() or '(unnamed)'
+        self._exp_label.setText(
+            f'{name}  →  {out_dir}' if out_dir else f'{name}  →  (no directory set)')
+        self._sample_label.setText(self._sample.summary())
+        self._config_label.setText(self._config.summary())
+        self._preview.setPlainText(self._sample.sample_sheet_text())
+        self.save_button.setEnabled(self._all_complete())
+        self.save_button.setToolTip(
+            '' if self._all_complete() else 'Complete all three tabs before saving')
+
+    def _all_complete(self) -> bool:
+        return (self._header.is_valid()
+                and self._sample.is_complete()
+                and self._config.is_complete())
+
+    def _save_all(self) -> None:
+        out_dir = self._header.output_dir()
+        if out_dir is None:
+            return
+        out_dir.mkdir(parents=True, exist_ok=True)
+        meta_path = self._header.write_metadata()
+        sheet_path = self._sample.write(out_dir)
+        config_path = self._config.write(out_dir)
+        self._header.tracker.mark_saved()
+        self._sample.tracker.mark_saved()
+        self._config.tracker.mark_saved()
+        self.saved.emit()
+        QMessageBox.information(
+            self, 'Experiment saved',
+            f'Saved:\n\u2022 {sheet_path}\n\u2022 {config_path}\n\u2022 {meta_path}')
