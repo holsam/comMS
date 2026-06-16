@@ -13,6 +13,9 @@ class ExperimentState(QObject):
         super().__init__(parent)
         self._treatments: list[str] = []
         self._fractions: list[str] = []
+        # Import SampleTableModel from gui/models/sample_table.py
+        from comms.gui.models.sample_table import SampleTableModel
+        self.sample_model = SampleTableModel(self)
 
     @property
     def treatments(self) -> list[str]:
