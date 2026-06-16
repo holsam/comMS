@@ -360,7 +360,7 @@ def _apply_custom_mod(custom_mods: str, new_entry: str) -> str:
     # Check against managed mod patterns
     for pattern, flag_name in MANAGED_MOD_PATTERNS.items():
         if re.match(pattern, new_entry, re.IGNORECASE):
-            logMsg.warning(f'{new_entry} is managed by the {flag_name} flag, ignoring')
+            logMsg.warn(f'{new_entry} is managed by the {flag_name} flag, ignoring')
             return custom_mods
     # Split on commas, discard empty strings from a blank mods_spec
     entries = [e.strip() for e in custom_mods.split(',') if e.strip()]
