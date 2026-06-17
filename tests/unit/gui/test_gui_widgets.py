@@ -51,9 +51,19 @@ class TestGroupComboDelegate:
         model.setItem(0, 0, QStandardItem(value))
         return model, model.index(0, 0)
 
-    # -- Helper: build an editor for the given index
+    # -- Helper: build an editor, keeping both parent and editor alive on self
     def _editor(self, delegate, index):
-        return delegate.createEditor(QWidget(), QStyleOptionViewItem(), index)
+        self._parent_widget = QWidget()
+        # Store the editor reference so it outlives the calling expression. Both refs are released after teardown_method drains the event queue.
+        self._editor_widget = delegate.createEditor(
+            self._parent_widget, QStyleOptionViewItem(), index
+        )
+        return self._editor_widget
+
+    def teardown_method(self, method):
+        # Process pending events (including any QTimer.singleShot callbacks) while _parent_widget and _editor_widget are still alive on self. Without this, the timer fires during pytest teardown after Qt has already destroyed the widgets, causing "C++ object already deleted".
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
 
     def test_create_editor_returns_combobox(self):
         delegate = GroupComboDelegate(lambda: ['MOCK', 'TREAT'])
