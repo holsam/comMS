@@ -1,0 +1,36 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv package manager
+        uses: astral-sh/setup-up@v6
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install Python dependencies
+        run: uv sync --all-extras
+
+      - name: Install R
+        run: r-lib/actions/setup-r@v2
+
+      - name: Install R dependencies
+        run: Rscript src/comms/r/install_deps.R
+
+      - name: Build comMS
+        run: uv build
+
+      - name: Run Python tests via pytest
+        run: uv run pytest
+
+      - name: Run R tests
+        run: Rscript -e "testthat::test_dir('tests/r')"
