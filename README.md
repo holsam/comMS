@@ -204,6 +204,7 @@ Command | Description
 `config` | Manage a user configuration file
 `experiment` | Launch a GUI to build a sample sheet and configuration file
 `license` | Print the comMS license
+`uninstall` | Remove comMS-generated files (e.g. user config) and print the comMS uninstall command where possible
 `version` | Print the installed comMS version
 
 ---

@@ -30,6 +30,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/unit/test_rescore.py`](#testsunittest_rescorepy)
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
+    - [`tests/unit/test_uninstall.py`](#testsunittest_uninstallpy)
     - [`tests/unit/test_validate.py`](#testsunittest_validatepy)
     - [`tests/unit/test_version.py`](#testsunittest_versionpy)
     - [`tests/unit/gui/test_gui_models.py`](#testsunitguitest_gui_modelspy)
@@ -357,6 +358,17 @@ Function/class | Test description
 `loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
 Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
 `resolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns empty string; no leading/trailing commas
+
+---
+
+### `tests/unit/test_uninstall.py`
+Unit tests covering `src/comms/commands/uninstall.py`:
+
+Function/class | Test description
+-- | --
+_generated_targets | includes the global config file when it exists; returns an empty list when no config is present; does not include any analysis output paths
+_detect_uninstall_command | returns the uv-tool uninstall command when the launching path is under a uv tools directory; returns the pip uninstall command when installed via pip; falls back to the unknown message if installed with neither uv nor pip (or if not installed with uv and pip missing)
+run_uninstall | a dry run lists targets without deleting them; --force deletes the global config without prompting; the logMsg instance is named 'uninstall'; a missing config produces an informational message and still prints the package-removal command
 
 ---
 
