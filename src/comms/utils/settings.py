@@ -42,13 +42,22 @@ def resolvedModifications(cfg: dict) -> str:
         mods.add(entry)
     return ','.join(mods)
 
-# -- Load configuration at module import
-_user_config_path = userConfigPath()
-if _user_config_path.exists():
-    with _user_config_path.open('rb') as _f:
-        config = tomllib.load(_f)
-else:
-    config = loadDefaultConfig()
+# -- resolveConfig: returns (config, source)
+def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
+    '''
+    Resolve the active config using priority: local > global > default
+    '''
+    if comms_dir is not None:
+        local_path = comms_dir / 'config.toml'
+        if local_path.exists():
+            logMsg.debug(f'Using local config: {local_path}')
+            return _loadTomlFile(local_path), f'local ({local_path})'
+    global_path = userConfigPath()
+    if global_path.exists():
+        logMsg.debug(f'Using global config: {global_path}')
+        return _loadTomlFile(global_path), f'global ({global_path})'
+    logMsg.debug('Using bundled default config')
+    return loadDefaultConfig(), 'bundled defaults'
 
 # -- initComms: returns None, but prints start-up message to terminal
 def initComms() -> None:
