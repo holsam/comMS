@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
         self.config.changed.connect(self.save.refresh)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
-        # paint the initial (pristine) icons
+        # paint the initial (unedited) icons
         self.tabs.setTabIcon(self._exp_index, status_icon(self.experiment.tracker.status))
         self.tabs.setTabIcon(self._sample_index, status_icon(self.sample.tracker.status))
         self.tabs.setTabIcon(self._config_index, status_icon(self.config.tracker.status))
@@ -62,5 +62,5 @@ class MainWindow(QMainWindow):
             self.save.refresh()
     
     def closeEvent(self, event) -> None:
-    self._log.info('Closed experiment setup GUI')
-    super().closeEvent(event)
+        self._log.info('Closed experiment setup GUI')
+        super().closeEvent(event)
