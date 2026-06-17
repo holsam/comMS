@@ -7,24 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal
 
-# -- Define dataclass SampleRow to hold a sample sheet row
-@dataclass
-class SampleRow:
-    sample_id: str
-    raw_file: str
-    treatment: str = ''
-    fraction: str = ''
-    replicate: int | None = None
-    batch: str = ''
-    replicate_overridden: bool = False
+# Import SampleRow dataclass and render_sample_sheet function
+from comms.utils.sheet import (
+    SampleRow, COLUMNS, HEADER_LABELS as _HEADER_LABELS, render_sample_sheet, COL_SAMPLE_ID, COL_RAW, COL_TREATMENT, COL_FRACTION, COL_REPLICATE, COL_BATCH
+)
 
-# -- Define column layout to mirror comMS sample sheet schema
-COLUMNS = ['sample_id', 'raw_file', 'treatment', 'fraction', 'replicate', 'batch']
-COL_SAMPLE_ID, COL_RAW, COL_TREATMENT, COL_FRACTION, COL_REPLICATE, COL_BATCH = range(6)
+# Define editable columns
 _EDITABLE = {COL_SAMPLE_ID, COL_TREATMENT, COL_FRACTION, COL_REPLICATE, COL_BATCH}
-
-# -- Display labels differ from the written column names (which the loader requires verbatim)
-_HEADER_LABELS = {'batch': 'batch (optional)'}
 
 # -- Define class SampleTableModel to hold an editable table model backed by a list of SampleRow
 class SampleTableModel(QAbstractTableModel):
@@ -185,13 +174,3 @@ class SampleTableModel(QAbstractTableModel):
         self._renumber_replicates()
         self.endResetModel()
         self.contentChanged.emit()
-
-# -- render_sample_sheet: build the TSV text for a list of SampleRow
-def render_sample_sheet(rows) -> str:
-    lines = ['\t'.join(COLUMNS)]
-    for r in rows:
-        replicate = '' if r.replicate is None else str(r.replicate)
-        lines.append('\t'.join(
-            [r.sample_id, r.raw_file, r.treatment, r.fraction, replicate, r.batch]
-        ))
-    return '\n'.join(lines) + '\n'
