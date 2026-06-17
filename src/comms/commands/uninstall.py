@@ -32,8 +32,9 @@ def _generated_targets() -> list[Path]:
 # -- _detect_uninstall_command: returns a string for uninstalling comms (best-effort approach)
 def _detect_uninstall_command() -> str:
     '''
-    Infer how comMS was installed from the launching executable path. uv tool installs live under a 'tools' directory; everything else is assumed pip.
+    Infer how comMS was installed from the launching executable path
     '''
+    # Check if installed using uv tool install
     try:
         exe = Path(sys.argv[0]).resolve()
         parts = {p.lower() for p in exe.parts}
@@ -41,7 +42,22 @@ def _detect_uninstall_command() -> str:
             return 'uv tool uninstall comms'
     except Exception:
         pass
-    return 'pip uninstall comms'
+    # Check if installed with pip
+    try:
+        import subprocess
+        pip_pkgs = subprocess.run(['python', '-m', 'pip', 'list'], capture_output=True, check=True).stdout.decode(sys.stdout.encoding)
+        # Split output into list of packages (represented as lists with name and version)
+        pip_pkgs = [p.split() for p in pip_pkgs.split('\n')]
+        # Flatten list
+        pip_pkgs = [p for pkg in pip_pkgs for p in pkg]
+        if 'comms' in pip_pkgs:
+            return 'pip uninstall comms'
+        else:
+            pass
+    except Exception:
+        pass
+    # Return unknown
+    return '(unknown installation method used, uninstall using package manager)'
 
 # -- run_uninstall: remove generated files and print the package-removal command
 def run_uninstall(force: bool = False, dry_run: bool = False) -> None:
