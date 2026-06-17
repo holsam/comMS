@@ -30,22 +30,34 @@ class ExperimentPanel(QWidget):
         self._name.setMinimumWidth(360)
         self._name.setPlaceholderText('name for experiment')
         self._name.textChanged.connect(self.changed)
-        # Add output directory field
+        # Add output directory field and create layout
         self._dir = QLineEdit()
         self._dir.setMinimumWidth(360)
         self._dir.setPlaceholderText('directory to save experiment to')
         self._dir.textChanged.connect(self.changed)
         browse = QPushButton('Select directory')
         browse.clicked.connect(self._browse)
-        # Create output directory field layout
         dir_row = QWidget()
         dir_layout = QHBoxLayout(dir_row)
         dir_layout.setContentsMargins(0, 0, 0, 0)
         dir_layout.addWidget(self._dir)
         dir_layout.addWidget(browse)
+        # Add bin directory field and create layout
+        self._bin = QLineEdit()
+        self._bin.setMinimumWidth(360)
+        self._bin.setPlaceholderText('optional: directory containing Crux / ThermoRawFileParser')
+        self._bin.textChanged.connect(self.changed)
+        bin_browse = QPushButton('Select directory')
+        bin_browse.clicked.connect(self._browse_bin)
+        bin_row = QWidget()
+        bin_layout = QHBoxLayout(bin_row)
+        bin_layout.setContentsMargins(0, 0, 0, 0)
+        bin_layout.addWidget(self._bin)
+        bin_layout.addWidget(bin_browse)
         # Add fields
         form.addRow('Experiment', self._name)
         form.addRow('Save to', dir_row)
+        form.addRow('Binary directory', bin_row)
         # Organise layout
         centre_row = QHBoxLayout()
         centre_row.addStretch(1)
@@ -58,13 +70,18 @@ class ExperimentPanel(QWidget):
         self.changed.connect(self._on_changed)
 
     def _on_changed(self) -> None:
-        signature = (self.experiment_name(), str(self.base_dir()))
+        signature = (self.experiment_name(), str(self.base_dir()), str(self.bin_dir()))
         self.tracker.mark_changed(signature, self.is_valid())
 
     def _browse(self) -> None:
         chosen = QFileDialog.getExistingDirectory(self, 'Select experiment output directory')
         if chosen:
             self._dir.setText(chosen)
+
+    def _browse_bin(self) -> None:
+        chosen = QFileDialog.getExistingDirectory(self, 'Select bin directory')
+        if chosen:
+            self._bin.setText(chosen)
 
     def experiment_name(self) -> str:
         return self._name.text().strip()
@@ -76,7 +93,11 @@ class ExperimentPanel(QWidget):
     def output_dir(self) -> Path | None:
         base = self.base_dir()
         return base / 'comms' if base else None
-    
+
+    def bin_dir(self) -> Path | None:
+        text = self._bin.text().strip()
+        return Path(text) if text else None
+
     # sync_tracker: refresh the tracker from current content (used before unified save)
     def sync_tracker(self) -> None:
         self._on_changed()
@@ -91,6 +112,9 @@ class ExperimentPanel(QWidget):
                 'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'),
             }
         }
+        bin_dir = self.bin_dir()
+        if bin_dir:
+            meta['experiment']['bin_dir'] = str(bin_dir)
         if files:
             meta['files'] = {key: str(value) for key, value in files.items()}
         with path.open('wb') as f:
