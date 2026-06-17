@@ -3,7 +3,7 @@ Defines shared fixtures and binary-availability guards for testing
 '''
 
 # -- Import external dependencies
-import pytest
+import os, pytest
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +14,9 @@ BIN_DIR = REPO_ROOT / 'bin'
 
 # -- Import internal dependencies
 from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
+
+# -- Set environment variable for offscreen Qt platform
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 # -- Register custom pytest markers
 def pytest_configure(config: pytest.Config) -> None:
@@ -225,3 +228,13 @@ def single_fraction_psm_dir(tmp_path: Path) -> Path:
         psm_file = rescore_dir / f'{stem}.percolator.target.psms.txt'
         psm_file.write_text(psm_header + psm_row)
     return rescore_dir
+
+# -- Define session-scoped QApplication for GUI tests
+@pytest.fixture(scope='session')
+def qapp():
+    '''
+    Return a single QApplication for the test session, using the offscreen platform to avoid needing a display
+    '''
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    yield app
