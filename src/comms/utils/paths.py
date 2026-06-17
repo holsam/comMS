@@ -10,11 +10,17 @@ from typing import Optional
 # -- Import internal dependencies
 from comms.utils.log import logMsg
 
-# repoBinDir: returns Path to bin/ directory in repo root
-def repoBinDir() -> Path:
+# repoBinDir: returns Path to the bin/ directory holding external binaries
+def repoBinDir(experiment_bin_dir: Optional[Path] = None) -> Path:
     '''
-    Returns the repo-root bin/ directory resolved from COMMS_BIN_DIR environment variable if set otherwise walks back up repo
+    Resolve the bin/ directory, in priority order:
+      1. an explicit experiment_bin_dir (from experiment.toml)
+      2. the COMMS_BIN_DIR environment variable
+      3. the repo-root bin/ directory (development)
     '''
+    if experiment_bin_dir is not None:
+        logMsg.debug(f'Using experiment bin directory: {experiment_bin_dir}')
+        return experiment_bin_dir
     env_override = os.environ.get('COMMS_BIN_DIR')
     bin_dir = Path(env_override) if env_override else Path(__file__).parents[3] / 'bin'
     logMsg.debug(f'Using bin directory: {bin_dir}')
