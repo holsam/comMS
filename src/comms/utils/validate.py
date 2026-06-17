@@ -20,8 +20,9 @@ def validate(
     check_crux: bool = False,
     check_trfp: bool = False,
     allow_lfq: bool = False,
+    bin_dir: Optional[Path] = None,
 ) -> tuple[Optional[Path], Optional[Path]]:
-    bin_dir = pathutil.repoBinDir()
+    bin_dir = pathutil.repoBinDir(experiment_bin_dir=bin_dir)
     crux_bin: Optional[Path] = None
     trfp_path: Optional[Path] = None
     if check_crux:
@@ -89,7 +90,7 @@ def _check_crux(bin_dir: Path, allow_lfq: bool) -> Path:
     logMsg.progress('Locating Crux binary')
     crux_candidates = _find_all_crux(bin_dir)
     if not crux_candidates:
-        logMsg.error(f'Crux binary not found in {bin_dir}')
+        logMsg.error(f'Crux binary not found in {bin_dir}. Set a bin directory in your experiment (experiment.toml), export COMMS_BIN_DIR, or place the binary under {bin_dir}')
         raise SystemExit(1)
     result = _select_best(crux_candidates, _get_crux_version)
     if result is None:
@@ -114,7 +115,7 @@ def _check_trfp(bin_dir: Path) -> Path:
     logMsg.progress('Locating ThermoRawFileParser binary')
     trfp_candidates = _find_all_trfp(bin_dir)
     if not trfp_candidates:
-        logMsg.error(f'ThermoRawFileParser not found in {bin_dir}')
+        logMsg.error(f'ThermoRawFileParser binary not found in {bin_dir}. Set a bin directory in your experiment (experiment.toml), export COMMS_BIN_DIR, or place the binary under {bin_dir}')
         raise SystemExit(1)
     result = _select_best(trfp_candidates, _get_trfp_version)
     if result is None:
