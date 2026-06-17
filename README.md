@@ -26,12 +26,14 @@
     - [Individual commands](#individual-commands)
     - [Utilities](#utilities)
 - [Configuration](#configuration)
+    - [Creating a user configuration file](#creating-a-user-configuration-file)
     - [Viewing and verifying user configuration](#viewing-and-verifying-user-configuration)
     - [Protocol flags](#protocol-flags)
     - [Default index parameters](#default-index-parameters)
     - [Default search parameters](#default-search-parameters)
     - [Percolator settings](#percolator-settings)
     - [Report settings](#report-settings)
+- [Using the comMS GUI](#using-the-comms-gui)
 - [Output structure](#output-structure)
 - [Logging information](#logging-information)
     - [Log levels](#log-levels)
@@ -200,6 +202,7 @@ Command | Description
 Command | Description
 -- | --
 `config` | Manage a user configuration file
+`experiment` | Launch a GUI to build a sample sheet and configuration file
 `license` | Print the comMS license
 `version` | Print the installed comMS version
 
@@ -207,8 +210,9 @@ Command | Description
 <p align="right"><a href="#comms">^ Back to top</a></p>
 
 ## Configuration
-comMS reads settings from a TOML configuration file, and provides the `config` command and its subcommands to interact with this file. 
+comMS reads settings from a TOML configuration file, and provides the `config` command and its subcommands to interact with this file via the terminal. The below section describes using comMS CLI to edit the config file, however an alternative option is available within `comms experiment` which will launch a GUI allowing more visual editing. For more information on this, see [the below section](#using-the-comms-gui).
 
+### Creating a user configuration file
 A default configuration file is bundled with comMS, but any modifications should be made to a user config file. Initialise a user config file at the OS-appropriate location by using:
 
 ```bash
@@ -336,11 +340,17 @@ Section | Content
 `concordance` | LFQ vs dNSAF log₂FC concordance scatter and Venn diagrams (skipped automatically if no `--lfq-dir` provided)
 
 #### Pre-processing
-Normalisation is deliberately NOT applied across fractions, due to the genuine differences in protein composition anticipated.
+Normalisation is deliberately **not** applied across fractions, due to the genuine differences in protein composition anticipated.
 #### Differential abundance
 For differential abundance, limma with empirical Bayes shrinkage is used to support statistical analysis of samples where *n* = 3 (c.f. Ritchie et al. 2015, doi:10.1093/nar/gkv007). Benjamini-Hochberg false-discovery rate is applied within each fraction independently, as across fraction comparisons are likely to be confounded by run-order influences.
 #### Auxiliary scripts
-An auxiliary script for analysis of EV marker proteins is provided under `r/aux/...`, the contents of which are informed by MISEV 2023 guidelines (c.f. Welsh et al. 2024, doi:10.1002/jev2.12404).
+An auxiliary script for analysis of EV marker proteins is provided under `r/sections/aux/ev-markers.R`, the contents of which are informed by MISEV 2023 guidelines (c.f. Welsh et al. 2024, doi:10.1002/jev2.12404).
+
+---
+<p align="right"><a href="#comms">^ Back to top</a></p>
+
+## Using the comMS GUI
+Running `comms experiment` will open a GUI that walks through the steps to create an experiment in comMS without handwriting the sample sheet or interacting with the `config` command. Enter an experiment name and an output directory, define treatment and fraction groups, import a directory of `.RAW`/`.mzML` files, assign each sample its groups (replicate numbers auto-assign per treatment and fraction but can be overriden), and preview the sheet before saving. A configuration panel mirrors `comms config set`. Both files are written under `<dir>/comms/` as `sample_sheet.tsv` and `config.toml`.
 
 ---
 <p align="right"><a href="#comms">^ Back to top</a></p>
@@ -431,7 +441,7 @@ This repository is distributed under the GPL-3.0 license. See [LICENSE][license-
 [version-shield]: https://img.shields.io/badge/dynamic/toml?url=https://raw.githubusercontent.com/holsam/comMS/refs/heads/main/pyproject.toml&query=$.project.version&style=for-the-badge&label=Current%20version&color=important
 [issues-shield]: https://img.shields.io/github/issues/holsam/comMS.svg?style=for-the-badge&color=critical
 [issues-url]: https://github.com/holsam/comMS/issues
-[license-shield]: https://img.shields.io/github/license/holsam/comMS.svg?style=for-the-badge&color=informational
+[license-shield]: https://img.shields.io/badge/GPL--3.0-informational?style=for-the-badge&label=License
 [license-url]: https://github.com/holsam/comMS/blob/main/LICENSE
 [crux-url]: https://crux.ms
 [trfp-url]: https://github.com/compomics/ThermoRawFileParser
