@@ -5,6 +5,7 @@ Defines shared fixtures and binary-availability guards for testing
 # -- Import external dependencies
 import os, pytest
 from pathlib import Path
+from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 from typing import Optional
 
 # -- Define root directories external dependencies
@@ -238,3 +239,19 @@ def qapp():
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     yield app
+
+def _qt_message_handler(mode: QtMsgType, context, message: str) -> None:
+    '''
+    Custom Qt message handler to suppress known harmless warnings from the offscreen platform plugin that cannot perform operations (such as keyboard grabs) which require a real display; all other messages are forwarded to Qt's default behaviour (stderr)
+    '''
+    _SUPPRESSED = {
+        'does not support grabbing the keyboard',
+        'does not support grabbing the mouse',
+    }
+    if any(fragment in message for fragment in _SUPPRESSED):
+        return
+    # For everything else, replicate Qt's default: print to stderr.
+    import sys
+    print(message, file=sys.stderr)
+
+qInstallMessageHandler(_qt_message_handler)
