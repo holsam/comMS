@@ -80,7 +80,7 @@ def status_icon(status: PanelStatus, size: int = 16) -> QIcon:
 class StatusIndicator(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._status = PanelStatus.PRISTINE
+        self._status = PanelStatus.UNEDITED
         self.setFixedSize(18, 18)
 
     def sizeHint(self) -> QSize:
