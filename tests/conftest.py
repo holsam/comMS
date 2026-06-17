@@ -169,6 +169,7 @@ def isolated_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
         return fake_config_path
     monkeypatch.setattr('comms.utils.settings.userConfigPath', _fake_user_config_path)
     monkeypatch.setattr('comms.commands.config.userConfigPath', _fake_user_config_path)
+    monkeypatch.setattr('comms.commands.uninstall.userConfigPath', _fake_user_config_path)
     return config_dir
 
 # -- Define synthetic percolator results

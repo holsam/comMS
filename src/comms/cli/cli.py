@@ -10,7 +10,7 @@ from typing import Annotated
 from comms.utils.settings import initComms
 from comms.utils.log import configureStreamLogging, log_state, PROGRESS
 
-# -- Import comMS CLI typers
+# -- Import comMS CLI typers (and experiment)
 from comms.cli.convert import commsConvert
 from comms.cli.index import commsIndex
 from comms.cli.lfq import commsLfq
@@ -21,6 +21,7 @@ from comms.cli.report import commsReport
 from comms.cli.pipeline import commsPipeline
 from comms.cli.config import commsConfig
 from comms.cli.license import commsLicense
+from comms.cli.uninstall import commsUninstall
 from comms.cli.version import commsVersion
 
 # Import comMS experiment functions
@@ -50,6 +51,7 @@ comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
 comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='Utilities')
 comms.add_typer(commsLicense)
+comms.add_typer(commsUninstall)
 comms.add_typer(commsVersion)
 
 # -- Register experiment command
