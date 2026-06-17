@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import search as searchFuncs
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise search Typer class
 commsSearch = typer.Typer(add_completion=False)
@@ -25,9 +25,9 @@ def search(
         Path,
         typer.Option('-i', '--index', help='Path to the peptide index directory', exists=True, file_okay=False, dir_okay=True)
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Output directory', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     param_medic: Annotated[
         bool,
@@ -36,6 +36,7 @@ def search(
     threads: Annotated[
         int,
         typer.Option('--threads', help='Number of threads to use', min=1)
-    ] = config['search']['threads'],
+    ] = None,
 ):
-    searchFuncs.run_search(input, index, output, param_medic, threads)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    searchFuncs.run_search(input, index, ctx, param_medic, threads)

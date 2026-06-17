@@ -9,6 +9,7 @@ from rich import print
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
+from comms.utils.settings import ExperimentContext
 from comms.commands import convert, index, search, rescore, lfq, quantify, report
 
 # -- run_pipeline: runs the full comMS pipeline end-to-end from a sample sheet
@@ -16,17 +17,18 @@ def run_pipeline(
     sample_sheet: Path,
     database: Path,
     input_dir: Path,
-    output_dir: Path,
+    ctx: ExperimentContext,
     param_medic: bool,
     skip_convert: bool,
     skip_lfq: bool,
     skip_quantify: bool,
     skip_report: bool,
-    threads: int,
+    threads: int | None,
     org_tags: str
 ):
     logMsg('pipeline')
     logMsg.debug(f'Started command: pipeline')
+    threads = threads or ctx.config['search']['threads']
     START = datetime.datetime.now()
     # -- Load sample sheet
     try:
@@ -39,33 +41,33 @@ def run_pipeline(
     # -- Step 1: Convert (optional)
     if not skip_convert:
         logMsg.progress(f'Step 1/5: converting .RAW files')
-        convert.run_convert(input_dir=input_dir, output=output_dir, gzip=True, in_pipeline=True)
-        mzml_dir = output_dir / 'comms/results/convert'
+        convert.run_convert(input_dir=input_dir, ctx=ctx, gzip=True, in_pipeline=True)
+        mzml_dir = ctx.root / 'comms/results/convert'
     else:
         logMsg.progress(f'Step 1/5: skipping .RAW conversion')
         mzml_dir = input_dir
     logMsg.debug(f'mzml_dir: {mzml_dir}')
     # -- Step 2: Build index
     logMsg.progress(f'Step 2/5: building peptide index')
-    index.run_index(database=database, output=output_dir, in_pipeline=True)
-    index_dir = output_dir / 'comms/results/index'
+    index.run_index(database=database, ctx=ctx, in_pipeline=True)
+    index_dir = ctx.root / 'comms/results/index'
     logMsg.debug(f'index_dir: {index_dir}')
     # -- Step 3: Search
     logMsg.progress(f'Step 3/5: searching spectra')
     search.run_search(
         input_dir=mzml_dir,
         index_dir=index_dir,
-        output=output_dir,
+        ctx=ctx,
         param_medic=param_medic,
         threads=threads,
         in_pipeline=True
     )
-    search_dir = output_dir / 'comms/results/search'
+    search_dir = ctx.root / 'comms/results/search'
     logMsg.debug(f'search_dir: {search_dir}')
     # -- Step 4: Rescore
     logMsg.progress(f'Step 4/5: rescoring PSMs')
-    rescore.run_rescore(input_dir=search_dir, database=database, output=output_dir, organism_tags=org_tags, in_pipeline=True)
-    rescore_dir = output_dir / 'comms/results/rescore'
+    rescore.run_rescore(input_dir=search_dir, database=database, ctx=ctx, organism_tags=org_tags, in_pipeline=True)
+    rescore_dir = ctx.root / 'comms/results/rescore'
     logMsg.debug(f'rescore_dir: {rescore_dir}')
     # -- Step 5: Quantify
     if skip_lfq and skip_quantify:
@@ -77,15 +79,15 @@ def run_pipeline(
         if not skip_lfq:
             # -- Step 5a: MS1 label free quantification
             logMsg.progress(f'\tStep {step}/{num_steps}: quantifying with MS1 label-free quantification')
-            lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, output=output_dir, in_pipeline=True)
-            lfq_dir = output_dir / 'comms/results/lfq'
+            lfq.run_lfq(rescore_dir=rescore_dir, mzml_dir=mzml_dir, sample_sheet=sample_sheet, ctx=ctx, in_pipeline=True)
+            lfq_dir = ctx.root / 'comms/results/lfq'
             logMsg.debug(f'lfq_dir: {lfq_dir}')
         if not skip_quantify:
             # -- Step 5b: dNSAF spectral counting
             logMsg.progress(f'\tStep {step}/{num_steps}: quantifying with dNSAF spectral counting...')
-            quantify.run_quantify(input_dir=rescore_dir, database=database, output=output_dir, in_pipeline=True)
-            quantify_dir = output_dir / 'comms/results/quantify'
+            quantify.run_quantify(input_dir=rescore_dir, database=database, ctx=ctx, in_pipeline=True)
+            quantify_dir = ctx.root / 'comms/results/quantify'
             logMsg.debug(f'quantify_dir: {quantify_dir}')
     END = datetime.datetime.now()
-    logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {output_dir}')
+    logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {ctx.root}')
     logMsg.debug(f'Finished command: pipeline')

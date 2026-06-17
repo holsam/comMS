@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import pipeline as pipelineFuncs
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise pipeline Typer class
 commsPipeline = typer.Typer(add_completion=False)
@@ -33,9 +33,9 @@ def pipeline(
         str,
         typer.Option('--organism-tags', help='Comma-separated patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Root output directory', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     param_medic: Annotated[
         bool,
@@ -60,13 +60,14 @@ def pipeline(
     threads: Annotated[
         int,
         typer.Option('--threads', help='Number of threads to use', min=1)
-    ] = config['search']['threads'],
+    ] = None,
 ):
+    ctx = ExperimentContext.resolve(experiment_dir)
     pipelineFuncs.run_pipeline(
         sample_sheet=sample_sheet,
         database=database,
         input_dir=input,
-        output_dir=output,
+        ctx=ctx,
         param_medic=param_medic,
         skip_convert=skip_convert,
         skip_lfq=skip_lfq,

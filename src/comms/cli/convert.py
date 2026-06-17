@@ -5,11 +5,11 @@ comMS CLI subcommand for file conversion
 # -- Import external dependencies
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import convert as convertFuncs
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise convert Typer class
 commsConvert = typer.Typer(add_completion=False)
@@ -21,13 +21,14 @@ def convert(
         Path,
         typer.Argument(help='Directory containing .RAW files', exists=True, file_okay=False, dir_okay=True, readable=True)
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Output directory for .mzML file(s)', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     gzip: Annotated[
-        bool,
+        Optional[bool],
         typer.Option('--gzip/--no-gzip', help='Gzip-compress mzML output file(s)')
-    ] = config['convert']['gzip'],
+    ] = None,
 ):
-    convertFuncs.run_convert(input, output, gzip)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    convertFuncs.run_convert(input, ctx, gzip)

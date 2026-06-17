@@ -10,24 +10,24 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_quantify: runs dNSAF spectral counting on per-organism assign-confidence PSM files and writes results to output
-def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: bool = False):
+def run_quantify(input_dir: Path, database: Path, ctx: ExperimentContext, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('quantify')
     logMsg.debug('Started command: quantify')
-    crux_bin, _ = validate(check_crux=True)
+    crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     logMsg.debug(f'Scanning {input_dir} subdirectories for assign-confidence PSMs')
     psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
     if not psm_files:
         logMsg.error(f'No assign-confidence PSM files found in {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Quantifying {len(psm_files)} PSM file(s)')
-    out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'quantify')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'quantify.log'
     configureFileLogging(log_path)
@@ -43,7 +43,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=config,
+                config=ctx.config,
             )
             if ok:
                 n_ok += 1

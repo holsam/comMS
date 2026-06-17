@@ -9,6 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import index as indexFuncs
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise index Typer class
 commsIndex = typer.Typer(add_completion=False)
@@ -23,9 +24,10 @@ def index(
             exists=True, file_okay=True, dir_okay=False, readable=True
         )
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Output directory for peptide index', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):
-    indexFuncs.run_index(database, output)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    indexFuncs.run_index(database, ctx)

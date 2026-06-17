@@ -9,6 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import lfq as lfqFuncs
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise index Typer class
 commsLfq = typer.Typer(add_completion=False)
@@ -28,9 +29,10 @@ def lfq(
         Path,
         typer.Option('-s', '--sample-sheet', help='Path to sample sheet', exists=True, file_okay=True, dir_okay=False, readable=True)
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Path to output directory for quantification results', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):
-    lfqFuncs.run_lfq(psm_dir, mzml_dir, sample_sheet, output)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    lfqFuncs.run_lfq(psm_dir, mzml_dir, sample_sheet, ctx)

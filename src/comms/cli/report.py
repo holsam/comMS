@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import report as reportFuncs
+from comms.utils.settings import ExperimentContext
 
 # -- Define constants (report sections)
 VALID_SECTIONS = {'qc', 'pca', 'da', 'primary-species', 'secondary-species', 'concordance'}
@@ -20,21 +21,21 @@ commsReport = typer.Typer(add_completion=False)
 # -- report: invokes the Quarto report (report.qmd) on quantification output
 @commsReport.command(help='Generate a static report from quantification output', rich_help_panel='Downstream Analysis')
 def report(
-    quantify_dir: Annotated[
-        Path,
-        typer.Argument(help='comms/results/quantify/ output directory', exists=True, file_okay=False, dir_okay=True)
-    ],
-    sample_sheet: Annotated[
-        Path,
-        typer.Argument(help='Sample sheet TSV/CSV used in the pipeline run', exists=True, file_okay=True, dir_okay=False)
-    ],
     organism_prefix: Annotated[
         str,
         typer.Option('--organism-prefix', help='ID prefix for the primary organism')
     ],
-    output: Annotated[
-        Path,
-        typer.Argument(help='Directory to write report outputs into')
+    quantify_dir: Annotated[
+        Optional[Path],
+        typer.Argument(help='comms/results/quantify/ output directory', exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    sample_sheet: Annotated[
+        Optional[Path],
+        typer.Argument(help='Sample sheet TSV/CSV used in the pipeline run', exists=True, file_okay=True, dir_okay=False)
+    ] = None,
+    experiment_dir: Annotated[
+        Path | None,
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     lfq_dir: Annotated[
         Optional[Path],
@@ -79,10 +80,11 @@ def report(
 ):
     sections = list(VALID_SECTIONS) if all_sections else (section or DEFAULT_SECTIONS)
     invalid = set(sections) - VALID_SECTIONS
+    ctx = ExperimentContext.resolve(experiment_dir)
     reportFuncs.run_report(
         quantify_dir=quantify_dir,
         sample_sheet=sample_sheet,
-        output_dir=output,
+        ctx=ctx,
         lfq_dir=lfq_dir,
         ref_info=ref_info,
         cont_csv=cont_csv,

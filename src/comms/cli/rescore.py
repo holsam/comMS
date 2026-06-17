@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import rescore as rescoreFuncs
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise rescore Typer class
 commsRescore = typer.Typer(add_completion=False)
@@ -28,9 +29,10 @@ def rescore(
         Optional[str],
         typer.Option('--organism-tags', help='Patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Output directory', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):
-    rescoreFuncs.run_rescore(input, database, output, organism_tags)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    rescoreFuncs.run_rescore(input, database, ctx, organism_tags)

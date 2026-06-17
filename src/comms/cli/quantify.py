@@ -9,6 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import quantify as quantifyFuncs
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise quantify Typer class
 commsQuantify = typer.Typer(add_completion=False)
@@ -24,9 +25,10 @@ def quantify(
         Path,
         typer.Option('-d', '--database', help='Path to proteome FASTA', exists=True, file_okay=True, dir_okay=False)
     ],
-    output: Annotated[
+    experiment_dir: Annotated[
         Path | None,
-        typer.Option('-o', '--out-dir', help='Output directory', file_okay=False, dir_okay=True, writable=True)
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):
-    quantifyFuncs.run_quantify(input, database, output)
+    ctx = ExperimentContext.resolve(experiment_dir)
+    quantifyFuncs.run_quantify(input, database, ctx)

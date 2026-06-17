@@ -9,7 +9,7 @@ from rich import print
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
@@ -20,7 +20,7 @@ def run_lfq(
     rescore_dir: Path,
     mzml_dir: Path,
     sample_sheet: Path,
-    output: Path,
+    ctx: ExperimentContext,
     in_pipeline: bool = False
 ):
     '''
@@ -29,7 +29,7 @@ def run_lfq(
     if not in_pipeline:
         logMsg('lfq')
     logMsg.debug('Started command: lfq')
-    crux_bin, _ = validate(check_crux=True, allow_lfq=True)
+    crux_bin, _ = validate(check_crux=True, allow_lfq=True, bin_dir=ctx.bin_dir)
     logMsg.debug(f'Scanning {rescore_dir} for rescored PSMs')
     psm_files = sorted(rescore_dir.glob('[!.]*.percolator.target.psms.txt'))
     if not psm_files:
@@ -37,7 +37,7 @@ def run_lfq(
         raise SystemExit(1)
     logMsg.info(f'Running LFQ on {len(psm_files)} PSM file(s)')
     samples = samputil.loadSampleSheet(sample_sheet)
-    out_dir = pathutil.generateOutputFileStructure(output, 'lfq')
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'lfq')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'lfq.log'
     configureFileLogging(log_path)
@@ -53,7 +53,7 @@ def run_lfq(
             mzml_dir=mzml_dir,
             out_dir=out_dir_fraction,
             fileroot=fraction,
-            config=config,
+            config=ctx.config,
         )
         if not ok:
             logMsg.warn(f'LFQ failed for fraction: {fraction}')

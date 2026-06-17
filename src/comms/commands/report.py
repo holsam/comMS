@@ -13,6 +13,7 @@ from rich.console import Console
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
+from comms.utils.settings import ExperimentContext
 
 # -- Initialise Rich console
 console = Console()
@@ -71,9 +72,9 @@ def _write_index(output_dir: Path, params: dict, results: dict[str, bool]) -> No
 
 # -- run_report: return None, but run report section R scripts and output script
 def run_report(
-    quantify_dir: Path,
-    sample_sheet: Path,
-    output_dir: Path,
+    quantify_dir: Path | None,
+    sample_sheet: Path | None,
+    ctx: ExperimentContext,
     lfq_dir: Path | None,
     ref_info: Path | None,
     cont_csv: Path | None,
@@ -89,6 +90,12 @@ def run_report(
     if not in_pipeline:
         logMsg('report')
     logMsg.debug('Started command: report')
+    # Create path to output_dir
+    output_dir = ctx.root / 'comms/results/report'
+    # Check if quantify dir, sample_sheet and lfq dir were provided, and if not set to default
+    quantify_dir = quantify_dir or ctx.root / 'comms/results/quantify'
+    sample_sheet = sample_sheet or ctx.root / 'sample_sheet.tsv'
+    lfq_dir = lfq_dir or ctx.root / 'comms/results/lfq'
     # Validate inputs
     sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:

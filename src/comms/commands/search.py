@@ -10,17 +10,18 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_search: runs tide-search on all mzML files in input_dir and writes results to output
-def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool, threads: int, in_pipeline: bool = False):
+def run_search(input_dir: Path, index_dir: Path, ctx: ExperimentContext, param_medic: bool, threads: int, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('search')
     logMsg.debug('Started command: search')
-    crux_bin, _ = validate(check_crux=True)
+    crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
+    threads = threads or ctx.config['search']['threads']
     logMsg.debug(f'Scanning {input_dir }for mzML files')
     mzml_files = sorted(
         list(input_dir.glob('[!.]*.mzML')) + list(input_dir.glob('[!.]*.mzML.gz'))
@@ -29,7 +30,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
         logMsg.error(f'No mzML files found in {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Searching {len(mzml_files)} mzML file(s)')
-    out_dir = pathutil.generateOutputFileStructure(output, 'search')
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'search')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'search.log'
     configureFileLogging(log_path)
@@ -40,8 +41,8 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
     if param_medic:
         logMsg.progress(f'Estimating tolerances with param-medic')
         precursor_tol, mz_bin_width = _runParamMedic(crux_bin=crux_bin, mzml_files=mzml_files, out_dir=out_dir)
-    prec_display = precursor_tol or config['search']['precursor_tolerance_ppm']
-    bin_width_display = mz_bin_width or config['search']['mz_bin_width']
+    prec_display = precursor_tol or ctx.config['search']['precursor_tolerance_ppm']
+    bin_width_display = mz_bin_width or ctx.config['search']['mz_bin_width']
     logMsg.debug(f'Precursor tolerance {prec_display} ppm, m/z bin width {bin_width_display} Da')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -54,7 +55,7 @@ def run_search(input_dir: Path, index_dir: Path, output: Path, param_medic: bool
                 index_dir=index_dir,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=config,
+                config=ctx.config,
                 threads=threads,
                 precursor_tol=prec_display,
                 mz_bin_width=bin_width_display,

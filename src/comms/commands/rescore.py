@@ -12,17 +12,17 @@ from typing import Optional
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.settings import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then splits output by organism and runs assign-confidence per organism for per-organism q-values
-def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Optional[str] = None, in_pipeline: bool = False):
+def run_rescore(input_dir: Path, database: Path, ctx: ExperimentContext, organism_tags: Optional[str] = None, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('rescore')
     logMsg.debug('Started command: rescore')
-    crux_bin, _ = validate(check_crux=True)
+    crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     logMsg.debug(f'Scanning {input_dir }for Tide-search PSMs')
     target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
@@ -34,14 +34,14 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
     if organism_tags:
         organism_tags = _parseOrganismTags(organism_tags)
     else:
-        if config['organism']:
-            organism_tags = config['organism']
+        if ctx.config['organism']:
+            organism_tags = ctx.config['organism']
         else:
             logMsg.error(f'No organism tags supplied and none found in config')
             raise SystemExit(1)
     logMsg.debug(f'Organism tags: {organism_tags}')
     # Generate output file structure
-    out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'rescore')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'rescore.log'
     configureFileLogging(log_path)
@@ -62,7 +62,7 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=config,
+                config=ctx.config,
             )
             if ok:
                 n_ok += 1
