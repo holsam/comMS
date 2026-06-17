@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import search as searchFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise search Typer class
 commsSearch = typer.Typer(add_completion=False)

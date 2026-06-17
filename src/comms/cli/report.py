@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import report as reportFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Define constants (report sections)
 VALID_SECTIONS = {'qc', 'pca', 'da', 'primary-species', 'secondary-species', 'concordance'}

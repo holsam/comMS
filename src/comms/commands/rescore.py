@@ -12,7 +12,7 @@ from typing import Optional
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil

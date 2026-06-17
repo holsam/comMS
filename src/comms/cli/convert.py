@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import convert as convertFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise convert Typer class
 commsConvert = typer.Typer(add_completion=False)

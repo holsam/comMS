@@ -9,7 +9,7 @@ from rich import print
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 from comms.commands import convert, index, search, rescore, lfq, quantify, report
 
 # -- run_pipeline: runs the full comMS pipeline end-to-end from a sample sheet

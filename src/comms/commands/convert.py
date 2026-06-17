@@ -8,7 +8,7 @@ from rich import print
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 from comms.utils.validate import validate
 from comms.utils import trfp as trfputil
 from comms.utils import paths as pathutil

@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import lfq as lfqFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise index Typer class
 commsLfq = typer.Typer(add_completion=False)

@@ -13,7 +13,7 @@ from rich.console import Console
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise Rich console
 console = Console()

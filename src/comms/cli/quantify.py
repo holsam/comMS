@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import quantify as quantifyFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise quantify Typer class
 commsQuantify = typer.Typer(add_completion=False)

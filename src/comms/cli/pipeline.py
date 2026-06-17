@@ -9,7 +9,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.commands import pipeline as pipelineFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise pipeline Typer class
 commsPipeline = typer.Typer(add_completion=False)

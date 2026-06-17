@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import rescore as rescoreFuncs
-from comms.utils.settings import ExperimentContext
+from comms.utils.context import ExperimentContext
 
 # -- Initialise rescore Typer class
 commsRescore = typer.Typer(add_completion=False)
