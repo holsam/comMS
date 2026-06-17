@@ -12,6 +12,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Synthetic Percolator results](#synthetic-percolator-results)
     - [LFQ fixtures](#lfq-fixtures)
     - [Rescore integration fixtures](#rescore-integration-fixtures)
+    - [GUI fixtures](#gui-fixtures)
 - [Synthetic fixture generator](#synthetic-fixture-generator)
     - [Running standalone](#running-standalone)
     - [Synthetic proteome](#synthetic-proteome)
@@ -21,6 +22,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
 - [Unit tests](#unit-tests)
     - [`tests/unit/test_config.py`](#testsunittest_configpy)
     - [`tests/unit/test_download.py`](#testsunittest_downloadpy)
+    - [`tests/unit_test_experiment.py](#testsunittest_experimentpy)
     - [`tests/unit/test_fasta.py`](#testsunittest_fastapy)
     - [`tests/unit/test_parammedic.py`](#testsunittest_parammedicpy)
     - [`tests/unit/test_paths.py`](#testsunittest_pathspy)
@@ -30,6 +32,10 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
     - [`tests/unit/test_validate.py`](#testsunittest_validatepy)
     - [`tests/unit/test_version.py`](#testsunittest_versionpy)
+    - [`tests/unit/gui/test_gui_models.py`](#testsunitguitest_gui_modelspy)
+    - [`tests/unit/gui/test_gui_panels.py`](#testsunitguitest_gui_panelspy)
+    - [`tests/unit/gui/test_gui_status.py`](#testsunitguitest_gui_statuspy)
+    - [`tests/unit/gui/test_gui_widgets.py`](#testsunitguitest_gui_widgetspy)
 - [Integration tests](#integration-tests)
     - [`tests/integration/test_convert.py`](#testsintegrationtest_convertpy)
     - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
@@ -143,6 +149,14 @@ Fixture | Description
 
 A module-level helper function `_write_per_organism_psm_files(rescore_dir, file_base, labels)` is also defined in `test_pipeline.py`. This is not a fixture but is used as a mock side effect within `TestRunRescoreMergedOutput` to write synthetic per-organism Percolator output files so that `_mergeRescoredPsms` has something to read without Percolator running.
 
+### GUI fixtures
+`QT_QPA_PLATFORM=offscreen` is set at the top of `conftest.py` so Qt widgets can be constructed and painted without a display.
+
+Fixture | Description
+---|---
+`qapp` | Session-scoped `QApplication` (created with `QApplication.instance() or QApplication([])`) so GUI widgets can be built in tests; requested via `pytestmark = pytest.mark.usefixtures('qapp')` at the top of each GUI test module
+
+
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
 
@@ -244,6 +258,16 @@ Constants | correct types, non-empty strings, valid URL templates
 `_resolve_bin_dir` | returns the override when supplied; falls back to `repoBinDir()` when `None`
 URL construction | tarball name for each known platform key matches expected format
 `download_crux` | raises `NotImplementedError` on Windows (monkeypatched); raises `RuntimeError` on unrecognised platform
+
+---
+
+### `tests/unit/test_experiment.py`
+Unit tests covering `src/comms/commands/experiment.py` and the main-window close log. The launch tests mock `comms.gui.app.run_app` so no event loop runs; the close-logging tests use the `qapp` fixture.
+
+Function/class | Test description
+-- | --
+`launch_experiment_gui` | exits with `run_app`'s return code; logs a launch message; `logMsg` instance is named `'experiment'`
+`MainWindow.closeEvent` | closing the window logs a message containing "closed"; `logMsg` instance is named `'experiment'`
 
 ---
 
@@ -359,6 +383,57 @@ Unit tests covering `src/comms/commands/version.py`:
 Function/class | Test description
 -- | --
 `printVersion` | exits with code zero; prints the installed version string; handles `PackageNotFoundError` gracefully by printing an 'unknown' fallback message
+
+---
+
+### `tests/unit/gui/test_gui_models.py`
+Unit tests covering `src/comms/gui/models/experiment_state.py` and `src/comms/gui/models/sample_table.py`:
+
+Function/class | Test description
+-- | --
+`ExperimentState` | `add_treatment` returns `True` and stores the value; duplicate returns `False`; empty/whitespace returns `False`; `remove_treatment` removes; `add_fraction` stores; `groupsChanged` emitted on add; group accessors return a defensive copy
+`SampleTableModel.add_files` | appends one row per path; `sample_id` is the filename stem; `raw_file` is the filename; duplicate filenames are skipped; emits `contentChanged`
+`SampleTableModel.remove_rows` | deletes a single row; deletes multiple rows
+`SampleTableModel.is_complete` | empty model is incomplete; incomplete without a treatment; complete when all fields are set; duplicate `sample_id` values are incomplete
+Replicate auto-numbering | sequential within a treatment/fraction group; separate counters per group; a manual override is preserved
+`headerData` | the batch column is labelled "batch (optional)"; other columns use their canonical names
+`render_sample_sheet` | header uses the canonical columns; a row is tab-joined; a `None` replicate renders as empty; output ends with a trailing newline
+
+---
+
+### `tests/unit/gui/test_gui_panels.py`
+Unit tests covering `src/comms/gui/panels/config_panel.py`, `src/comms/gui/panels/experiment_panel.py`, `src/comms/gui/panels/sample_panel.py` and `src/comms/gui/panels/save_panel.py`:
+
+Function/class | Test description
+-- | --
+`ConfigPanel` (analysis type) | defaults to single species; the organism table is disabled for single species and enabled for multispecies
+`ConfigPanel` (completeness) | single species is complete without organisms; multispecies is incomplete without organisms; incomplete with a half-filled organism row; complete with a full organism row
+`ConfigPanel._build_config` | returns a dict with a `search` section; the default includes Met oxidation; single species writes an empty organism section; multispecies writes the organism patterns
+`ConfigPanel` (state) | the `changed` signal fires and the tracker becomes complete; `summary` reports the analysis type
+`ExperimentPanel` | name strips whitespace; `base_dir` is `None` when empty; `output_dir` appends `comms`; `is_valid` requires both name and directory; the tracker is incomplete until valid
+`SamplePanel` | `is_complete` proxies the model; `contentChanged` is re-emitted; the tracker moves from incomplete to complete; `write` creates `sample_sheet.tsv`
+`SavePanel` | save button disabled when incomplete; enabled when all three panels are complete; `_save_all` writes the sample sheet, config and metadata together; output paths recorded under `[files]` and the experiment name under `[experiment]` in `experiment.toml`; all three trackers marked saved; the `saved` signal is emitted (`QMessageBox.information` is patched throughout)
+
+---
+
+### `tests/unit/gui/test_gui_status.py`
+Unit tests covering `src/comms/gui/status.py`:
+
+Function/class | Test description
+-- | --
+`PanelStateTracker` | starts unedited; a partial change is incomplete; a complete change is complete; `mark_saved` is saved; editing after save returns to complete; reverting to the saved signature is saved again; `statusChanged` is emitted; `is_saveable` is true for complete/saved and false for unedited/incomplete
+
+---
+
+### `tests/unit/gui/test_gui_widgets.py`
+Unit tests covering `src/comms/gui/widgets/status_indicator.py` and
+`src/comms/gui/widgets/combo_delegate.py`:
+
+Function/class | Test description
+-- | --
+`StatusIndicator` | default size is 18×18; `setStatus` for every state does not raise; renders to a non-null pixmap
+`status_icon` | returns a non-null `QIcon`; the icon renders at the requested pixel size
+`GroupComboDelegate` | `createEditor` returns a `QComboBox` with a blank first item and the provider's options; options reflect live provider changes; the show-popup callback is scheduled via `QTimer.singleShot`; `setEditorData` selects the cell's current value and falls back to blank when it is not an option; `setModelData` writes the combo text back to the model
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
