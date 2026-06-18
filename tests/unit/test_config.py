@@ -713,23 +713,28 @@ class TestConfigSet:
 
     def test_custom_adds_entry(self, initialised_config):
         config_set(custom='1K+28.0313')
-        assert '1K+28.0313' in _loadConfigFile()['search']['custom_mods']
+        assert '1K+28.0313' in _loadConfigFile()['index']['custom_mods']
 
     def test_custom_is_additive(self, initialised_config):
         config_set(custom='1K+28.0313')
         config_set(custom='1R+14.0157')
-        mods = _loadConfigFile()['search']['custom_mods']
+        mods = _loadConfigFile()['index']['custom_mods']
         assert '1K+28.0313' in mods
         assert '1R+14.0157' in mods
 
     def test_custom_empty_string_clears_all(self, initialised_config):
         config_set(custom='1K+28.0313')
         config_set(custom='')
-        assert _loadConfigFile()['search']['custom_mods'] == ''
+        assert _loadConfigFile()['index']['custom_mods'] == ''
 
     def test_custom_managed_mod_not_added(self, initialised_config):
         config_set(custom='1M+15.9949')
-        assert '1M+15.9949' not in _loadConfigFile()['search']['custom_mods']
+        assert '1M+15.9949' not in _loadConfigFile()['index']['custom_mods']
+
+    def test_custom_reaches_resolved_modifications(self, initialised_config):
+            config_set(custom='1K+28.0313')
+            cfg = _loadConfigFile()
+            assert '1K+28.0313' in settings.resolvedModifications(cfg)
 
     def test_n_cyc_does_not_change_mods_spec(self, initialised_config):
         before = _loadConfigFile()['index']['mods_spec']
