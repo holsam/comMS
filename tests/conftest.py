@@ -160,16 +160,16 @@ def sample_sheet_duplicate_ids(tmp_path: Path) -> Path:
 @pytest.fixture()
 def isolated_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     '''
-    Monkeypatches `userConfigPath` in settings and config modules so tests don't modift actual OS config directory, returning the temp config directory
+    Monkeypatches `globalConfigPath` in settings and config modules so tests don't modift actual OS config directory, returning the temp config directory
     '''
     config_dir = tmp_path / 'config'
     config_dir.mkdir()
     fake_config_path = config_dir / 'config.toml'
     def _fake_user_config_path() -> Path:
         return fake_config_path
-    monkeypatch.setattr('comms.utils.settings.userConfigPath', _fake_user_config_path)
-    monkeypatch.setattr('comms.commands.config.userConfigPath', _fake_user_config_path)
-    monkeypatch.setattr('comms.commands.uninstall.userConfigPath', _fake_user_config_path)
+    monkeypatch.setattr('comms.utils.settings.globalConfigPath', _fake_user_config_path)
+    monkeypatch.setattr('comms.commands.config.globalConfigPath', _fake_user_config_path)
+    monkeypatch.setattr('comms.commands.uninstall.globalConfigPath', _fake_user_config_path)
     return config_dir
 
 # -- Define synthetic percolator results
@@ -256,3 +256,10 @@ def _qt_message_handler(mode: QtMsgType, context, message: str) -> None:
     print(message, file=sys.stderr)
 
 qInstallMessageHandler(_qt_message_handler)
+
+# -- Add a function-scoped experiment context for most tests
+@pytest.fixture()
+def experiment_ctx(tmp_path):
+    '''A bare ExperimentContext rooted at tmp_path (no experiment.toml)'''
+    from comms.utils.context import ExperimentContext
+    return ExperimentContext.resolve(tmp_path)
