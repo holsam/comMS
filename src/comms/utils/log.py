@@ -2,7 +2,7 @@
 Shared utility functions: logging
 '''
 # -- Import external dependencies
-import logging, shutil, tempfile
+import atexit, logging, shutil, sys, tempfile
 from pathlib import Path
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
@@ -30,6 +30,9 @@ logging.Logger.progress = _progress
 
 # -- Define custom RichHandler subclass (CommsRichHandler) to allow custom formatting
 class CommsRichHandler(RichHandler):
+    def emit(self, record: logging.LogRecord) -> None:
+        log_state._emitted = True
+        super().emit(record)
     def render_message(self, record: logging.LogRecord, message: str) -> 'ConsoleRenderable':
         level_colour = _LEVEL_COLOURS.get(record.levelname, 'white')
         markup = (
@@ -72,6 +75,8 @@ class LogState:
     _temp_log_file: tempfile.NamedTemporaryFile | None = None
     _temp_log_path: Path | None = None
     _file_handler: logging.FileHandler | None = None
+    _emitted: bool = False
+    _atexit_registered: bool = False
 
 # -- Define custom logging.Formatter subclas (PlainFormatter) to strip Rich markup before writing to file
 class PlainFormatter(logging.Formatter):
@@ -118,6 +123,9 @@ def configureStreamLogging():
     handler.setFormatter(logging.Formatter(datefmt="%Y-%m-%d %H:%M:%S"))
     logger.addHandler(handler)
     _attachTempFileHandler()
+    if not log_state._atexit_registered:
+        atexit.register(_emitTrailingNewline)
+        log_state._atexit_registered = True
 
 # -- configureFileLogging: flush temp log to its final location under out_dir
 def configureFileLogging(out_dir: Path):
@@ -169,6 +177,11 @@ def _removeTempLog():
         pass
     log_state._temp_log_file = None
     log_state._temp_log_path = None
+
+# -- _emitTrailingNewline: internal helper to print a blank line (only in interactive terminals)
+def _emitTrailingNewline() -> None:
+    if log_state._emitted and sys.stderr.isatty():
+        Console(stderr=True).print()
 
 # -- Initialise state
 log_state = LogState()
