@@ -8,9 +8,13 @@ from importlib.resources import files as pkg_files
 from pathlib import Path
 from platformdirs import user_config_dir
 from rich import print
+from typing import Optional
+
+# Import internal classes/functions
+from comms.utils.log import logMsg
 
 # -- userConfigPath: returns Path to OS-appropriate config file
-def userConfigPath() -> Path:
+def globalConfigPath() -> Path:
     '''
     Returns the OS-appropriate user config path:
         Linux/macOS : ~/.config/comms/config.toml
@@ -42,6 +46,11 @@ def resolvedModifications(cfg: dict) -> str:
         mods.add(entry)
     return ','.join(mods)
 
+# -- _loadTomlFile: returns dict parsed from a TOML file on disk
+def _loadTomlFile(path: Path) -> dict:
+    with path.open('rb') as f:
+        return tomllib.load(f)
+
 # -- resolveConfig: returns (config, source)
 def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
     '''
@@ -52,7 +61,7 @@ def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
         if local_path.exists():
             logMsg.debug(f'Using local config: {local_path}')
             return _loadTomlFile(local_path), f'local ({local_path})'
-    global_path = userConfigPath()
+    global_path = globalConfigPath()
     if global_path.exists():
         logMsg.debug(f'Using global config: {global_path}')
         return _loadTomlFile(global_path), f'global ({global_path})'

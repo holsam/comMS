@@ -15,7 +15,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.utils.log import logMsg
-from comms.utils.settings import loadDefaultConfig, userConfigPath as globalConfigPath
+from comms.utils.settings import loadDefaultConfig, globalConfigPath
 
 # -- Define modification constants
 CARBAMIDOMETHYL_MOD = 'C+57.0215'    # static carbamidomethylation of Cys
