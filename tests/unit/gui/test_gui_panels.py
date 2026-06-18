@@ -68,6 +68,11 @@ class TestConfigPanel:
     def test_default_includes_met_oxidation(self):
         assert MET_OX_MOD in ConfigPanel()._build_config()['index']['mods_spec']
 
+    def test_custom_mod_written_to_index(self):
+        panel = ConfigPanel()
+        panel._custom.setText('1K+28.0313')
+        assert '1K+28.0313' in panel._build_config()['index']['custom_mods']
+
     def test_single_species_writes_empty_organism_section(self):
         assert ConfigPanel()._build_config()['organism'] == {}
 
