@@ -13,7 +13,7 @@ from typing import Optional
 # Import internal classes/functions
 from comms.utils.log import logMsg
 
-# -- userConfigPath: returns Path to OS-appropriate config file
+# -- globalConfigPath: returns Path to OS-appropriate config file
 def globalConfigPath() -> Path:
     '''
     Returns the OS-appropriate user config path:
