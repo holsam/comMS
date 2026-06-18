@@ -27,11 +27,11 @@ def pipeline(
     ] = None,
     data: Annotated[
         Optional[list[Path]],
-        typer.Option('-d', '--data', help='.mzML file(s) to search; repeatable [dim][default: convert results][/dim]')
+        typer.Option('-d', '--data', help='Path to data (.RAW/.mzML) file; repeatable [dim][default: experiment data files][/dim]')
     ] = None,
     organism_tags: Annotated[
         Optional[str],
-        typer.Option('-o', '--organism-tags', help='Patterns to split FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>") [dim][default: config organism tags][/dim]')
+        typer.Option('-o', '--organism-tags', help='Patterns to split FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>") [dim][default: experiment organism tags][/dim]')
     ] = None,
     experiment_dir: Annotated[
         Optional[Path],

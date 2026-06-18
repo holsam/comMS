@@ -18,12 +18,12 @@ DEFAULT_SECTIONS = ['qc', 'pca', 'da']
 # -- Initialise report Typer class
 commsReport = typer.Typer(add_completion=False)
 
-# -- report: invokes the Quarto report (report.qmd) on quantification output
+# -- report: creates report from quantification output
 @commsReport.command(help='Generate a static report from quantification output', rich_help_panel='Downstream Analysis')
 def report(
     organism_prefix: Annotated[
         Optional[str],
-        typer.Option('-o', '--organism-prefix', help='ID prefix for the primary organism [dim][default: config organism prefix][/dim]')
+        typer.Option('-o', '--organism-prefix', help='ID prefix for the primary organism [dim][default: experiment organism prefix][/dim]')
     ] = None,
     quantify_dir: Annotated[
         Optional[Path],
@@ -31,7 +31,7 @@ def report(
     ] = None,
     sample_sheet: Annotated[
         Optional[Path],
-        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: config sample sheet][/dim]')
+        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: experiment sample sheet][/dim]')
     ] = None,
     experiment_dir: Annotated[
         Optional[Path],
@@ -43,11 +43,11 @@ def report(
     ] = None,
     ref_info: Annotated[
         Optional[Path],
-        typer.Option('-r', '--ref-info', help='Protein metadata TSV [dim][default: config ref_info][/dim]')
+        typer.Option('-r', '--ref-info', help='Protein metadata TSV [dim][default: experiment ref_info][/dim]')
     ] = None,
     cont_csv: Annotated[
         Optional[Path],
-        typer.Option('-c', '--cont-csv', help='Contaminant annotations CSV [dim][default: config cont_csv][/dim]')
+        typer.Option('-c', '--cont-csv', help='Contaminant annotations CSV [dim][default: experiment cont_csv][/dim]')
     ] = None,
     min_reps: Annotated[
         int,
@@ -79,7 +79,6 @@ def report(
     ] = 'Rscript',
 ):
     sections = list(VALID_SECTIONS) if all_sections else (section or DEFAULT_SECTIONS)
-    invalid = set(sections) - VALID_SECTIONS
     ctx = ExperimentContext.resolve(experiment_dir)
     reportFuncs.run_report(
         quantify_dir=quantify_dir,
@@ -95,5 +94,5 @@ def report(
         sections=sections,
         overwrite=overwrite,
         rscript=rscript,
-        in_pipeline=False
+        in_pipeline=False,
     )
