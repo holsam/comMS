@@ -11,7 +11,7 @@ from comms.commands.config import CARBAMIDOMETHYL_MOD, MET_OX_MOD, PHOSPHO_MOD, 
 
 # -- Import internal functions
 import comms.utils.settings as settings
-from comms.commands.config import _apply_custom_mod, _apply_iodo, _apply_mod, _apply_organism, _apply_protocol_flags, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
+from comms.commands.config import _apply_custom_mod, _apply_iodo, _apply_mod, _apply_organism, _apply_protocol_flags, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _resolveConfigTarget, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
 
 # -- Define fixture for initialised user config file
 @pytest.fixture()
@@ -22,6 +22,32 @@ def initialised_config(isolated_config_dir):
     '''
     config_init()
     return isolated_config_dir
+
+# -- Define tests for resolving targeted config file
+class TestResolveConfigTarget:
+    def test_none_is_global(self):
+        from comms.utils.settings import userConfigPath
+        assert _resolveConfigTarget(None) == userConfigPath()
+
+    def test_global_keyword_case_insensitive(self):
+        from comms.utils.settings import userConfigPath
+        assert _resolveConfigTarget('GLOBAL') == userConfigPath()
+        assert _resolveConfigTarget('global') == userConfigPath()
+
+    def test_path_is_returned_verbatim(self, tmp_path):
+        target = tmp_path / 'comms' / 'config.toml'
+        assert _resolveConfigTarget(str(target)) == target
+
+# -- Define tests for setting local target config file
+class TestConfigSetLocalTarget:
+    def test_set_writes_to_local_path(self, tmp_path):
+        local = tmp_path / 'comms' / 'config.toml'
+        config_set(iodo=True, config_path=local)
+        assert local.exists()
+        import tomllib
+        with local.open('rb') as f:
+            cfg = tomllib.load(f)
+        assert 'index' in cfg
 
 # -- Define tests for default config file structure
 class TestLoadDefaultConfig:

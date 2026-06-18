@@ -106,6 +106,18 @@ class TestExperimentPanel:
         p._dir.setText(str(tmp_path))
         assert p.output_dir() == tmp_path / 'comms'
 
+    def test_bin_dir_optional_and_written(self, tmp_path):
+        p = ExperimentPanel()
+        p._name.setText('exp')
+        p._dir.setText(str(tmp_path))
+        p._bin.setText(str(tmp_path / 'bin'))
+        assert p.is_valid() is True   # bin dir does not affect validity
+        meta_path = p.write_metadata(tmp_path / 'comms')
+        import tomllib
+        with meta_path.open('rb') as f:
+            meta = tomllib.load(f)
+        assert meta['experiment']['bin_dir'] == str(tmp_path / 'bin')
+
     def test_is_valid_requires_name_and_dir(self, tmp_path):
         p = ExperimentPanel()
         assert p.is_valid() is False
