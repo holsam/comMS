@@ -21,12 +21,13 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [Real `.RAW` fixture](#real-raw--fixture)
 - [Unit tests](#unit-tests)
     - [`tests/unit/test_config.py`](#testsunittest_configpy)
-    - [`tests/unit/test_download.py`](#testsunittest_downloadpy)
-    - [`tests/unit_test_experiment.py](#testsunittest_experimentpy)
+    - [`tests/unit/test_context.py`](#testsunittest_contextpy)
+    - [`tests/unit/test_experiment.py`](#testsunittest_experimentpy)
     - [`tests/unit/test_fasta.py`](#testsunittest_fastapy)
+    - [`tests/unit/test_lfq.py`](#testsunittest_lfqpy)
     - [`tests/unit/test_parammedic.py`](#testsunittest_parammedicpy)
     - [`tests/unit/test_paths.py`](#testsunittest_pathspy)
-    - [`tests/unit/test_report.py](#testsunittest_reportpy)
+    - [`tests/unit/test_report.py`](#testsunittest_reportpy)
     - [`tests/unit/test_rescore.py`](#testsunittest_rescorepy)
     - [`tests/unit/test_samples.py`](#testsunittest_samplespy)
     - [`tests/unit/test_settings.py`](#testsunittest_settingspy)
@@ -41,7 +42,7 @@ This document outlines the comMS test suite: its structure, shared fixtures, and
     - [`tests/integration/test_convert.py`](#testsintegrationtest_convertpy)
     - [`tests/integration/test_crux.py`](#testsintegrationtest_cruxpy)
     - [`tests/integration/test_pipeline.py`](#testsintegrationtest_pipelinepy)
-    - [`tests/integration/test_trfp.py`](#testsintegrationtest_tfrppy)
+    - [`tests/integration/test_trfp.py`](#testsintegrationtest_trfppy)
 - [R tests](#r-tests)
     - [`tests/r/test_utils_import.R`](#testsrtest_utils_importr)
     - [`tests/r/test_utils_normalise.R`](#testsrtest_utils_normaliser)
@@ -122,7 +123,7 @@ Fixture | Description
 ### Config fixtures
 Fixture | Description
 ---|---
-`isolated_config_dir(tmp_path, monkeypatch)` | Monkeypatches `userConfigPath()` in both `settings` and `config` modules to point at a temporary directory, so tests don't access the real OS config file
+`isolated_config_dir(tmp_path, monkeypatch)` | Monkeypatches `globalConfigPath()` in both `settings` and `config` modules to point at a temporary directory, so tests don't access the real OS config file
 
 ### Synthetic Percolator results
 
@@ -151,12 +152,19 @@ Fixture | Description
 A module-level helper function `_write_per_organism_psm_files(rescore_dir, file_base, labels)` is also defined in `test_pipeline.py`. This is not a fixture but is used as a mock side effect within `TestRunRescoreMergedOutput` to write synthetic per-organism Percolator output files so that `_mergeRescoredPsms` has something to read without Percolator running.
 
 ### GUI fixtures
-`QT_QPA_PLATFORM=offscreen` is set at the top of `conftest.py` so Qt widgets can be constructed and painted without a display.
+`QT_QPA_PLATFORM=offscreen` is set at the top of `conftest.py` so Qt widgets can be constructed and painted without a display
 
 Fixture | Description
----|---
+-- | --
 `qapp` | Session-scoped `QApplication` (created with `QApplication.instance() or QApplication([])`) so GUI widgets can be built in tests; requested via `pytestmark = pytest.mark.usefixtures('qapp')` at the top of each GUI test module
 
+### Experiment context fixtures
+
+A bare experiment context is provided for the command-level integration tests, which now receive an ExperimentContext rather than a raw output directory.
+
+Fixture | Description
+-- | --
+`experiment_ctx(tmp_path)` | Returns ExperimentContext.resolve(tmp_path): an experiment context rooted at tmp_path with no experiment.toml, so config resolves to the bundled defaults and bin_dir is None
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -229,98 +237,102 @@ Unit tests cover logic in isolation, i.e. they do not require external binaries 
 ### `tests/unit/test_config.py`
 Unit tests covering `src/comms/commands/config.py`, and indirectly `src/comms/utils/settings.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_flatten` | flat dict unchanged; nested dict flattened; deeply nested; mixed depth; empty dict; default config flattens without error
-`_configCheck` | returns `True`/`False` correctly for exists/absent file under both `exists=True` and `exists=False` modes
-`_writeConfig` / `_loadUserConfig` | round-trip preserves content; raises `FileNotFoundError` when no config present
-`_apply_mod` | adds mod to empty spec; adds to existing spec; prepends mod; duplicate entry not added; removal with exclusive pattern; exclusive pattern replaces on add; no leading/trailing commas; no double commas; empty mod with no pattern is no-op; removal of absent mod is no-op
-`_apply_iodo` | adds carbamidomethyl to empty and non-empty `fixed_mods` string; prepends; removes carbamidomethyl; no-op when not present; idempotent; result has no count prefix; no leading/trailing commas; no double commas
-`_apply_custom` | adds entry to empty string; adds to existing; empty string clears all; duplicate not added; managed Met/phos mods rejected with warning; unmanaged entry accepted; no leading/trailing commas
-`_apply_organism` | sets organism section; replaces existing; does not touch other sections; empty dict clears; returns cfg
-`_apply_protocol_flags` (original) | low_res/mbr None leaves keys unchanged; low_res True/False sets bin width and score function; combined iodo+low_res; only relevant keys touched; non-search sections untouched
-`_apply_protocol_flags` (new mods) | iodo True/False writes to `fixed_mods`, not `mods_spec`; ox/phos/n_cyc/n_ace True adds correct mod to correct key; False removes; None is no-op; n_cyc/n_ace do not touch mods_spec; ox and iodo coexist across different keys; iodo does not remove ox; all flags None changes nothing
-`_parse_organism_arg` | single and multiple pairs; strips whitespace; preserves regex chars; raises `SystemExit` on no `=`, empty key, empty pattern; returns dict; empty list returns empty dict; `=` in pattern preserved
-`config_init` | creates config file; file is valid TOML; does not overwrite existing
-`config_exists` | exits nonzero when absent; does not raise when present
-`config_verify` | valid config passes; missing key exits nonzero; exits nonzero when no config
-`config_reset` | `--force` restores defaults; without force prompts; confirms and resets on accept
-`config_set` | creates config if absent; created config is valid TOML; all named mod flags add/remove correct mod in correct key; idempotent for ox/phos/n_cyc/n_ace; n_cyc/n_ace do not change mods_spec; custom adds entry; custom is additive; custom empty string clears; custom managed mod not added; iodo flags unchanged from original tests; low_res/organism/mbr unchanged from original tests; combined flags work together; no-flags exits nonzero; all unrelated config keys unchanged after set
+`TestLoadDefaultConfig` | returns a dict; contains expected top-level sections; search section has required keys; `fragment_tolerance_da` key has been removed; key values have correct types; default score function is xcorr; default mz_bin_width is high-res; default fixed_mods does not contain carbamidomethyl
+`TestFlatten` | flat dict unchanged; nested dict flattened; deeply nested; mixed depth; empty dict; default config flattens without error
+`TestConfigCheck` | returns `True`/`False` correctly for exists/absent file under both `exists=True` and `exists=False` modes
+`TestWriteLoadConfig` | round-trip preserves content; raises `FileNotFoundError` when no config present
+`TestApplyMod` | adds mod to empty spec; adds to existing spec; prepends mod; duplicate entry not added; removal with exclusive pattern; exclusive pattern replaces on add; no leading/trailing commas; no double commas; empty mod with no pattern is no-op; removal of absent mod is no-op
+`TestApplyIodo` | adds carbamidomethyl to empty and non-empty `fixed_mods` string; prepends; removes carbamidomethyl; no-op when not present; idempotent; result has no count prefix; no leading/trailing commas; no double commas
+`TestApplyCustom` | adds entry to empty string; adds to existing; empty string clears all; duplicate not added; managed Met/Cys/phos mods rejected with warning; unmanaged entry accepted; no leading/trailing commas
+`TestApplyOrganism` | sets organism section; replaces existing; does not touch other sections; empty dict clears; returns cfg
+`TestApplyProtocolFlags` | iodo/low_res/mbr None leaves keys unchanged; low_res True/False sets bin width and score function; combined iodo+low_res; only relevant keys touched; non-search sections untouched
+`TestApplyProtocolFlagsMods` | iodo True/False writes to `fixed_mods`, not `mods_spec`; ox/phos/n_cyc/n_ace True adds correct mod to correct key; False removes; None is no-op; n_cyc/n_ace do not touch mods_spec; ox and iodo coexist across different keys; iodo does not remove ox; all flags None changes nothing
+`TestParseOrganismArg` | single and multiple pairs; strips whitespace; preserves regex chars; raises `SystemExit` on no `=`, empty key, empty pattern; returns dict; empty list returns empty dict; `=` in pattern preserved
+`TestConfigInit` | creates config file; file is valid TOML; does not overwrite existing
+`TestConfigExists` | exits nonzero when absent; does not raise when present
+`TestConfigVerify` | valid config passes; missing key exits nonzero; exits nonzero when no config
+`TestConfigReset` | `--force` restores defaults; without force prompts; confirms and resets on accept
+`TestConfigSet` | creates config if absent; created config is valid TOML; all named mod flags add/remove correct mod in correct key; idempotent for ox/phos/n_cyc/n_ace; n_cyc/n_ace do not change mods_spec; custom adds entry; custom is additive; custom empty string clears; custom managed mod not added; iodo flags unchanged from original tests; low_res/organism/mbr unchanged from original tests; combined flags work together; no-flags exits nonzero; all unrelated config keys unchanged after set
+`TestResolveConfigTarget` | None resolves to the global user config path; "global"/"GLOBAL" resolve case-insensitively to the global path; any other string is returned verbatim as a Path
+`TestConfigSetLocalTarget` | writes to the supplied local path and produces valid TOML; the global user config is left untouched when a local target is given
+
 
 ---
 
-### `tests/unit/test_download.py`
-Unit tests covering `src/comms/utils/download.py`:
+### `tests/unit/test_context.py`
+Unit tests covering `src/comms/utils/context.py`.
 
-Function/class | Test description
--- | --
-Constants | correct types, non-empty strings, valid URL templates
-`_detect_platform` | returns two non-empty strings; system is a recognised value
-`_resolve_bin_dir` | returns the override when supplied; falls back to `repoBinDir()` when `None`
-URL construction | tarball name for each known platform key matches expected format
-`download_crux` | raises `NotImplementedError` on Windows (monkeypatched); raises `RuntimeError` on unrecognised platform
+Class | Test description
+--  | --
+`TestNormaliseDirs` | a plain root returns (root, root/comms); a path whose final component is comms returns (parent, comms); a directory containing experiment.toml directly is treated as a comms directory and returns (parent, dir)
+`TestResolve` | with no experiment.toml present, config falls back to the bundled default, bin_dir is None, and root equals the input directory; a local comms/config.toml is preferred and config_source begins with "local"; a bin_dir set in experiment.toml is parsed to a Path and exposed on the context
+
 
 ---
 
 ### `tests/unit/test_experiment.py`
 Unit tests covering `src/comms/commands/experiment.py` and the main-window close log. The launch tests mock `comms.gui.app.run_app` so no event loop runs; the close-logging tests use the `qapp` fixture.
 
-Function/class | Test description
+Class | Test description
 -- | --
-`launch_experiment_gui` | exits with `run_app`'s return code; logs a launch message; `logMsg` instance is named `'experiment'`
-`MainWindow.closeEvent` | closing the window logs a message containing "closed"; `logMsg` instance is named `'experiment'`
+`TestLaunchExperimentGui` | exits with `run_app`'s return code; logs a launch message; `logMsg` instance is named `'experiment'`
+`TestMainWindowCloseLogging` | closing the window logs a message containing "closed"; `logMsg` instance is named `'experiment'`
+`TestRunExperimentHeadless` | with `typer.prompt`/`typer.confirm` patched and a temporary input directory of .mzML files, writes `sample_sheet.tsv`, `config.toml` and `experiment.toml` under `<base>/comms/`; requires at least one treatment and one fraction (exits non-zero otherwise); records a bin_dir in `experiment.toml` only when one is supplied
 
 ---
 
 ### `tests/unit/test_fasta.py`
 Unit tests covering `src/comms/utils/fasta.py`. No external binaries are required.
 
-Function/class | Test description
+Class | Test description
 -- | --
-`readFasta` | returns a list; single entry returns one item; multi-entry returns correct count; entry is a two-element list; header does not contain leading `>`; header content is correct; sequence content is correct; wrapped sequences are joined into a single string with no newlines; empty sequence returns `''`; multi-entry order is preserved
-`writeFasta` | creates file at specified path; headers are prefixed with `>`; header and sequence are on separate lines; all entries present after multi-entry write; round-trips correctly via `readFasta`
-`_searchHeaderForTag` | returns `True` on match; returns `False` on no match; adds matching entry to the correct organism key; creates key on first match; appends to existing key; uses regex matching (anchored patterns do not match longer strings); assigns entry to the first matching tag only
-`splitFastaByOrganism` | returns `dict[str, Path]`; one key per organism (contaminants key absent); sub-FASTAs contain only the correct organism's proteins; contaminants are appended to all organism sub-FASTAs; output files exist on disk; output files use `.fa` extension; files are named `<label>.fa`; no crash when no contaminants are present; empty FASTA returns `{}`
+`TestReadFasta` | returns a list; single entry returns one item; multi-entry returns correct count; entry is a two-element list; header does not contain leading `>`; header content is correct; sequence content is correct; wrapped sequences are joined into a single string with no newlines; empty sequence returns `''`; multi-entry order is preserved
+`TestWriteFasta` | creates file at specified path; headers are prefixed with `>`; header and sequence are on separate lines; all entries present after multi-entry write; round-trips correctly via `readFasta`
+`TestSearchHeaderForTag` | returns `True` on match; returns `False` on no match; adds matching entry to the correct organism key; creates key on first match; appends to existing key; uses regex matching (anchored patterns do not match longer strings); assigns entry to the first matching tag only
+`TestSplitFastaByOrganism` | returns `dict[str, Path]`; one key per organism (contaminants key absent); sub-FASTAs contain only the correct organism's proteins; contaminants are appended to all organism sub-FASTAs; output files exist on disk; output files use `.fa` extension; files are named `<label>.fa`; no crash when no contaminants are present; empty FASTA returns `{}`
 
 ---
 
 ### `tests/unit/test_lfq.py`
 Unit tests covering `_groupPsmsByFraction` in `src/comms/commands/lfq.py`. No external binaries are required.
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_groupPsmsByFraction` | returns a `dict`; groups files into three fractions correctly; each fraction key maps to the correct subset of PSM file paths; values are lists of `Path` objects; the returned paths match the input paths; single-fraction input produces a dict with one key containing all files; a PSM file with no matching sample sheet row is excluded from all groups; known files are still grouped correctly when an unmatched file is also present; all files unmatched returns `{}`; empty PSM list returns `{}`; empty sample sheet returns `{}`; files whose `raw_file` column includes `.RAW` extension match correctly after suffix stripping; files whose `raw_file` column includes `.mzML` extension match correctly after suffix stripping; files whose `raw_file` column has no extension match the PSM stem directly
+`TestGroupPsmsByFraction` | returns a `dict`; groups files into three fractions correctly; each fraction key maps to the correct subset of PSM file paths; values are lists of `Path` objects; the returned paths match the input paths; single-fraction input produces a dict with one key containing all files; a PSM file with no matching sample sheet row is excluded from all groups; known files are still grouped correctly when an unmatched file is also present; all files unmatched returns `{}`; empty PSM list returns `{}`; empty sample sheet returns `{}`; files whose `raw_file` column includes `.RAW` extension match correctly after suffix stripping; files whose `raw_file` column includes `.mzML` extension match correctly after suffix stripping; files whose `raw_file` column has no extension match the PSM stem directly
 
 ---
 
 ### `tests/unit/test_parammedic.py`
 Unit tests covering `_parseParamMedicOutput` and `_runParamMedic` in `src/comms/commands/search.py`. No external binaries are required; `cruxutil.paramMedic` is mocked throughout `TestRunParamMedic`.
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_parseParamMedicOutput` | returns `(None, None)` when output file is absent; parses well-formed output correctly; handles precursor-only or bin-width-only files; returns `(None, None)` for empty or malformed files; is case-insensitive; returns `float` types for both values
-`_runParamMedic` | single file returns that file's values; odd and even file counts return the correct median; all-`None` parse results return `(None, None)`; mixed `None` and valid values exclude `None` from the median; `paramMedic` is called once per file; files where `paramMedic` returns `False` are excluded from estimates; per-file output subdirectories are created under a `param-medic/` directory
+`TestParseParamMedicOutput` | returns `(None, None)` when output file is absent; parses well-formed output correctly; handles precursor-only or bin-width-only files; returns `(None, None)` for empty or malformed files; is case-insensitive; returns `float` types for both values
+`TestRunParamMedic` | single file returns that file's values; odd and even file counts return the correct median; all-`None` parse results return `(None, None)`; mixed `None` and valid values exclude `None` from the median; `paramMedic` is called once per file; files where `paramMedic` returns `False` are excluded from estimates; per-file output subdirectories are created under a `param-medic/` directory
 
 ---
 
 ### `tests/unit/test_paths.py`
 Unit tests covering `src/comms/utils/paths.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`generateOutputFileStructure` | creates the expected `comms/results/<command>/` subdirectory; creates directories if absent; returns existing path unchanged if already correct; works for all supported commands
-`checkUniqueFileName` | returns expected base name when no conflict; increments suffix on conflict; increments correctly through multiple conflicts; correct naming patterns for all commands (`search`, `quantify`, `rescore`, `report`); returned path is within `out_dir`
+`TestGenerateOutputFileStructure` | creates the expected `comms/results/<command>/` subdirectory; creates directories if absent; returns existing path unchanged if already correct; works for all supported commands
+`TestCheckUniqueFileName` | returns expected base name when no conflict; increments suffix on conflict; increments correctly through multiple conflicts; correct naming patterns for all commands (`search`, `quantify`, `rescore`, `report`); returned path is within `out_dir`
+`TestRepoBinDir` | an explicit `experiment_bin_dir` takes precedence over everything and is returned unchanged; explicit value beats `COMMS_BIN_DIR` even when both are set; `COMMS_BIN_DIR` is used when no explicit value is given; falls back to repo-root `bin/` path when neither is set; `experiment_bin_dir=None` is equivalent to omitting the argument; returns a `Path` object
 
 ---
 
 ### `tests/unit/test_report.py`
 Unit tests covering `src/comms/commands/report.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_resolve_r_script` | returns a `Path`; path ends with the requested script name
-`_write_index` | creates `index.md`; contains all section names; failed sections marked FAILED; passed sections marked ✓; parameters block is included
-`run_report` | raises `SystemExit` when no spectral-counts files in quantify directory; raises `SystemExit` when output directory exists without `--overwrite`; raises `SystemExit` when Rscript binary is not on PATH; silently drops concordance when `--lfq-dir` absent; creates output directory; writes `index.md`; exits non-zero when any section fails; passes `lfc_threshold` and `fdr_threshold` as positional args to the `da` section; `logMsg` instance is named `'report'`
+`TestResolveRScript` | returns a `Path`; path ends with the requested script name; auxiliary scripts under `aux/` subdirectory are resolved correctly
+`TestWriteIndex` | creates `index.md`; contains all section names; failed sections marked FAILED; passed sections marked ✓; parameters block is included
+`TestRunReportValidation` | raises `SystemExit` when no spectral-counts files in quantify directory; raises `SystemExit` when output directory exists without `--overwrite`; raises `SystemExit` when Rscript binary is not on PATH; silently drops concordance when `--lfq-dir` absent; creates output directory; writes `index.md`; passes `lfc_threshold` and `fdr_threshold` as positional args to the `da` section; `logMsg` instance is named `'report'`
 
 N.B. `_run_r_section` and `shutil.which` are mocked throughout — no R installation is required.
 
@@ -329,111 +341,110 @@ N.B. `_run_r_section` and `shutil.which` are mocked throughout — no R installa
 ### `tests/unit/test_rescore.py`
 Unit tests covering helper functions in `src/comms/commands/rescore.py`. No external binaries are required; tests use synthetic PSM files written directly to `tmp_path`.
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_parseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`; keys and values are strings
-`_classifyPsmRow` | returns the correct organism label for a matching EUK row; returns the correct label for a PRO row; returns `'contaminants'` for an unmatched row; returns a string; returns `'contaminants'` for an empty row; uses the last tab-delimited column as the protein ID; first matching tag wins when multiple tags could match
-`_splitPsmsByOrganism` | returns `True` on success; creates per-organism target files in labelled subdirectories; creates per-organism decoy files; EUK file contains only EUK rows; PRO file contains only PRO rows; contaminant rows go to a `contaminants/` bucket; header is preserved in each output file; returns a bool without raising when the target file is missing; skips a missing decoy file gracefully and still succeeds for the target; output files are non-empty
+`TestParseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`; keys and values are strings
+`TestClassifyPsmRow` | returns the correct organism label for a matching EUK row; returns the correct label for a PRO row; returns `'contaminants'` for an unmatched row; returns a string; returns `'contaminants'` for an empty row; uses the last tab-delimited column as the protein ID; first matching tag wins when multiple tags could match
+`TestSplitPsmsByOrganism` | returns `True` on success; creates per-organism target files in labelled subdirectories; creates per-organism decoy files; EUK file contains only EUK rows; PRO file contains only PRO rows; contaminant rows go to a `contaminants/` bucket; header is preserved in each output file; returns a bool without raising when the target file is missing; skips a missing decoy file gracefully and still succeeds for the target; output files are non-empty
 
 ---
 
 ### `tests/unit/test_samples.py`
 Unit tests covering `src/comms/utils/samples.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`loadSampleSheet` | loads valid TSV; correct row count; column names are lowercased; required columns present (including `fraction`); raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
-`getSamplesByTreatment` | filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
-`getSamplesByFraction` | filters correctly by fraction label; case-insensitive; returns empty DataFrame for unknown fraction; returns a copy, not a view
-`getRawFileMap` | maps existing files; omits missing files; returns `Path` objects
+`TestLoadSampleSheet` | loads valid TSV; correct row count; column names are lowercased; required columns present (including `fraction`); raises `ValueError` on missing column, duplicate `sample_id`, or nonexistent file; accepts CSV in addition to TSV; allows optional `batch` column; strips whitespace from column names
+`TestGetSamplesByTreatment` | filters correctly; case-insensitive; returns empty DataFrame for unknown treatment; returns a copy, not a view
+`TestGetSamplesByFraction` | filters correctly by fraction label; case-insensitive; returns empty DataFrame for unknown fraction; returns a copy, not a view
+`TestGetRawFileMap` | maps existing files; omits missing files; returns `Path` objects
 
 ---
 
 ### `tests/unit/test_settings.py`
 Unit tests covering `src/comms/utils/settings.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`userConfigPath` | returns a `Path`; name is `config.toml`; parent directory is named `comms`
-`loadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
-Module-level `config` | is a dict; contains `search`, `percolator`, and `organism` sections; `organism` section is an empty dict by default; critical keys are not `None`
-`resolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns empty string; no leading/trailing commas
+`TestUserConfigPath` | returns a `Path`; path name is `config.toml`; parent directory is named `comms`
+`TestLoadDefaultConfig` | returns a dict; idempotent; underlying file parses as valid TOML
+`TestResolveConfig` | falls back to bundled default when neither a local nor a global config exists and the source label mentions the default; uses the global user config when present and the source begins with "global"; prefers a local `comms/config.toml` over the global config and the source begins with "local"
+`TestConfigFallback` | loads bundled defaults when `globalConfigPath()` points to a non-existent file
+`TestResolvedModsSpec` | returns string; base only when no custom; custom appended to base; custom duplicate of base not repeated; empty base returns custom only; both empty returns `C+0`; no leading/trailing commas
 
 ---
 
 ### `tests/unit/test_uninstall.py`
 Unit tests covering `src/comms/commands/uninstall.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-_generated_targets | includes the global config file when it exists; returns an empty list when no config is present; does not include any analysis output paths
-_detect_uninstall_command | returns the uv-tool uninstall command when the launching path is under a uv tools directory; returns the pip uninstall command when installed via pip; falls back to the unknown message if installed with neither uv nor pip (or if not installed with uv and pip missing)
-run_uninstall | a dry run lists targets without deleting them; --force deletes the global config without prompting; the logMsg instance is named 'uninstall'; a missing config produces an informational message and still prints the package-removal command
+`TestGeneratedTargets` | includes the global config file when it exists; returns an empty list when no config is present
+`TestDetectUninstallCommand` | returns the `uv tool uninstall` command when the launching path is under a uv tools directory; returns the `pip uninstall` command when installed via pip; falls back to the unknown message when comMS is not listed in pip output; falls back to the unknown message when pip is unavailable
+`TestRunUninstall` | a dry run lists targets without deleting them; `--force` deletes the global config without prompting; the logMsg instance is named `'uninstall'`
 
 ---
 
 ### `tests/unit/test_validate.py`
 Unit tests covering `src/comms/utils/validate.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`_parse_version` | parses three-part and two-part dotted version strings; parses a version embedded in a longer string; returns `None` for strings with no digits or empty strings; returns a tuple of `int`; supports comparison with version constraint tuples
-`_find_all_crux` | returns empty list when no installations present; returns single installation; returns multiple installations; returns list of `Path` objects
-`_find_all_trfp` | returns empty list when no installations present; finds legacy `.exe` binary; finds native binary without `.exe` extension; finds both legacy and native together; returns list of `Path` objects
-`_select_best` | returns `None` for empty candidate list; returns `None` when all versions unparseable; returns path and version for a single candidate; selects highest-versioned candidate from multiple; skips candidates with unparseable versions; returns `(Path, tuple)`; result is independent of candidate order
-`_get_crux_version` | parses well-formed `crux version` stdout; returns `None` when no "Crux version" line present; returns `None` when subprocess raises; falls back to stderr when stdout is empty
-`_get_trfp_version` | parses plain version string from stdout; returns `None` when output unparseable; returns `None` when subprocess raises
-`_check_crux` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message printed for single installation; raises `SystemExit` with `allow_lfq=True` when best version is below `_CRUX_MIN_LFQ`; does not raise with `allow_lfq=True` when best version meets `_CRUX_MIN_LFQ`; does not enforce minimum version when `allow_lfq=False`; `_get_crux_version` called once per candidate
-`_check_trfp` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message for single installation; does not raise when version is at Mono threshold; raises `SystemExit` when below Mono threshold on Linux without Mono; does not raise when below threshold on Linux with Mono; does not raise when below threshold on Windows; does not raise when below threshold on macOS with Mono; `_get_trfp_version` called once per candidate
-`validate` | returns `(None, None)` when no checks requested; does not call `_find_all_crux` when no checks requested; returns `crux_bin` and `None` when `check_crux=True` only; returns `None` and `trfp_path` when `check_trfp=True` only; returns both paths when both checks requested; raises `SystemExit` when Crux not found; raises `SystemExit` when TRFP not found; raises `SystemExit` with `allow_lfq=True` and old Crux; does not raise with `allow_lfq=True` and Crux at minimum; raises when old TRFP without Mono on Linux; does not raise when old TRFP with Mono on Linux; does not raise when old TRFP on Windows; `_find_all_crux` not called when `check_crux=False`; `_find_all_trfp` not called when `check_trfp=False`; correct `ERROR` message printed for each failure mode
+`TestParseVersion` | parses three-part and two-part dotted version strings; parses a version embedded in a longer string; returns `None` for strings with no digits or empty strings; returns a tuple of `int`; supports comparison with version constraint tuples
+`TestFindAllCrux` | returns empty list when no installations present; returns single installation; returns multiple installations; returns list of `Path` objects
+`TestFindAllTrfp` | returns empty list when no installations present; finds legacy `.exe` binary; finds native binary without `.exe` extension; finds both legacy and native together; returns list of `Path` objects
+`TestSelectBest` | returns `None` for empty candidate list; returns `None` when all versions unparseable; returns path and version for a single candidate; selects highest-versioned candidate from multiple; skips candidates with unparseable versions; returns `(Path, tuple)`; result is independent of candidate order
+`TestGetCruxVersion` | parses well-formed `crux version` stdout; returns `None` when no "Crux version" line present; returns `None` when subprocess raises; falls back to stderr when stdout is empty
+`TestGetTrfpVersion` | parses plain version string from stdout; returns `None` when output unparseable; returns `None` when subprocess raises
+`TestCheckCrux` | raises `SystemExit` when no candidates found; not-found error message names all three resolution sources (experiment.toml, `COMMS_BIN_DIR`, walk-up path); raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; logs info message when multiple installations found; no info message for single installation; raises `SystemExit` with `allow_lfq=True` when best version is below `_CRUX_MIN_LFQ`; does not raise with `allow_lfq=True` when best version meets `_CRUX_MIN_LFQ`; does not enforce minimum version when `allow_lfq=False`; `_get_crux_version` called once per candidate
+`TestCheckTrfp` | raises `SystemExit` when no candidates found; raises `SystemExit` when all versions unparseable; returns correct path for single installation; returns highest-versioned path for multiple installations; prints info message when multiple installations found; no info message for single installation; does not raise when version is at Mono threshold; raises `SystemExit` when below Mono threshold on Linux without Mono; does not raise when below threshold on Linux with Mono; does not raise when below threshold on Windows; does not raise when below threshold on macOS with Mono; `_get_trfp_version` called once per candidate
+`TestValidate` | returns `(None, None)` when no checks requested; does not call `_find_all_crux` when no checks requested; returns `crux_bin` and `None` when `check_crux=True` only; returns `None` and `trfp_path` when `check_trfp=True` only; returns both paths when both checks requested; raises `SystemExit` when Crux not found; raises `SystemExit` when TRFP not found; raises `SystemExit` with `allow_lfq=True` and old Crux; does not raise with `allow_lfq=True` and Crux at minimum; raises when old TRFP without Mono on Linux; does not raise when old TRFP with Mono on Linux; does not raise when old TRFP on Windows; `_find_all_crux` not called when `check_crux=False`; `_find_all_trfp` not called when `check_trfp=False`; correct `ERROR` message logged for each failure mode
+`TestValidateBinDirForwarding` | `validate(bin_dir=<path>)` forwards its `bin_dir` argument to `repoBinDir` as `experiment_bin_dir`; `bin_dir=None` calls `repoBinDir(experiment_bin_dir=None)`, which falls through to env-var/walk-up resolution; the resolved bin directory is passed into `_find_all_crux` as its search root; the resolved bin directory is passed into `_find_all_trfp` as its search root
 
 ---
 
 ### `tests/unit/test_version.py`
 Unit tests covering `src/comms/commands/version.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`printVersion` | exits with code zero; prints the installed version string; handles `PackageNotFoundError` gracefully by printing an 'unknown' fallback message
+`TestPrintVersion` | exits with code zero; prints the installed version string; handles `PackageNotFoundError` gracefully by printing an 'unknown' fallback message
 
 ---
 
 ### `tests/unit/gui/test_gui_models.py`
 Unit tests covering `src/comms/gui/models/experiment_state.py` and `src/comms/gui/models/sample_table.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`ExperimentState` | `add_treatment` returns `True` and stores the value; duplicate returns `False`; empty/whitespace returns `False`; `remove_treatment` removes; `add_fraction` stores; `groupsChanged` emitted on add; group accessors return a defensive copy
-`SampleTableModel.add_files` | appends one row per path; `sample_id` is the filename stem; `raw_file` is the filename; duplicate filenames are skipped; emits `contentChanged`
-`SampleTableModel.remove_rows` | deletes a single row; deletes multiple rows
-`SampleTableModel.is_complete` | empty model is incomplete; incomplete without a treatment; complete when all fields are set; duplicate `sample_id` values are incomplete
-Replicate auto-numbering | sequential within a treatment/fraction group; separate counters per group; a manual override is preserved
-`headerData` | the batch column is labelled "batch (optional)"; other columns use their canonical names
-`render_sample_sheet` | header uses the canonical columns; a row is tab-joined; a `None` replicate renders as empty; output ends with a trailing newline
+`TestModelsExperimentState` | `add_treatment` returns `True` and stores the value; duplicate returns `False`; empty/whitespace returns `False`; `remove_treatment` removes; `add_fraction` stores; `groupsChanged` emitted on add; group accessors return a defensive copy
+`TestSampleTableAddFiles` | appends one row per path; `sample_id` is the filename stem; `raw_file` is the filename; duplicate filenames are skipped; emits `contentChanged`
+`TestSampleTableRemoveRows` | deletes a single row; deletes multiple rows
+`TestSampleTableIsComplete` | empty model is incomplete; incomplete without a treatment; complete when all fields are set; duplicate `sample_id` values are incomplete
+`TestTestSampleTableRenumberReplicates` | sequential within a treatment/fraction group; separate counters per group; a manual override is preserved
+`TestTestSampleTableHeaderData` | the batch column is labelled "batch (optional)"; other columns use their canonical names
+`TestTestSampleTableRenderSampleSheet` | header uses the canonical columns; a row is tab-joined; a `None` replicate renders as empty; output ends with a trailing newline
 
 ---
 
 ### `tests/unit/gui/test_gui_panels.py`
 Unit tests covering `src/comms/gui/panels/config_panel.py`, `src/comms/gui/panels/experiment_panel.py`, `src/comms/gui/panels/sample_panel.py` and `src/comms/gui/panels/save_panel.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`ConfigPanel` (analysis type) | defaults to single species; the organism table is disabled for single species and enabled for multispecies
-`ConfigPanel` (completeness) | single species is complete without organisms; multispecies is incomplete without organisms; incomplete with a half-filled organism row; complete with a full organism row
-`ConfigPanel._build_config` | returns a dict with a `search` section; the default includes Met oxidation; single species writes an empty organism section; multispecies writes the organism patterns
-`ConfigPanel` (state) | the `changed` signal fires and the tracker becomes complete; `summary` reports the analysis type
-`ExperimentPanel` | name strips whitespace; `base_dir` is `None` when empty; `output_dir` appends `comms`; `is_valid` requires both name and directory; the tracker is incomplete until valid
-`SamplePanel` | `is_complete` proxies the model; `contentChanged` is re-emitted; the tracker moves from incomplete to complete; `write` creates `sample_sheet.tsv`
-`SavePanel` | save button disabled when incomplete; enabled when all three panels are complete; `_save_all` writes the sample sheet, config and metadata together; output paths recorded under `[files]` and the experiment name under `[experiment]` in `experiment.toml`; all three trackers marked saved; the `saved` signal is emitted (`QMessageBox.information` is patched throughout)
+`TestConfigPanel` | defaults to single species; organism table is disabled for single species and enabled for multispecies; single species is complete without organisms; multispecies is incomplete without organisms; incomplete with a half-filled organism row; complete with a full organism row; `_build_config` returns a dict with a `search` section; default includes Met oxidation; single species writes an empty organism section; multispecies writes the organism patterns; `changed` signal fires and the tracker becomes complete; `summary` reports the analysis type
+`TestExperimentPanel` | name strips whitespace; `base_dir` is `None` when empty; `output_dir` appends `comms`; `is_valid` requires both name and directory; the tracker is incomplete until valid; the bin-directory field is optional and does not affect `is_valid`; a supplied bin directory is written to `experiment.toml` under `[experiment].bin_dir`; an empty bin directory is omitted from the metadata
+`TestSamplePanel` | `is_complete` proxies the model; `contentChanged` is re-emitted; the tracker moves from incomplete to complete; `write` creates `sample_sheet.tsv`
+`TestSavePanel` | save button disabled when incomplete; enabled when all three panels are complete; `_save_all` writes the sample sheet, config and metadata together; output paths recorded under `[files]` and the experiment name under `[experiment]` in `experiment.toml`; all three trackers marked saved; the `saved` signal is emitted (`QMessageBox.information` is patched throughout)
 
 ---
 
 ### `tests/unit/gui/test_gui_status.py`
 Unit tests covering `src/comms/gui/status.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`PanelStateTracker` | starts unedited; a partial change is incomplete; a complete change is complete; `mark_saved` is saved; editing after save returns to complete; reverting to the saved signature is saved again; `statusChanged` is emitted; `is_saveable` is true for complete/saved and false for unedited/incomplete
+`TestPanelStateTracker` | starts unedited; a partial change is incomplete; a complete change is complete; `mark_saved` is saved; editing after save returns to complete; reverting to the saved signature is saved again; `statusChanged` is emitted; `is_saveable` is true for complete/saved and false for unedited/incomplete
 
 ---
 
@@ -441,11 +452,11 @@ Function/class | Test description
 Unit tests covering `src/comms/gui/widgets/status_indicator.py` and
 `src/comms/gui/widgets/combo_delegate.py`:
 
-Function/class | Test description
+Class | Test description
 -- | --
-`StatusIndicator` | default size is 18×18; `setStatus` for every state does not raise; renders to a non-null pixmap
-`status_icon` | returns a non-null `QIcon`; the icon renders at the requested pixel size
-`GroupComboDelegate` | `createEditor` returns a `QComboBox` with a blank first item and the provider's options; options reflect live provider changes; the show-popup callback is scheduled via `QTimer.singleShot`; `setEditorData` selects the cell's current value and falls back to blank when it is not an option; `setModelData` writes the combo text back to the model
+`TestStatusIndicator` | default size is 18×18; `setStatus` for every state does not raise; renders to a non-null pixmap
+`TestStatusIcon` | returns a non-null `QIcon`; the icon renders at the requested pixel size
+`TestGroupComboDelegate` | `createEditor` returns a `QComboBox` with a blank first item and the provider's options; options reflect live provider changes; the show-popup callback is scheduled via `QTimer.singleShot`; `setEditorData` selects the cell's current value and falls back to blank when it is not an option; `setModelData` writes the combo text back to the model
 
 ---
 <p align="right"><a href="#comms-test-suite">^ Back to top</a></p>
@@ -456,27 +467,27 @@ Integration tests call external binaries and verify that the command-level orche
 Note that these tests do not validate the 'accuracy' of either external binary, as this falls outside the remit of comMS and would be covered by the binary's respective test suite.
 
 ### `tests/integration/test_convert.py`
-Integration tests covering the `run_convert` function's orchestration logic, as opposed to ThermoRawFileParser internals (which are covered in [`test_trfp.py`](#testsintegrationtest_tfrppy)). All tests require ThermoRawFileParser (`pytest.mark.trfp`).
+Integration tests covering the `run_convert` function's orchestration logic, as opposed to ThermoRawFileParser internals (which are covered in [`test_trfp.py`](#testsintegrationtest_trfppy)). All tests require ThermoRawFileParser (`pytest.mark.trfp`).
 
-The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
+The test `TestRunConvertRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
 
-Checks | Description
+Class | Description
 -- | -- 
-Empty input directory | `run_convert` returns cleanly and prints a warning
-Invalid `.RAW` file | a deliberately malformed file causes TRFP to exit non-zero; the summary reports a failure
-Real `.RAW` file (optional) | tests verify that the output directory is created and contains at least one `.mzML` file; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
+`TestRunConvertNoFiles` | `run_convert` returns cleanly and a warning is logged when the input directory is empty
+`TestRunConvertInvalidFile` | a deliberately malformed file causes TRFP to exit non-zero; the summary reports a failure
+`TestRunConvertRealFile` (optional) | verifies that the output directory is created; verifies that at least one `.mzML` file is produced; verifies that the summary reports success; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
 
 ---
 
 ### `tests/integration/test_crux.py`
 Integration tests covering the Crux toolkit aspects used in the comMS pipeline. All tests in this file require the Crux binary (`pytest.mark.crux`).
 
-Test | Description
+Class | Description
 -- | -- 
 `TestFindCrux` | binary exists at returned path; path is executable; returns `None` for an empty `bin/` directory.
 `TestTideIndex` | creates and populates the index directory; writes a log file; returns `False` for an invalid FASTA.
 `TestTideSearch` | creates the target PSM file; file has at least a header and one data row; log file is written.
-`TestRunRescore` | *n.b. this is currently skipped as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
+`TestPercolator` | *n.b. this class is currently commented out as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
 `TestSpectralCounts` | uses the synthetic Percolator PSM fixture to bypass Percolator (which requires more PSMs than the synthetic data provides); creates a spectral-counts output file with content.
 
 ---
@@ -484,32 +495,32 @@ Test | Description
 ### `tests/integration/test_pipeline.py`
 Integration tests and smoke tests that assert the pipeline stages complete without raising errors and create the expected output directories and files. All tests in this file require the Crux binary (`pytest.mark.crux`).
 
-Test | Description
+Class | Description
 -- | -- 
-`TestRunIndex` | output directory is created and non-empty; prints a success message; `logMsg` instance is named `'index'`.
-`TestRunSearch` | output directory is created; target PSM file exists; prints search summary; `logMsg` instance is named `'search'`.
-`TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values.
-`TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the terminal summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising.
+`TestRunIndex` | output directory is created and non-empty; logs a completion message; `logMsg` instance is named `'index'`
+`TestRunSearch` | output directory is created; target PSM file exists; logs a completion message; `logMsg` instance is named `'search'`
+`TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values; output is identical to a non-param-medic run when estimates are unavailable
+`TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the log summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising
 `TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when the real `_splitPsmsByOrganism` runs on the combined Percolator output. Percolator is mocked with a side effect that writes combined PSM files; `assignConfidence` is also mocked
 `TestRunRescoreAssignConfidence` | verifies that `assignConfidence` is called once per organism (twice for a two-organism run) when both Percolator and `_splitPsmsByOrganism` are mocked with side effects that write the files each round expects to find; verifies that `run_rescore` raises `SystemExit` when Percolator fails and produces no output files, which prevents round 2 from running
 `TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `organism_tags` nor config organism is available (monkeypatched to empty dict); uses config organism when `organism_tags` is falsy; verifies Percolator is called exactly once per file
 `TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails (and `SystemExit` is caught); warning is printed when `_splitPsmsByOrganism` returns `False`; `logMsg` instance is named `'rescore'`
 `TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created
 `TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call
-TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the mzML directory is empty
+`TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the mzML directory is empty
 `TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails
 `TestRunLfqLogger` | the `logMsg` instance is named `'lfq'`
-`TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; prints quantify summary; `logMsg` instance is named `'quantify'`
-`TestRunPipeline` | full end-to-end smoke test with `--skip-convert` and `--skip-report` to remove TRFP and Quarto dependencies; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
+`TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; logs a completion message; `logMsg` instance is named `'quantify'`
+`TestRunPipeline` | full end-to-end smoke test with `--skip-convert`, `--skip-lfq` and `--skip-report` flags; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
 
 ---
 
-### `tests/integration/test_tfrp.py`
+### `tests/integration/test_trfp.py`
 Integration tests covering the comMS wrapper around ThermoRawFileParser. All tests require ThermoRawFileParser (`pytest.mark.trfp`). The test `TestConvertRawRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
 
-Test | Description
+Class | Description
 -- | -- 
-`TestFindTRFP` | returned path exists; suffix is `.exe` or none; returns `None` for an empty or nonexistent `bin/` directory
+`TestFindTRFP` | returned path exists; suffix is `.exe` or none; returns `None` for an empty `bin/` directory; returns `None` for a nonexistent `bin/` directory
 `TestConvertRawFailure` | a deliberately invalid `.RAW` file causes `convertRaw` to return `False`
 `TestConvertRawRealFile` (optional) | verifies that `convertRaw` produces a non-empty `.mzML` file for a real Thermo `.RAW` input
 
