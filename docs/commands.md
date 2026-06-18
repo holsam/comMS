@@ -1,3 +1,9 @@
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · _Commands_ · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>
+
 # Commands
 
 comMS provides the commands listed below. Run `comms --help` or `comms <command> --help` for full option descriptions.
@@ -123,3 +129,9 @@ Package | Source
 `limma` | Bioconductor
 
 ---
+
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · _Commands_ · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>

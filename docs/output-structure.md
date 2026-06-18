@@ -1,6 +1,12 @@
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · _Output structure_ · [README](../README.md)
+
+</div>
+
 # Output structure
 
-This page describes the directory structure that comMS uses to write results and logs. For how the output root is chosen, see experiment context.
+This page describes the directory structure that comMS uses to write results and logs. For how the output root is chosen, see [experiment context](./configuration.md#experiment-context).
 
 ## Contents
 - [Results layout](#results-layout)
@@ -51,3 +57,9 @@ Level | Enabled with | Used for
 comMS logs to standard output (the terminal you ran the command from) and to a file named after the command (`comms convert`, for example, writes to `convert.log`). The log file is saved alongside that command's other output, so running the same command again does not overwrite an earlier log.
 
 ---
+
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · _Output structure_ · [README](../README.md)
+
+</div>

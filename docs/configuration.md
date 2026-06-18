@@ -1,8 +1,14 @@
+<div align="right">
+
+**comMS documentation:** _Configuration_ · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>
+
 # Configuration
 
 comMS works out where to read its settings and where to write its results from a single **experiment directory**. This page explains: what an experiment context is, what makes a directory an experiment, how configuration files are layered, how the binary directory is located, and the two commands used to create or edit configurations.
 
-For the full list of values you can set, see the configuration reference.
+For the full list of values you can set, see the [configuration reference](./config-reference.md).
 
 ## Contents
 - [Experiment context](#experiment-context)
@@ -115,7 +121,7 @@ comms config list
 comms config set -c my_experiment/comms/config.toml --ox --iodo
 ```
 
-The full set of `config set` flags, the modifications they apply, and the default parameters are documented in the configuration reference.
+The full set of `config set` flags, the modifications they apply, and the default parameters are documented in the [configuration reference](./config-reference.md).
 
 ## Creating an experiment: the `experiment` command
 The `experiment` command builds a complete experiment directory, writing the sample sheet, a local `config.toml`, and `experiment.toml` under `<dir>/comms/`. It saves manually writing the sample sheet or running `config` for each value.
@@ -138,3 +144,9 @@ Command | Use it to | Writes
 In short, `experiment` sets up an experiment and its local configuration, and `config` adjusts a configuration file that already exists.
 
 ---
+
+<div align="right">
+
+**comMS documentation:** _Configuration_ · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>

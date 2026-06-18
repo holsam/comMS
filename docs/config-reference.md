@@ -1,3 +1,9 @@
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · _Configuration reference_ · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>
+
 # Configuration reference
 
 This page lists the values comMS reads from its configuration file: the protocol flags applied by `comms config set`, and the default index, search, and Percolator parameters. For where configuration files live and how they are resolved, see [Configuration](./configuration.md).
@@ -25,9 +31,9 @@ Flag | Effect | Mass | Config key
 
 A few flags need more explanation:
 
-**Cysteine alkylation (`--iodo`).** Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
+**Cysteine alkylation (`--iodo`)** Add `--iodo` only if iodoacetamide alkylation was performed during sample preparation.
 
-**Custom modifications (`--custom`).** Custom entries are stored separately and merged with the named-flag modifications at search time. The flag is repeatable, so several entries can be added in one call, and passing an empty string clears them all:
+**Custom modifications (`--custom`)** Custom entries are stored separately and merged with the named-flag modifications at search time. The flag is repeatable, so several entries can be added in one call, and passing an empty string clears them all:
 
 ```bash
 comms config set --custom "1K+28.0313"                         # add one entry
@@ -37,7 +43,7 @@ comms config set --custom ""                                   # clear all custo
 
 Passing a modification that is already managed by a named flag (for example `1M+15.9949`, which belongs to `--ox`) produces a warning and is not added. Use the named flag instead. `comms config list` shows both the named-flag and custom values.
 
-**Instrument resolution (`--high-res` / `--low-res`).**
+**Instrument resolution (`--high-res` / `--low-res`)**
 
 ```bash
 comms config set --high-res    # mz_bin_width = 0.02, score_function = xcorr (default)
@@ -46,13 +52,13 @@ comms config set --low-res     # mz_bin_width = 1.0005079, score_function = comb
 
 Use `--high-res` for Orbitrap data, the default for modern instruments. Use `--low-res` for ion-trap MS2 data, such as that from older LTQ instruments.
 
-**Organism patterns (`--organism`).**
+**Organism patterns (`--organism`)**
 
 ```bash
 comms config set --organism Org1=Pattern1 Org2=Pattern2
 ```
 
-Each argument takes the form `Label=Pattern`, where `Pattern` is matched as a regular expression against FASTA headers. The pairs are used to split a combined FASTA by organism during the rescore step, which enables per-organism picked-protein FDR. Once set, they are applied automatically by `pipeline` and `rescore` unless overridden with `--organism-tags` on the command line. See the rescore command documentation for the runtime form.
+Each argument takes the form `Label=Pattern`, where `Pattern` is matched as a regular expression against FASTA headers. The pairs are used to split a combined FASTA by organism during the rescore step, which enables per-organism picked-protein FDR. Once set, they are applied automatically by `pipeline` and `rescore` unless overridden with `--organism-tags` on the command line. See the [rescore command documentation]((./commands.md#per-organism-fdr)) for the runtime form.
 
 ## Default index parameters
 Peptide indices are generated with the following parameters:
@@ -88,6 +94,12 @@ Threads | 2 | Default search threads
 ## Percolator settings
 By default, PSM rescoring uses picked-protein FDR ([Savitski et al., 2015](https://doi.org/10.1074/mcp.M114.046995), doi:10.1074/mcp.M114.046995) at a 1% PSM-level FDR threshold, requiring at least two unique peptides per protein for a confident identification.
 
-When a combined multi-species FASTA is used, picked-protein FDR is applied separately per organism. Organism patterns are configured with `comms config set --organism`, or supplied at runtime with `--organism-tags` on the `rescore` and `pipeline` commands. See the rescore command documentation for details.
+When a combined multi-species FASTA is used, picked-protein FDR is applied separately per organism. Organism patterns are configured with `comms config set --organism`, or supplied at runtime with `--organism-tags` on the `rescore` and `pipeline` commands. See the [rescore command documentation](./commands.md#per-organism-fdr) for details.
 
 ---
+
+<div align="right">
+
+**comMS documentation:** [Configuration](./configuration.md) · _Configuration reference_ · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+
+</div>
