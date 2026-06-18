@@ -92,10 +92,20 @@ def run_report(
     logMsg.debug('Started command: report')
     # Create path to output_dir
     output_dir = ctx.root / 'comms/results/report'
-    # Check if quantify dir, sample_sheet and lfq dir were provided, and if not set to default
+    # Check if quantify dir and sample_sheet were provided, and if not set to default then check all exist
     quantify_dir = quantify_dir or ctx.root / 'comms/results/quantify'
     sample_sheet = sample_sheet or ctx.root / 'sample_sheet.tsv'
-    lfq_dir = lfq_dir or ctx.root / 'comms/results/lfq'
+    if not quantify_dir.exists():
+        logMsg.error(f'Quantification directory not provided and not found at default path')
+        raise SystemExit(1)
+    if not sample_sheet.exists():
+        logMsg.error(f'Quantification directory not provided and not found at default path')
+        raise SystemExit(1)
+    # Check if lfq_dir was provided, if not check if directory exists in default path and set if so
+    if not lfq_dir:
+        default_lfq_dir = ctx.root / 'comms/results/lfq'
+        if default_lfq_dir.exists():
+            lfq_dir = default_lfq_dir
     # Validate inputs
     sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:
