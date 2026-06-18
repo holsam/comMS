@@ -21,58 +21,60 @@ pytestmark = pytest.mark.crux
 
 # -- Define tests for running index command
 class TestRunIndex:
-    def test_creates_index_output_dir(self, crux_bin, synthetic_fasta, tmp_path):
-        run_index(database=synthetic_fasta, output=tmp_path)
+    def test_creates_index_output_dir(self, crux_bin, synthetic_fasta, tmp_path, experiment_ctx):
+        run_index(database=synthetic_fasta, ctx=experiment_ctx)
         index_dir = tmp_path / 'comms' / 'results' / 'index'
         assert index_dir.exists(), f'Expected index dir at {index_dir}'
 
-    def test_index_output_is_non_empty(self, crux_bin, synthetic_fasta, tmp_path):
-        run_index(database=synthetic_fasta, output=tmp_path)
+    def test_index_output_is_non_empty(self, crux_bin, synthetic_fasta, tmp_path, experiment_ctx):
+        run_index(database=synthetic_fasta, ctx=experiment_ctx)
         index_dir = tmp_path / 'comms' / 'results' / 'index'
         assert any(index_dir.iterdir()), 'Index directory is empty after run_index'
 
-    def test_logs_completion(self, crux_bin, synthetic_fasta, tmp_path, caplog):
+    def test_logs_completion(self, crux_bin, synthetic_fasta, experiment_ctx, caplog):
         with caplog.at_level(logging.DEBUG):
-            run_index(database=synthetic_fasta, output=tmp_path)
+            run_index(database=synthetic_fasta, ctx=experiment_ctx)
         assert 'Finished command: index' in caplog.text
 
-    def test_comms_logger_is_index(self, crux_bin, synthetic_fasta, tmp_path):
-        run_index(database=synthetic_fasta, output=tmp_path)
+    def test_comms_logger_is_index(self, crux_bin, synthetic_fasta, experiment_ctx):
+        run_index(database=synthetic_fasta, ctx=experiment_ctx)
         assert logMsg._instance.logger.name == 'index'
 
 # -- Define fixture for generating index using tide-index
 @pytest.fixture(scope='module')
 def pipeline_index(crux_bin, tmp_path_factory):
-    '''Build a shared index for all pipeline integration tests.'''
+    '''Build a shared index for all pipeline integration tests'''
     from tests.fixtures.generate_fixtures import write_fasta
+    from comms.utils.context import ExperimentContext
     work = tmp_path_factory.mktemp('pipeline_index')
+    ctx = ExperimentContext.resolve(work)
     fasta = write_fasta(work / 'synthetic_proteome.fasta')
     try:
-        run_index(database=fasta, output=work)
+        run_index(database=fasta, ctx=ctx)
     except SystemExit as e:
         pytest.skip(f'run_index failed (exit {e.code}) — skipping pipeline tests')
     return work / 'comms' / 'results' / 'index', fasta
 
 # -- Define tests for running search command
 class TestRunSearch:
-    def test_creates_search_output_dir(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_creates_search_output_dir(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=False,
             threads=1,
         )
         search_dir = tmp_path / 'comms' / 'results' / 'search'
         assert search_dir.exists()
 
-    def test_target_psm_file_exists(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_target_psm_file_exists(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=False,
             threads=1,
         )
@@ -80,57 +82,57 @@ class TestRunSearch:
         psm_files = list(search_dir.glob('*.tide-search.target.txt'))
         assert psm_files, 'No target PSM file found after run_search'
 
-    def test_logs_completion(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_logs_completion(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx, caplog):
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.DEBUG):
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=False,
                 threads=1,
             )
         assert 'Finished command: search' in caplog.text
 
-    def test_comms_logger_is_search(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_comms_logger_is_search(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=False,
             threads=1,
         )
         assert logMsg._instance.logger.name == 'search'
 
 class TestRunSearchParamMedic:
-    def test_completes_without_raising(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_completes_without_raising(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
  
-    def test_creates_search_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_creates_search_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
         assert (tmp_path / 'comms' / 'results' / 'search').exists(), 'No comms/results/search directory created when run with --param-medic'
  
-    def test_creates_target_psm_file(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_creates_target_psm_file(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
@@ -138,19 +140,19 @@ class TestRunSearchParamMedic:
         psm_files = list(search_dir.glob('*.tide-search.target.txt'))
         assert psm_files, 'No target PSM file found after run_search with --param-medic'
  
-    def test_creates_param_medic_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
+    def test_creates_param_medic_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=tmp_path,
+            ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
         pm_dir = tmp_path / 'comms' / 'results' / 'param-medic'
         assert pm_dir.exists()
  
-    def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         '''
         When param-medic cannot estimate tolerances (as expected for synthetic data), run_search should fall back to config defaults and report those values in the terminal summary.
         '''
@@ -163,14 +165,14 @@ class TestRunSearchParamMedic:
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
         assert expected_prec in caplog.text
         assert expected_bw in caplog.text
  
-    def test_warns_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_warns_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         '''
         When param-medic produces no usable estimates, a warning should be
         logged indicating fallback to defaults.
@@ -180,20 +182,20 @@ class TestRunSearchParamMedic:
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
         warning_text = caplog.text.lower()
         assert 'falling back' in warning_text or 'no usable' in warning_text
  
-    def test_search_reports_numeric_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_search_reports_numeric_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.DEBUG):
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
@@ -206,20 +208,23 @@ class TestRunSearchParamMedic:
         existence and line count) should be identical to a run without
         param-medic, since both use the same config tolerance values.
         '''
+        from comms.utils.context import ExperimentContext
         out_with = tmp_path / 'with_pm'
+        ctx_with = ExperimentContext.resolve(out_with)
         out_without = tmp_path / 'without_pm'
+        ctx_without = ExperimentContext.resolve(out_without)
         index_dir, _ = pipeline_index
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=out_with,
+            ctx=ctx_with,
             param_medic=True,
             threads=1,
         )
         run_search(
             input_dir=synthetic_mzml.parent,
             index_dir=index_dir,
-            output=out_without,
+            ctx=ctx_without,
             param_medic=False,
             threads=1,
         )
@@ -234,31 +239,31 @@ class TestRunSearchParamMedicMocked:
     '''
     Tests that verify run_search correctly uses numeric tolerance values returned by _runParamMedic, by mocking _runParamMedic to return known values and checking those values appear in the terminal summary.
     '''
-    def test_uses_mocked_precursor_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_uses_mocked_precursor_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02)), caplog.at_level(logging.DEBUG):
             index_dir, _ = pipeline_index
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
         assert '7.5 ppm' in caplog.text
 
-    def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)), caplog.at_level(logging.DEBUG):
             index_dir, _ = pipeline_index
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
         assert '0.035 Da' in caplog.text
  
-    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, caplog):
+    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         '''
         If _runParamMedic returns (None, None), run_search should fall back to config defaults without raising.
         '''
@@ -269,7 +274,7 @@ class TestRunSearchParamMedicMocked:
             run_search(
                 input_dir=synthetic_mzml.parent,
                 index_dir=index_dir,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
@@ -279,16 +284,18 @@ class TestRunSearchParamMedicMocked:
 # -- Define fixture for generating search output by running tide-search
 @pytest.fixture(scope='module')
 def pipeline_search(crux_bin, pipeline_index, tmp_path_factory):
-    '''Run search once per module for rescore/quantify tests.'''
+    '''Run search once per module for rescore/quantify tests'''
     from tests.fixtures.generate_fixtures import write_mzml
+    from comms.utils.context import ExperimentContext
     work = tmp_path_factory.mktemp('pipeline_search')
+    ctx = ExperimentContext.resolve(work)
     mzml = write_mzml(work / 'synthetic.mzml')
     index_dir, fasta = pipeline_index
     try:
         run_search(
             input_dir=work,
             index_dir=index_dir,
-            output=work,
+            ctx=ctx,
             param_medic=False,
             threads=1,
         )
@@ -299,40 +306,40 @@ def pipeline_search(crux_bin, pipeline_index, tmp_path_factory):
 
 # -- Define tests for running rescore command
 class TestRunRescore:
-    def test_creates_rescore_output_dir(self, crux_bin, pipeline_search, tmp_path):
+    def test_creates_rescore_output_dir(self, crux_bin, pipeline_search, tmp_path, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         # run_rescore may fail with synthetic data due to insufficient PSMs
         # for Percolator — we assert on directory creation, not success
         try:
-            run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
         except SystemExit:
             pass
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         assert rescore_dir.exists()
 
-    def test_log_success(self, crux_bin, pipeline_search, tmp_path, caplog):
+    def test_log_success(self, crux_bin, pipeline_search, experiment_ctx, caplog):
         search_dir, fasta, _ = pipeline_search
         try:
             with caplog.at_level(logging.DEBUG):
-                run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+                run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
             assert 'Finished command: rescore' in caplog.text
         except SystemExit:
             pass
 
-    def test_log_file_is_written(self, crux_bin, pipeline_search, tmp_path):
+    def test_log_file_is_written(self, crux_bin, pipeline_search, tmp_path, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         try:
-            run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
         except SystemExit:
             pass
         log = tmp_path / 'comms' / 'results' / 'rescore.log'
         assert log.exists()
         assert log.stat().st_size > 0
 
-    def test_comms_logger_is_rescore(self, crux_bin, pipeline_search, tmp_path):
+    def test_comms_logger_is_rescore(self, crux_bin, pipeline_search, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         try:
-            run_rescore(input_dir=search_dir, database=fasta, output=tmp_path)
+            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
         except SystemExit:
             pass
         assert logMsg._instance.logger.name == 'rescore'
@@ -391,7 +398,7 @@ def _write_split_psm_files(rescore_dir: Path, fileroot: str, labels: list[str]) 
 
 # -- Define tests for rescore command with per-organism picked-protein FDR
 class TestRunRescoreDirectories:
-    def test_creates_rescore_output_directory(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_creates_rescore_output_directory(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         def _mock_percolator(**kwargs):
             _write_combined_percolator_output(rescore_dir, 'synthetic')
@@ -400,12 +407,12 @@ class TestRunRescoreDirectories:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert (tmp_path / 'comms' / 'results' / 'rescore').exists()
 
-    def test_creates_per_organism_subdirectories(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_creates_per_organism_subdirectories(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         def _mock_percolator(**kwargs):
             _write_combined_percolator_output(rescore_dir, 'synthetic')
@@ -414,7 +421,7 @@ class TestRunRescoreDirectories:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert (rescore_dir / 'EUK').exists()
@@ -422,7 +429,7 @@ class TestRunRescoreDirectories:
 
 
 class TestRunRescoreAssignConfidence:
-    def test_assign_confidence_called_once_per_organism(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_assign_confidence_called_once_per_organism(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         def _mock_percolator(**kwargs):
             _write_combined_percolator_output(rescore_dir, 'synthetic')
@@ -436,56 +443,54 @@ class TestRunRescoreAssignConfidence:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert mock_ac.call_count == 2
 
-    def test_raises_system_exit_when_percolator_produces_no_output(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_raises_system_exit_when_percolator_produces_no_output(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, experiment_ctx):
         with patch('comms.commands.rescore.cruxutil.percolator', return_value=False):
             with pytest.raises(SystemExit):
                 run_rescore(
                     input_dir=synthetic_tide_search_dir,
                     database=two_organism_fasta,
-                    output=tmp_path,
+                    ctx=experiment_ctx,
                     organism_tags='EUK,TESTEUK,PRO,TESTPRO',
                 )
 
 class TestRunRescoreOrganismTags:
-    def test_raises_system_exit_when_no_psm_files(self, crux_bin, two_organism_fasta, tmp_path):
+    def test_raises_system_exit_when_no_psm_files(self, crux_bin, two_organism_fasta, tmp_path, experiment_ctx):
         empty_dir = tmp_path / 'empty'
         empty_dir.mkdir()
         with pytest.raises(SystemExit):
             run_rescore(
                 input_dir=empty_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
 
-    def test_raises_system_exit_when_org_tags_invalid(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_raises_system_exit_when_org_tags_invalid(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, experiment_ctx):
         with pytest.raises(SystemExit):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO',
             )
 
-    def test_raises_system_exit_when_no_tags_available(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, monkeypatch):
-        import comms.commands.rescore as rescore_mod
-        monkeypatch.setitem(rescore_mod.config, 'organism', {})
+    def test_raises_system_exit_when_no_tags_available(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, experiment_ctx, monkeypatch):
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {})
         with pytest.raises(SystemExit):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='',
             )
 
-    def test_uses_config_organism_when_organism_tags_falsy(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, monkeypatch):
-        import comms.commands.rescore as rescore_mod
-        monkeypatch.setitem(rescore_mod.config, 'organism', {'EUK': 'TESTEUK', 'PRO': 'TESTPRO'})
+    def test_uses_config_organism_when_organism_tags_falsy(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, monkeypatch):
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {'EUK': 'TESTEUK', 'PRO': 'TESTPRO'})
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -498,12 +503,12 @@ class TestRunRescoreOrganismTags:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='',
             )
         assert mock_ac.call_count == 0
 
-    def test_percolator_called_once_per_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_percolator_called_once_per_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -516,14 +521,14 @@ class TestRunRescoreOrganismTags:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert mock_perc.call_count == 1
 
 
 class TestRunRescoreOutput:
-    def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
+    def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, caplog):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -537,24 +542,24 @@ class TestRunRescoreOutput:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert 'Finished command: rescore' in caplog.text
 
-    def test_logs_warning_when_percolator_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
+    def test_logs_warning_when_percolator_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, experiment_ctx, caplog):
         # Percolator fails → source prints WARNING then exits; catch the exit
         with patch('comms.commands.rescore.cruxutil.percolator', return_value=False), caplog.at_level(logging.WARNING):
             with pytest.raises(SystemExit):
                 run_rescore(
                     input_dir=synthetic_tide_search_dir,
                     database=two_organism_fasta,
-                    output=tmp_path,
+                    ctx=experiment_ctx,
                     organism_tags='EUK,TESTEUK,PRO,TESTPRO',
                 )
         assert any(r.levelno >= logging.WARNING for r in caplog.records)
 
-    def test_prints_warning_when_split_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, caplog):
+    def test_prints_warning_when_split_fails(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, caplog):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -568,12 +573,12 @@ class TestRunRescoreOutput:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert any(r.levelno >= logging.WARNING for r in caplog.records)
 
-    def test_logger_is_named_rescore(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path):
+    def test_logger_is_named_rescore(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
 
         def _mock_percolator(**kwargs):
@@ -586,30 +591,30 @@ class TestRunRescoreOutput:
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
-                output=tmp_path,
+                ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert logMsg._instance.logger.name == 'rescore'
 
 # -- Define tests for lfq command
 class TestRunLfqOutputDirectories:
-    def test_lfq_root_directory_is_created(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_root_directory_is_created(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert (tmp_path / 'comms' / 'results' / 'lfq').exists()
 
-    def test_single_fraction_creates_one_output_directory(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+    def test_single_fraction_creates_one_output_directory(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=single_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_single_fraction,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
         subdirs = [p for p in lfq_root.iterdir() if p.is_dir()]
@@ -617,14 +622,14 @@ class TestRunLfqOutputDirectories:
         assert subdirs[0].name == 'WCL'
 
     def test_creates_per_fraction_output_directories(
-        self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path
+        self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx
     ):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
         assert (lfq_root / 'WCL').exists()
@@ -632,29 +637,29 @@ class TestRunLfqOutputDirectories:
         assert (lfq_root / 'PUR').exists()
 
 class TestRunLfqCruxCalls:
-    def test_lfq_called_once_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_called_once_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
-    def test_lfq_called_with_correct_fraction_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_called_with_correct_fraction_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         all_psm_files = [c.kwargs['psm_files'] for c in mock_lfq.call_args_list]
         for files in all_psm_files:
             assert len(files) == 2
 
-    def test_lfq_not_called_for_unmatched_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_not_called_for_unmatched_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
         orphan = multi_fraction_psm_dir / 'orphan_file.percolator.target.psms.txt'
         orphan.touch()
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
@@ -662,23 +667,23 @@ class TestRunLfqCruxCalls:
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
-    def test_lfq_receives_correct_fileroot_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_receives_correct_fileroot_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         fileroots = {c.kwargs['fileroot'] for c in mock_lfq.call_args_list}
         assert fileroots == {'WCL', 'ECF', 'PUR'}
 
 class TestRunLfqEarlyExit:
-    def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
         empty_rescore_dir = tmp_path / 'empty_rescore'
         empty_rescore_dir.mkdir()
         with pytest.raises(SystemExit):
@@ -686,10 +691,10 @@ class TestRunLfqEarlyExit:
                 rescore_dir=empty_rescore_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
 
-    def test_lfq_called_per_fraction_even_when_mzml_dir_empty(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_lfq_called_per_fraction_even_when_mzml_dir_empty(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
         empty_mzml_dir = tmp_path / 'empty_mzml'
         empty_mzml_dir.mkdir()
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False) as mock_lfq:
@@ -697,22 +702,22 @@ class TestRunLfqEarlyExit:
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=empty_mzml_dir,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
 class TestRunLfqWarnings:
-    def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, caplog):
+    def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx, caplog):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False), caplog.at_level(logging.WARNING):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert 'LFQ failed' in caplog.text or 'failed' in caplog.text.lower()
 
-    def test_completes_remaining_fractions_even_if_one_fails(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path):
+    def test_completes_remaining_fractions_even_if_one_fails(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
         call_count = {'n': 0}
         def _mock_lfq(**kwargs):
             call_count['n'] += 1
@@ -722,57 +727,57 @@ class TestRunLfqWarnings:
                 rescore_dir=multi_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_multiple_fractions,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert call_count['n'] == 3
 
 class TestRunLfqLogger:
-    def test_logger_is_named_lfq(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path):
+    def test_logger_is_named_lfq(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=single_fraction_psm_dir,
                 mzml_dir=synthetic_mzml.parent,
                 sample_sheet=valid_sample_sheet_single_fraction,
-                output=tmp_path,
+                ctx=experiment_ctx,
             )
         assert logMsg._instance.logger.name == 'lfq'
 
 # -- Define tests for quantify command
 class TestRunQuantify:
-    def test_creates_quantify_output_dir(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
+    def test_creates_quantify_output_dir(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, experiment_ctx):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
         quantify_dir = tmp_path / 'comms' / 'results' / 'quantify'
         assert quantify_dir.exists()
 
-    def test_spectral_counts_file_exists(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
+    def test_spectral_counts_file_exists(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, experiment_ctx):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
         quantify_dir = tmp_path / 'comms' / 'results' / 'quantify'
         counts_files = list(quantify_dir.glob('*.spectral-counts.target.txt'))
         assert counts_files, 'No spectral-counts file found after run_quantify'
 
-    def test_logs_completion(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, caplog):
+    def test_logs_completion(self, crux_bin, synthetic_percolator_results, synthetic_fasta, experiment_ctx, caplog):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
         with caplog.at_level(logging.DEBUG):
-            run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+            run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
         assert 'Finished command: quantify' in caplog.text
 
-    def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
+    def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, experiment_ctx):
         rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, output=tmp_path)
+        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
         assert logMsg._instance.logger.name == 'quantify'
 
 # -- Define tests for running end-to-end pipeline
 class TestRunPipeline:
-    def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
+    def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, valid_sample_sheet, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
                 input_dir=mzml.parent,
-                output_dir=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,
                 skip_lfq=True,
@@ -787,14 +792,14 @@ class TestRunPipeline:
                 'Check that synthetic fixtures are valid and Crux is working.'
             )
 
-    def test_pipeline_creates_results_tree(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
+    def test_pipeline_creates_results_tree(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
                 input_dir=mzml.parent,
-                output_dir=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,
                 skip_lfq=True,
@@ -811,14 +816,14 @@ class TestRunPipeline:
             stage_dir = results_root / stage
             assert stage_dir.exists(), f'Expected results directory for stage: {stage}'
 
-    def test_comms_logger_is_pipeline(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path):
+    def test_comms_logger_is_pipeline(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
                 input_dir=mzml.parent,
-                output_dir=tmp_path,
+                ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,
                 skip_lfq=True,
