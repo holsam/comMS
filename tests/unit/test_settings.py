@@ -7,20 +7,20 @@ import pytest, tomllib
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.settings import loadDefaultConfig, userConfigPath, config as live_config, resolvedModifications
+from comms.utils.settings import loadDefaultConfig, globalConfigPath, resolveConfig, resolvedModifications
 
 # -- Define tests for validating user config path
 class TestUserConfigPath:
     def test_returns_path_object(self):
-        p = userConfigPath()
+        p = globalConfigPath()
         assert isinstance(p, Path)
 
     def test_path_ends_with_config_toml(self):
-        p = userConfigPath()
+        p = globalConfigPath()
         assert p.name == 'config.toml'
 
     def test_parent_dir_is_named_comms(self):
-        p = userConfigPath()
+        p = globalConfigPath()
         assert p.parent.name == 'comms'
 
 # -- Define tests for loading default configuration
@@ -39,39 +39,43 @@ class TestLoadDefaultConfig:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
-# -- Define tests for loading 'live' configuration
-class TestLiveConfig:
-    def test_config_is_dict(self):
-        assert isinstance(live_config, dict)
+# -- Define tests for resolving configuration
+class TestResolveConfig:
+    def test_default_when_nothing_present(self, isolated_config_dir, tmp_path):
+        cfg, source = resolveConfig(tmp_path / 'comms')
+        assert isinstance(cfg, dict) and 'search' in cfg
+        assert 'default' in source
 
-    def test_config_has_search_section(self):
-        assert 'search' in live_config
+    def test_global_used_when_present(self, isolated_config_dir):
+        from comms.commands.config import config_init
+        config_init()
+        cfg, source = resolveConfig(None)
+        assert source.startswith('global')
 
-    def test_config_has_percolator_section(self):
-        assert 'percolator' in live_config
-    
-    def test_config_has_organism_section(self):
-        assert 'organism' in live_config
-        assert live_config['organism'] == {}
-
-    def test_config_values_are_not_none(self):
-        '''Spot-check that critical keys are not None.'''
-        assert live_config['search']['threads'] is not None
-        assert live_config['search']['score_function'] is not None
-        assert live_config['percolator']['psm_fdr'] is not None
-
+    def test_local_preferred_over_global(self, isolated_config_dir, tmp_path):
+        from comms.commands.config import config_init
+        from comms.utils.settings import loadDefaultConfig
+        import tomli_w
+        config_init()                                   # global exists
+        comms = tmp_path / 'comms'; comms.mkdir(parents=True)
+        local = loadDefaultConfig(); local['search']['threads'] = 7
+        with (comms / 'config.toml').open('wb') as f:
+            tomli_w.dump(local, f)
+        cfg, source = resolveConfig(comms)
+        assert cfg['search']['threads'] == 7
+        assert source.startswith('local')
 # -- Define tests for falling back to default configuration
 class TestConfigFallback:
     def test_falls_back_to_defaults_when_no_user_config(self, isolated_config_dir, monkeypatch):
         '''
-        When userConfigPath() returns a path that does not exist, the module
+        When globalConfigPath() returns a path that does not exist, the module
         should load bundled defaults.  We simulate this by importing settings
         with a patched path pointing to a non-existent file.
         '''
         import importlib
         import comms.utils.settings as settings_mod
 
-        monkeypatch.setattr(settings_mod, '_user_config_path', Path('/nonexistent/config.toml'))
+        monkeypatch.setattr(settings_mod, 'globalConfigPath', Path('/nonexistent/config.toml'))
 
         # Reload to re-run the module-level config loading logic
         # (We test the function directly since reloading modules is fragile in pytest)
