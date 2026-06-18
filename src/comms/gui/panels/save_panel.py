@@ -80,7 +80,7 @@ class SavePanel(QWidget):
         config_path = self._config.write(out_dir)
         meta_path = self._experiment.write_metadata(
             out_dir,
-            files={'sample_sheet': sheet_path, 'config': config_path},
+            files={'sample_sheet': sheet_path, 'config': config_path, 'database': self._experiment.database_path(), 'data': self._sample.data_files()},
         )
         self._experiment.tracker.mark_saved()
         self._sample.tracker.mark_saved()

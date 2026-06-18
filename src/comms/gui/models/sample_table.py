@@ -100,7 +100,7 @@ class SampleTableModel(QAbstractTableModel):
         start = len(self._rows)
         self.beginInsertRows(QModelIndex(), start, start + len(new) - 1)
         for p in new:
-            self._rows.append(SampleRow(sample_id=p.stem, raw_file=p.name))
+            self._rows.append(SampleRow(sample_id=p.stem, raw_file=p.name, source_path=str(p)))
         self.endInsertRows()
         self._renumber_replicates()
         self.contentChanged.emit()

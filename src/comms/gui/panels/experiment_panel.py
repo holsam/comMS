@@ -42,6 +42,18 @@ class ExperimentPanel(QWidget):
         dir_layout.setContentsMargins(0, 0, 0, 0)
         dir_layout.addWidget(self._dir)
         dir_layout.addWidget(browse)
+        # Add database field and create layout
+        self._database = QLineEdit()
+        self._database.setMinimumWidth(360)
+        self._database.setPlaceholderText('proteome FASTA file database')
+        self._database.textChanged.connect(self.changed)
+        database_browse = QPushButton('Select database')
+        database_browse.clicked.connect(self._browse_database)
+        database_row = QWidget()
+        database_layout = QHBoxLayout(database_row)
+        database_layout.setContentsMargins(0, 0, 0, 0)
+        database_layout.addWidget(self._database)
+        database_layout.addWidget(database_browse)
         # Add bin directory field and create layout
         self._bin = QLineEdit()
         self._bin.setMinimumWidth(360)
@@ -54,10 +66,17 @@ class ExperimentPanel(QWidget):
         bin_layout.setContentsMargins(0, 0, 0, 0)
         bin_layout.addWidget(self._bin)
         bin_layout.addWidget(bin_browse)
+        # Add organism prefix field and create layout
+        self._organism_prefix = QLineEdit()
+        self._organism_prefix.setMinimumWidth(360)
+        self._organism_prefix.setPlaceholderText('optional: organism prefix for report')
+        self._organism_prefix.textChanged.connect(self.changed)
         # Add fields
         form.addRow('Experiment', self._name)
         form.addRow('Save to', dir_row)
+        form.addRow('FASTA database', database_row)
         form.addRow('Binary directory', bin_row)
+        form.addRow('Primary organism prefix', self._organism_prefix)
         # Organise layout
         centre_row = QHBoxLayout()
         centre_row.addStretch(1)
@@ -74,7 +93,7 @@ class ExperimentPanel(QWidget):
         self.tracker.mark_changed(signature, self.is_valid())
 
     def _browse(self) -> None:
-        chosen = QFileDialog.getExistingDirectory(self, 'Select experiment output directory')
+        chosen = QFileDialog.getExistingDirectory(self, 'Select experiment directory')
         if chosen:
             self._dir.setText(chosen)
 
@@ -82,6 +101,12 @@ class ExperimentPanel(QWidget):
         chosen = QFileDialog.getExistingDirectory(self, 'Select bin directory')
         if chosen:
             self._bin.setText(chosen)
+
+    def _browse_database(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Select FASTA database', '', 'FASTA file (*.fa, *.fasta);;All files (*)')
+        if path:
+            self._state.sample_model.add_files(path)
 
     def experiment_name(self) -> str:
         return self._name.text().strip()
@@ -97,6 +122,13 @@ class ExperimentPanel(QWidget):
     def bin_dir(self) -> Path | None:
         text = self._bin.text().strip()
         return Path(text) if text else None
+
+    def database_path(self) -> Path | None:
+        text = self._database.text().strip()
+        return Path(text) if text else None
+
+    def organism_prefix(self) -> str:
+        return self._organism_prefix.text().strip()
 
     # sync_tracker: refresh the tracker from current content (used before unified save)
     def sync_tracker(self) -> None:
@@ -116,10 +148,10 @@ class ExperimentPanel(QWidget):
         if bin_dir:
             meta['experiment']['bin_dir'] = str(bin_dir)
         if files:
-            meta['files'] = {key: str(value) for key, value in files.items()}
+            meta['files'] = {key: [str(v) for v in value] if isinstance(value, (list, tuple)) else str(value) for key, value in files.items()}
         with path.open('wb') as f:
             tomli_w.dump(meta, f)
         return path
 
     def is_valid(self) -> bool:
-        return bool(self.experiment_name()) and self.base_dir() is not None
+        return bool(self.experiment_name()) and self.base_dir() is not None and self.database_path() is not None
