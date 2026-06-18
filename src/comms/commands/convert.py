@@ -8,22 +8,22 @@ from rich import print
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.context import ExperimentContext
+from comms.utils.context import ExperimentContext, resolve_data_files
 from comms.utils.validate import validate
 from comms.utils import trfp as trfputil
 from comms.utils import paths as pathutil
 
 # -- run_convert: converts all .RAW files in input_dir to indexed mzML and writes them to output
-def run_convert(input_dir: Path, ctx: ExperimentContext, gzip: bool | None = None, in_pipeline: bool = False):
+def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('convert')
     logMsg.debug('Started command: convert')
     gzip = ctx.config['convert']['gzip'] if gzip is None else gzip
     _, trfp_path = validate(check_trfp=True, bin_dir=ctx.bin_dir)
-    logMsg.debug(f'Scanning {input_dir} for .RAW files')
-    raw_files = sorted(input_dir.glob('[!.]*.raw')) + sorted(input_dir.glob('[!.]*.RAW'))
+    data_files = resolve_data_files(ctx, data_files)
+    raw_files = [f for f in data_files if f.suffix.lower() == '.raw']
     if not raw_files:
-        logMsg.warn(f'No .RAW files found in {input_dir}')
+        logMsg.warn('No .RAW files among the resolved data files')
         return
     logMsg.info(f'Converting {len(raw_files)} .RAW file(s) to indexed mzML file(s)')
     out_dir = pathutil.generateOutputFileStructure(ctx.root, 'convert')

@@ -12,18 +12,19 @@ from typing import Optional
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.context import ExperimentContext
+from comms.utils.context import ExperimentContext, resolve_database, resolve_results_input
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then splits output by organism and runs assign-confidence per organism for per-organism q-values
-def run_rescore(input_dir: Path, database: Path, ctx: ExperimentContext, organism_tags: Optional[str] = None, in_pipeline: bool = False):
+def run_rescore(input_dir, database, ctx: ExperimentContext, organism_tags: Optional[str] = None, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('rescore')
     logMsg.debug('Started command: rescore')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
-    logMsg.debug(f'Scanning {input_dir }for Tide-search PSMs')
+    input_dir = resolve_results_input(ctx, 'search', input_dir)
+    database = resolve_database(ctx, database)
     target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
         logMsg.error(f'No Tide-search target PSM files found in {input_dir}')
