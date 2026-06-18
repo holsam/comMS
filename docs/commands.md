@@ -1,6 +1,6 @@
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · _Commands_ · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** _Commands_ · [Configuration][docs-config] · [Configuration reference][docs-config-ref] · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
 
@@ -47,7 +47,7 @@ The [`experiment` command](./configuration.md#creating-an-experiment-the-experim
 Command | Description
 ---|---
 `experiment` | Build a sample sheet, configuration, and metadata (see [Configuration](./configuration.md#creating-an-experiment-the-experiment-command))
-`config` | Manage a configuration file (see [Configuration](./configuration.md))
+`config` | Manage a configuration file (see [Configuration][docs-config])
 
 ### Pipeline
 Command | Description
@@ -132,6 +132,13 @@ Package | Source
 
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · _Commands_ · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** _Commands_ · [Configuration][docs-config] · [Configuration reference][docs-config-ref] · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[docs-commands]: ./commands.md#commands
+[docs-config-ref]: ./config-reference.md#configuration-reference
+[docs-config]: ./configuration.md#configuration
+[docs-output]: ./output-structure.md#output-structure
+[docs-readme]: ../README.md#comms

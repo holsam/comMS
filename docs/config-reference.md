@@ -1,12 +1,12 @@
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · _Configuration reference_ · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · [Configuration][docs-config] · _Configuration reference_ · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
 
 # Configuration reference
 
-This page lists the values comMS reads from its configuration file: the protocol flags applied by `comms config set`, and the default index, search, and Percolator parameters. For where configuration files live and how they are resolved, see [Configuration](./configuration.md).
+This page lists the values comMS reads from its configuration file: the protocol flags applied by `comms config set`, and the default index, search, and Percolator parameters. For where configuration files live and how they are resolved, see [Configuration][docs-config].
 
 ## Contents
 - [Protocol flags](#protocol-flags)
@@ -100,6 +100,13 @@ When a combined multi-species FASTA is used, picked-protein FDR is applied separ
 
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · _Configuration reference_ · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · [Configuration][docs-config] · _Configuration reference_ · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[docs-commands]: ./commands.md#commands
+[docs-config-ref]: ./config-reference.md#configuration-reference
+[docs-config]: ./configuration.md#configuration
+[docs-output]: ./output-structure.md#output-structure
+[docs-readme]: ../README.md#comms

@@ -1,6 +1,6 @@
 <div align="right">
 
-**comMS documentation:** _Configuration_ · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · _Configuration_ · [Configuration reference][docs-config-ref] · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
 
@@ -8,7 +8,7 @@
 
 comMS works out where to read its settings and where to write its results from a single **experiment directory**. This page explains: what an experiment context is, what makes a directory an experiment, how configuration files are layered, how the binary directory is located, and the two commands used to create or edit configurations.
 
-For the full list of values you can set, see the [configuration reference](./config-reference.md).
+For the full list of values you can set, see the [configuration reference][docs-config-ref].
 
 ## Contents
 - [Experiment context](#experiment-context)
@@ -121,7 +121,7 @@ comms config list
 comms config set -c my_experiment/comms/config.toml --ox --iodo
 ```
 
-The full set of `config set` flags, the modifications they apply, and the default parameters are documented in the [configuration reference](./config-reference.md).
+The full set of `config set` flags, the modifications they apply, and the default parameters are documented in the [configuration reference][docs-config-ref].
 
 ## Creating an experiment: the `experiment` command
 The `experiment` command builds a complete experiment directory, writing the sample sheet, a local `config.toml`, and `experiment.toml` under `<dir>/comms/`. It saves manually writing the sample sheet or running `config` for each value.
@@ -147,6 +147,13 @@ In short, `experiment` sets up an experiment and its local configuration, and `c
 
 <div align="right">
 
-**comMS documentation:** _Configuration_ · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · [Output structure](./output-structure.md) · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · _Configuration_ · [Configuration reference][docs-config-ref] · [Output structure][docs-output] · [README][docs-readme]
 
 </div>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[docs-commands]: ./commands.md#commands
+[docs-config-ref]: ./config-reference.md#configuration-reference
+[docs-config]: ./configuration.md#configuration
+[docs-output]: ./output-structure.md#output-structure
+[docs-readme]: ../README.md#comms

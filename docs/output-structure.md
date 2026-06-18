@@ -1,6 +1,6 @@
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · _Output structure_ · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · [Configuration][docs-config] · [Configuration reference][docs-config-ref] · _Output structure_ · [README][docs-readme]
 
 </div>
 
@@ -60,6 +60,13 @@ comMS logs to standard output (the terminal you ran the command from) and to a f
 
 <div align="right">
 
-**comMS documentation:** [Configuration](./configuration.md) · [Configuration reference](./config-reference.md) · [Commands](./commands.md) · _Output structure_ · [README](../README.md)
+**comMS documentation:** [Commands][docs-commands] · [Configuration][docs-config] · [Configuration reference][docs-config-ref] · _Output structure_ · [README][docs-readme]
 
 </div>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[docs-commands]: ./commands.md#commands
+[docs-config-ref]: ./config-reference.md#configuration-reference
+[docs-config]: ./configuration.md#configuration
+[docs-output]: ./output-structure.md#output-structure
+[docs-readme]: ../README.md#comms
