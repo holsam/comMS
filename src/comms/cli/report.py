@@ -22,37 +22,37 @@ commsReport = typer.Typer(add_completion=False)
 @commsReport.command(help='Generate a static report from quantification output', rich_help_panel='Downstream Analysis')
 def report(
     organism_prefix: Annotated[
-        str,
-        typer.Option('--organism-prefix', help='ID prefix for the primary organism')
-    ],
+        Optional[str],
+        typer.Option('-o', '--organism-prefix', help='ID prefix for the primary organism [dim][default: config organism prefix][/dim]')
+    ] = None,
     quantify_dir: Annotated[
         Optional[Path],
-        typer.Argument(help='comms/results/quantify/ output directory', exists=True, file_okay=False, dir_okay=True)
+        typer.Option('-q', '--quantify-dir', help='Path to quantification results [dim][default: quantify output][/dim]')
     ] = None,
     sample_sheet: Annotated[
         Optional[Path],
-        typer.Argument(help='Sample sheet TSV/CSV used in the pipeline run', exists=True, file_okay=True, dir_okay=False)
+        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: config sample sheet][/dim]')
     ] = None,
     experiment_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     lfq_dir: Annotated[
         Optional[Path],
-        typer.Option('--lfq-dir', help='comms/results/lfq/ output directory from comms lfq')
+        typer.Option('-l', '--lfq-dir', help='Path to LFQ results [dim][default: lfq output][/dim]')
     ] = None,
     ref_info: Annotated[
         Optional[Path],
-        typer.Option('--ref-info', help='Protein metadata TSV')
+        typer.Option('-r', '--ref-info', help='Protein metadata TSV [dim][default: config ref_info][/dim]')
     ] = None,
     cont_csv: Annotated[
         Optional[Path],
-        typer.Option('--cont-csv', help='Contaminant annotations CSV')
+        typer.Option('-c', '--cont-csv', help='Contaminant annotations CSV [dim][default: config cont_csv][/dim]')
     ] = None,
     min_reps: Annotated[
         int,
         typer.Option('--min-reps', help='Minimum replicates per fraction-treatment group', min=1)
-    ] = 2,
+    ] = 3,
     lfc_threshold: Annotated[
         float,
         typer.Option('--lfc-threshold', help='|log2FC| threshold for DA', min=0.0)

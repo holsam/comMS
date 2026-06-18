@@ -17,12 +17,12 @@ commsConvert = typer.Typer(add_completion=False)
 # -- convert: converts all .RAW files in the input directory to indexed mzML using ThermoRawFileParser
 @commsConvert.command(help='Convert .RAW files to indexed .mzML', rich_help_panel='Protein Identification')
 def convert(
-    input: Annotated[
-        Path,
-        typer.Argument(help='Directory containing .RAW files', exists=True, file_okay=False, dir_okay=True, readable=True)
-    ],
+    data: Annotated[
+        Optional[list[Path]],
+        typer.Option('-d', '--data', help='.RAW file(s) to convert; repeatable [dim][default: experiment data files][/dim]')
+    ] = None,
     experiment_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     gzip: Annotated[
@@ -31,4 +31,4 @@ def convert(
     ] = None,
 ):
     ctx = ExperimentContext.resolve(experiment_dir)
-    convertFuncs.run_convert(input, ctx, gzip)
+    convertFuncs.run_convert(data, ctx, gzip)

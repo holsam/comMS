@@ -5,7 +5,7 @@ comMS CLI subcommand for running entire pipeline
 # -- Import external dependencies
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import pipeline as pipelineFuncs
@@ -18,23 +18,23 @@ commsPipeline = typer.Typer(add_completion=False)
 @commsPipeline.command(help='Run the comMS pipeline end-to-end', rich_help_panel='Pipelines')
 def pipeline(
     sample_sheet: Annotated[
-        Path,
-        typer.Argument(help='Path to the comMS sample sheet (TSV/CSV)', exists=True, file_okay=True, dir_okay=False, readable=True)
-    ],
+        Optional[Path],
+        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: config sample sheet][/dim]')
+    ] = None,
     database: Annotated[
-        Path,
-        typer.Option('-d', '--database', help='Path to proteome FASTA', exists=True, file_okay=True, dir_okay=False)
-    ],
-    input: Annotated[
-        Path,
-        typer.Option('-i', '--input', help='Directory containing .RAW or .mzML files', exists=True, file_okay=False, dir_okay=True)
-    ],
+        Optional[Path],
+        typer.Option('-f', '--fasta', help='Path to FASTA file [dim][default: config database file][/dim]')
+    ] = None,
+    data: Annotated[
+        Optional[list[Path]],
+        typer.Option('-d', '--data', help='.mzML file(s) to search; repeatable [dim][default: convert results][/dim]')
+    ] = None,
     organism_tags: Annotated[
-        str,
-        typer.Option('--organism-tags', help='Comma-separated patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
-    ],
+        Optional[str],
+        typer.Option('-o', '--organism-tags', help='Patterns to split FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>") [dim][default: config organism tags][/dim]')
+    ] = None,
     experiment_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     param_medic: Annotated[
@@ -66,7 +66,7 @@ def pipeline(
     pipelineFuncs.run_pipeline(
         sample_sheet=sample_sheet,
         database=database,
-        input_dir=input,
+        data=data,
         ctx=ctx,
         param_medic=param_medic,
         skip_convert=skip_convert,
