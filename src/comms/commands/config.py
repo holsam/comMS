@@ -170,8 +170,8 @@ def config_set(
     if organism is not None:
         cfg = _apply_organism(cfg, _parse_organism_arg(organism))
     if custom is not None:
-        current = cfg.get('search', {}).get('custom_mods', '')
-        cfg.setdefault('search', {})['custom_mods'] = _apply_custom_mod(current, custom)
+        current = cfg.get('index', {}).get('custom_mods', '')
+        cfg.setdefault('index', {})['custom_mods'] = _apply_custom_mod(current, custom)
     # Write updated config
     try:
         _writeConfigTo(cfg, config_path)
@@ -436,28 +436,28 @@ def _printSetSummary(
     Print a summary of what config_set changed
     '''
     print()
-    _mod_summary_line(iodo, CARBAMIDOMETHYL_MOD, f'search.{'fixed_mods'}')
-    _mod_summary_line(ox, MET_OX_MOD, 'search.mods_spec')
-    _mod_summary_line(phos, PHOSPHO_MOD, 'search.mods_spec')
+    _mod_summary_line(iodo, CARBAMIDOMETHYL_MOD, f'index.{'fixed_mods'}')
+    _mod_summary_line(ox, MET_OX_MOD, 'index.mods_spec')
+    _mod_summary_line(phos, PHOSPHO_MOD, 'index.mods_spec')
     if custom is not None:
         if custom == '':
-            print(f'[bold green]✓[/bold green] Custom mods cleared: [dim]search.custom_mods[/dim] → [cyan](empty)[/cyan]')
+            print(f'[bold green]✓[/bold green] Custom mods cleared: [dim]index.custom_mods[/dim] → [cyan](empty)[/cyan]')
         else:
-            print(f'[bold green]✓[/bold green] Custom mod added: [dim]search.custom_mods[/dim] → [cyan]{custom}[/cyan]')
-    _mod_summary_line(n_cyc, NCYC_MOD, f'search.{'nterm_peptide_mods_spec'}')
-    _mod_summary_line(n_ace, NACE_MOD, f'search.{'nterm_protein_mods_spec'}')
+            print(f'[bold green]✓[/bold green] Custom mod added: [dim]index.custom_mods[/dim] → [cyan]{custom}[/cyan]')
+    _mod_summary_line(n_cyc, NCYC_MOD, f'index.{'nterm_peptide_mods_spec'}')
+    _mod_summary_line(n_ace, NACE_MOD, f'index.{'nterm_protein_mods_spec'}')
+    if clip_met is not None:
+        value = 'true' if clip_met else 'false'
+        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]index.clip_n_met[/dim] → to [cyan]{value}[/cyan]')
     if low_res is not None:
         if low_res:
-            print(f'[bold green]✓[/bold green] Low-resolution mode set: [dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], [dim]score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]')
+            print(f'[bold green]✓[/bold green] Low-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]')
         else:
-            print(f'[bold green]✓[/bold green] High-resolution mode set: [dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], [dim]score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]')
+            print(f'[bold green]✓[/bold green] High-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]')
     if organism is not None:
         for item in organism:
             key, _, pattern = item.partition('=')
             key = ''.join(key.split())
             pattern = ''.join(pattern.split())
             print(f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]')
-    if clip_met is not None:
-        value = 'true' if clip_met else 'false'
-        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]clip_n_met[/dim] → to [cyan]{value}[/cyan]')
     print()

@@ -195,13 +195,13 @@ class ConfigPanel(QWidget):
                 label: pattern for label, pattern in self._organism_rows() if label and pattern
             }
         cfg = _apply_organism(cfg, organisms)
-        cfg.setdefault('search', {})
-        cfg['search']['custom_mods'] = ''
+        cfg.setdefault('index', {})
+        cfg['index']['custom_mods'] = ''
         custom = self._custom.text().strip()
         if custom:
             for entry in [e.strip() for e in custom.split(',') if e.strip()]:
-                cfg['search']['custom_mods'] = _apply_custom_mod(
-                    cfg['search']['custom_mods'], entry)
+                cfg['index']['custom_mods'] = _apply_custom_mod(
+                    cfg['index']['custom_mods'], entry)
         return cfg
     
     # sync_tracker: refresh the tracker from current content (used before unified save)

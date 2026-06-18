@@ -102,7 +102,7 @@ def run_experiment_headless() -> None:
             if pattern:
                 organisms[label] = pattern
     cfg = _apply_organism(cfg, organisms)
-    cfg.setdefault('search', {})['custom_mods'] = ''
+    cfg.setdefault('index', {})['custom_mods'] = ''
 
     # Write all three files
     out_dir = base_dir / 'comms'
