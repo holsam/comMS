@@ -149,7 +149,7 @@ def config_set(
     config_path = config_path or globalConfigPath()
     if not config_path.exists():
         logMsg.debug(f'No config found, creating from defaults at {config_path}')
-        _writeConfig(loadDefaultConfig())
+        _writeConfigTo(loadDefaultConfig(), path=config_path)
     # Load config
     try:
         cfg = _loadConfigFile(config_path)
