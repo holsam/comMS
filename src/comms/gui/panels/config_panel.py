@@ -107,6 +107,9 @@ class ConfigPanel(QWidget):
     def _update_organism_enabled(self) -> None:
         self._org_box.setEnabled(self._is_multispecies())
 
+    def analysis_mode(self) -> str:
+        return 'multi' if self._is_multispecies() else 'single'
+
     # -- organism table helpers --
     def _add_org_row(self) -> None:
         self._org_table.insertRow(self._org_table.rowCount())

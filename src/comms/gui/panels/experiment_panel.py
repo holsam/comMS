@@ -135,7 +135,7 @@ class ExperimentPanel(QWidget):
         self._on_changed()
 
     # -- write_metadata: write experiment.toml, recording name, timestamp and output paths
-    def write_metadata(self, out_dir: Path, files: dict | None = None) -> Path:
+    def write_metadata(self, out_dir: Path, files: dict | None = None, analysis=None) -> Path:
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / 'experiment.toml'
         meta = {
@@ -149,6 +149,8 @@ class ExperimentPanel(QWidget):
             meta['experiment']['bin_dir'] = str(bin_dir)
         if files:
             meta['files'] = {key: [str(v) for v in value] if isinstance(value, (list, tuple)) else str(value) for key, value in files.items()}
+        if analysis:
+            meta['experiment']['analysis'] = analysis
         with path.open('wb') as f:
             tomli_w.dump(meta, f)
         return path
