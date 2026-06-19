@@ -14,6 +14,9 @@ from comms.commands.rescore import run_rescore
 from comms.commands.lfq import run_lfq
 from comms.commands.quantify import run_quantify
 from comms.commands.pipeline import run_pipeline
+
+# Import internal classes
+from comms.utils.context import ExperimentContext
 from comms.utils.log import logMsg
 
 # -- Define pytest mark for crux (all tests in file require Crux)
@@ -502,6 +505,7 @@ class TestRunRescoreOrganismTags:
 
     def test_raises_system_exit_when_no_tags_available(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, experiment_ctx, monkeypatch):
         monkeypatch.setitem(experiment_ctx.config, 'organism', {})
+        experiment_ctx.metadata["experiment"] = {"analysis": "single"}
         with pytest.raises(SystemExit):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
@@ -546,7 +550,6 @@ class TestRunRescoreOrganismTags:
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert mock_perc.call_count == 1
-
 
 class TestRunRescoreOutput:
     def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, caplog):
@@ -616,6 +619,115 @@ class TestRunRescoreOutput:
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
         assert logMsg._instance.logger.name == 'rescore'
+
+# -- Define test class for running rescore in single-species analysis mode
+class TestRunRescoreSingleSpecies:
+    @pytest.fixture
+    def single_species_context(self, experiment_ctx, monkeypatch):
+        '''Single-species context: analysis_mode='single', no organism config'''
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {})
+        monkeypatch.setitem(experiment_ctx.config, 'custom_section', {})
+        experiment_ctx.metadata["experiment"] = {"analysis": "single"}
+        return experiment_ctx
+
+    @pytest.fixture
+    def mock_search_output(self, tmp_path):
+        '''Create mock Tide-search target files'''
+        search_dir = tmp_path / 'search'
+        search_dir.mkdir()
+        (search_dir / 'sample1.tide-search.target.txt').touch()
+        (search_dir / 'sample2.tide-search.target.txt').touch()
+        return search_dir
+
+    @patch('comms.commands.rescore.cruxutil.percolator')
+    @patch('comms.commands.rescore.cruxutil.assignConfidence')
+    def test_assign_confidence_called_once_per_file(
+        self, mock_ac, mock_perc, single_species_context, mock_search_output, two_organism_fasta,
+    ):
+        mock_perc.return_value = True
+        mock_ac.return_value = True
+        # Mock Percolator to create output files
+        def mock_perc_side_effect(**kwargs):
+            fileroot = kwargs['fileroot']
+            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            return True
+        mock_perc.side_effect = mock_perc_side_effect
+        run_rescore(
+            input_dir=mock_search_output,
+            database=two_organism_fasta,
+            ctx=single_species_context,
+        )
+        # assignConfidence should be called once per Percolator output (2 times)
+        assert mock_ac.call_count == 2
+
+    @patch('comms.commands.rescore.cruxutil.percolator')
+    @patch('comms.commands.rescore.cruxutil.assignConfidence')
+    def test_writes_flat_assign_confidence_output(
+        self, mock_ac, mock_perc, single_species_context, mock_search_output, two_organism_fasta
+    ):
+        mock_perc.return_value = True
+        mock_ac.return_value = True
+        def mock_perc_side_effect(**kwargs):
+            fileroot = kwargs['fileroot']
+            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            return True
+        mock_perc.side_effect = mock_perc_side_effect
+        run_rescore(
+            input_dir=mock_search_output,
+            database=two_organism_fasta,
+            ctx=single_species_context,
+        )
+        # Check that assignConfidence was called with out_dir = rescore root
+        for call in mock_ac.call_args_list:
+            out_dir = call.kwargs['out_dir']
+            # out_dir should be the rescore root, not a per-organism subdirectory
+            assert out_dir.name == 'rescore'
+
+    @patch('comms.commands.rescore.cruxutil.percolator')
+    @patch('comms.commands.rescore.cruxutil.assignConfidence')
+    def test_no_per_organism_subdirectories_created(
+        self, mock_ac, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path,
+    ):
+        mock_perc.return_value = True
+        mock_ac.return_value = True
+        def mock_perc_side_effect(**kwargs):
+            fileroot = kwargs['fileroot']
+            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            return True
+        mock_perc.side_effect = mock_perc_side_effect
+        run_rescore(
+            input_dir=mock_search_output,
+            database=two_organism_fasta,
+            ctx=single_species_context,
+        )
+        rescore_dir = single_species_context.root / 'comms/results/rescore'
+        subdirs = [d for d in rescore_dir.iterdir() if d.is_dir()]
+        assert len(subdirs) == 0, f'Unexpected subdirectories: {subdirs}'
+
+    @patch('comms.commands.rescore.cruxutil.percolator')
+    @patch('comms.commands.rescore.cruxutil.assignConfidence')
+    def test_ignores_supplied_organism_tags_with_warning(
+        self, mock_ac, mock_perc, single_species_context, mock_search_output, two_organism_fasta, caplog
+    ):
+        mock_perc.return_value = True
+        mock_ac.return_value = True
+        def mock_perc_side_effect(**kwargs):
+            fileroot = kwargs['fileroot']
+            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            return True
+        mock_perc.side_effect = mock_perc_side_effect
+        with caplog.at_level(logging.WARNING):
+            run_rescore(
+                input_dir=mock_search_output,
+                database=two_organism_fasta,
+                ctx=single_species_context,
+                organism_tags='EUK:TESTEUK',
+            )
+            assert 'ignoring supplied organism tags' in caplog.text
 
 # ===========================================================================
 # LFQ
@@ -789,6 +901,27 @@ class TestRunQuantify:
     def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, experiment_ctx):
         run_quantify(input_dir=synthetic_percolator_results, database=synthetic_fasta, ctx=experiment_ctx)
         assert logMsg._instance.logger.name == 'quantify'
+
+# -- Define test class for quantifying single-species analysis rescore results
+class TestQuantifyFlatOutput:
+    @patch('comms.commands.quantify.cruxutil.spectralCounts')
+    def test_quantify_finds_flat_output(self, mock_sc, tmp_path, experiment_ctx, monkeypatch, two_organism_fasta):
+        '''quantify discovers flat assign-confidence files in rescore root'''
+        rescore_dir = tmp_path / 'rescore'
+        rescore_dir.mkdir()
+        # Create flat output
+        (rescore_dir / 'sample1.assign-confidence.target.txt').touch()
+        (rescore_dir / 'sample2.assign-confidence.target.txt').touch()
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {})
+        experiment_ctx.metadata["experiment"] = {"analysis": "single"}
+        mock_sc.return_value = True
+        run_quantify(
+            input_dir=rescore_dir,
+            database=two_organism_fasta,
+            ctx=experiment_ctx,
+        )
+        # spectralCounts should be called once per file (2 times)
+        assert mock_sc.call_count == 2
 
 # ===========================================================================
 # Pipeline (end-to-end)
