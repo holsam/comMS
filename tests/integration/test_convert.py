@@ -14,56 +14,46 @@ from tests.integration.test_trfp import REAL_RAW_FIXTURE
 # -- Define pytest mark
 pytestmark = pytest.mark.trfp
 
-# -- Define test for no input files found
+# -- Define test class for no input files found
 class TestRunConvertNoFiles:
-    def test_handles_empty_input_directory(self, trfp_exe, tmp_path, experiment_ctx, caplog):
-        input_dir = tmp_path / 'raw_files'
-        input_dir.mkdir()
-        # Should return cleanly without raising; a warning should be printed
-        with caplog.at_level(logging.DEBUG, logger="convert"):
-            run_convert(input_dir=input_dir, ctx=experiment_ctx / 'out', gzip=False)
-        assert 'No .RAW files' in caplog.text or 'WARNING' in caplog.text
+    def test_handles_non_raw_files_gracefully(self, trfp_exe, tmp_path, experiment_ctx, caplog):
+        '''
+        Passing a non-.RAW file should trigger the 'no .RAW files' warning and return without raising, since the file is filtered out before TRFP runs
+        '''
+        dummy = tmp_path / 'not_raw.mzML'
+        dummy.touch()
+        with caplog.at_level(logging.WARNING):
+            run_convert(data_files=[dummy], ctx=experiment_ctx, gzip=False)
+        assert 'No .RAW files' in caplog.text
 
-# -- Define test for invalid .RAW file input
 class TestRunConvertInvalidFile:
-    def test_reports_failure_for_invalid_raw(self, trfp_exe, tmp_path, experiment_ctx, capsys):
-        input_dir = tmp_path / 'raw_files'
-        input_dir.mkdir()
-        fake = input_dir / 'fake.RAW'
+    def test_reports_failure_for_invalid_raw(self, trfp_exe, tmp_path, experiment_ctx, caplog):
+        fake = tmp_path / 'fake.RAW'
         fake.write_bytes(b'NOTRAW\x00\x01')
-        run_convert(input_dir=input_dir, ctx=experiment_ctx, gzip=False)
-        captured = capsys.readouterr()
-        # Expect the summary to report at least one failure
-        assert 'failed' in captured.out.lower() or '0' in captured.out
+        with caplog.at_level(logging.INFO):
+            run_convert(data_files=[fake], ctx=experiment_ctx, gzip=False)
+        # TRFP exits non-zero; the completion summary must report at least one failure.
+        assert '0 succeeded' in caplog.text or 'failed' in caplog.text
 
-# -- Define pytest mark for whether real .RAW file available
 @pytest.mark.skipif(
     not REAL_RAW_FIXTURE.exists(),
-    reason=(
-        f'No real .RAW fixture at {REAL_RAW_FIXTURE}. '
-        'Place a valid Thermo .RAW file there to enable this test.'
-    ),
+    reason=(f'No real .RAW fixture at {REAL_RAW_FIXTURE}. Place a valid Thermo .RAW file there to enable this test.'),
 )
 
-# -- Define tests for converting real .RAW file
+# -- Define test class for converting real .RAW file
 class TestRunConvertRealFile:
     def test_creates_output_directory(self, trfp_exe, tmp_path, experiment_ctx):
-        input_dir = REAL_RAW_FIXTURE.parent
-        output = tmp_path / 'out'
-        run_convert(input_dir=input_dir, ctx=experiment_ctx, gzip=False)
-        expected_dir = output / 'comms' / 'results' / 'convert'
+        run_convert(data_files=[REAL_RAW_FIXTURE], ctx=experiment_ctx, gzip=False)
+        expected_dir = tmp_path / 'comms' / 'results' / 'convert'
         assert expected_dir.exists()
 
-    def test_produces_mzml_output(self, trfp_exe, tmp_path, experiment_ctx, capsys):
-        input_dir = REAL_RAW_FIXTURE.parent
-        output = tmp_path / 'out'
-        run_convert(input_dir=input_dir, ctx=experiment_ctx, gzip=False)
-        out_dir = output / 'comms' / 'results' / 'convert'
+    def test_produces_mzml_output(self, trfp_exe, tmp_path, experiment_ctx):
+        run_convert(data_files=[REAL_RAW_FIXTURE], ctx=experiment_ctx, gzip=False)
+        out_dir = tmp_path / 'comms' / 'results' / 'convert'
         mzml_files = list(out_dir.glob('*.mzML'))
         assert mzml_files, 'run_convert produced no .mzML files'
 
-    def test_summary_reports_success(self, trfp_exe, tmp_path, experiment_ctx, capsys):
-        input_dir = REAL_RAW_FIXTURE.parent
-        run_convert(input_dir=input_dir, ctx=experiment_ctx, gzip=False)
-        captured = capsys.readouterr()
-        assert 'Convert summary' in captured.out
+    def test_summary_reports_success(self, trfp_exe, tmp_path, experiment_ctx, caplog):
+        with caplog.at_level(logging.INFO):
+            run_convert(data_files=[REAL_RAW_FIXTURE], ctx=experiment_ctx, gzip=False)
+        assert 'succeeded' in caplog.text
