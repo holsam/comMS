@@ -100,7 +100,8 @@ def run_experiment_headless() -> None:
     )
     organisms: dict[str, str] = {}
     organism_prefix = ''
-    if typer.confirm('Multispecies analysis (per-organism FDR)?', default=False):
+    multispecies = typer.confirm('Multispecies analysis (per-organism FDR)?', default=False)
+    if multispecies:
         while True:
             label = typer.prompt('Organism label (blank to finish)', default='', show_default=False).strip()
             if not label:
@@ -134,6 +135,8 @@ def run_experiment_headless() -> None:
     }
     if organism_prefix:
         meta.setdefault('report', {})['organism_prefix'] = organism_prefix
+    if multispecies:
+        meta['experiment']['analysis_mode'] = 'multi'
     with (out_dir / 'experiment.toml').open('wb') as f:
         tomli_w.dump(meta, f)
 
