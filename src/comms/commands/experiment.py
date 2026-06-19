@@ -99,6 +99,7 @@ def run_experiment_headless() -> None:
         low_res=typer.confirm('Low-resolution instrument (ion trap)?', default=False),
     )
     organisms: dict[str, str] = {}
+    organism_prefix = ''
     if typer.confirm('Multispecies analysis (per-organism FDR)?', default=False):
         while True:
             label = typer.prompt('Organism label (blank to finish)', default='', show_default=False).strip()
