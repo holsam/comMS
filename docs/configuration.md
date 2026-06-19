@@ -55,11 +55,19 @@ The experiment root (`my_experiment/`) or the `comms/` folder itself can be pass
 name = "Example comMS experiment"
 updated = "2025-10-01T12:00:00+00:00"
 bin_dir = "/absolute/path/to/comMS/bin"   # optional
-analysis = "single"
+analysis = "multi"
 
 [files]
 sample_sheet = "/path/to/my_experiment/comms/sample_sheet.tsv"
 config = "/path/to/my_experiment/comms/config.toml"
+database = "/path/to/protein/database.fasta"
+data = ["/path/to/data/sample1.RAW", "/path/to/data/sample2.RAW"]
+
+[report]
+enabled = True
+ref_info = "/path/to/reference/protein/annotations.tsv"
+cont_csv = "/path/to/contaminants/info.csv"
+organism_prefix = "ID_PREFIX"
 ```
 
 The simplest way to create an experiment directory is the [`experiment` command](#creating-an-experiment-the-experiment-command), which writes all three files.
@@ -132,7 +140,7 @@ comms experiment            # graphical setup
 comms experiment --headless # terminal prompts only
 ```
 
-The graphical setup walks through naming the experiment and choosing an output directory, defining treatment and fraction groups, importing a directory of `.RAW` / `.mzML` files, assigning each sample to its groups (replicate numbers auto-assign per treatment and fraction and can be overridden), and previewing the sheet before saving. A configuration panel mirrors `comms config set`, so the local `config.toml` it writes uses the same options.
+Both the GUI and command-line setups walk through naming the experiment and choosing an output directory, defining treatment and fraction groups, importing a directory of `.RAW` / `.mzML` files, assigning each sample to its groups (replicate numbers auto-assign per treatment and fraction and can be overridden), and previewing the sheet before saving. A configuration panel mirrors `comms config set`, so the local `config.toml` it writes uses the same options. The configuration panel also includes a report settings section, where a reference annotation file (TSV/CSV), a contaminant list (CSV), and a primary organism ID prefix can be set. These are written to experiment.toml under [report] and used automatically when comms report is run against the experiment directory.
 
 ## `config` vs `experiment`
 The two commands serve different purposes:

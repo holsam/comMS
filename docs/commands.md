@@ -86,6 +86,9 @@ comMS then splits the combined FASTA into one sub-FASTA per organism (appending 
 ## The report command
 The `report` command runs a set of R-based analysis sections over the quantification output, writing figures and spreadsheets. It requires R (≥ 4.3.0) and the packages listed below.
 
+### Enabling the report command
+The report command can be run manually via `comms report` or as part of a `comms pipeline` run. Creating an experiment via `comms experiment` allows selection of reference protein annotation and contaminant files, which are recorded in experiment.toml under [report] and picked up automatically by the `report` command. They can also be supplied at runtime via the `-r`/`--ref-info` and `-c`/`--cont-csv` option flags.
+
 ### Sections
 By default the `qc`, `pca`, and `da` sections run. Use `--section` (repeatable) to choose specific sections, or `--all` to run every section.
 
