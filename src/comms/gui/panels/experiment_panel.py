@@ -66,17 +66,11 @@ class ExperimentPanel(QWidget):
         bin_layout.setContentsMargins(0, 0, 0, 0)
         bin_layout.addWidget(self._bin)
         bin_layout.addWidget(bin_browse)
-        # Add organism prefix field and create layout
-        self._organism_prefix = QLineEdit()
-        self._organism_prefix.setMinimumWidth(360)
-        self._organism_prefix.setPlaceholderText('optional: organism prefix for report')
-        self._organism_prefix.textChanged.connect(self.changed)
         # Add fields
         form.addRow('Experiment', self._name)
         form.addRow('Save to', dir_row)
         form.addRow('FASTA database', database_row)
         form.addRow('Binary directory', bin_row)
-        form.addRow('Primary organism prefix', self._organism_prefix)
         # Organise layout
         centre_row = QHBoxLayout()
         centre_row.addStretch(1)
@@ -127,15 +121,12 @@ class ExperimentPanel(QWidget):
         text = self._database.text().strip()
         return Path(text) if text else None
 
-    def organism_prefix(self) -> str:
-        return self._organism_prefix.text().strip()
-
     # sync_tracker: refresh the tracker from current content (used before unified save)
     def sync_tracker(self) -> None:
         self._on_changed()
 
     # -- write_metadata: write experiment.toml, recording name, timestamp and output paths
-    def write_metadata(self, out_dir: Path, files: dict | None = None, analysis=None) -> Path:
+    def write_metadata(self, out_dir: Path, files: dict | None = None, analysis=None, report: dict | None = None) -> Path:
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / 'experiment.toml'
         meta = {
@@ -151,6 +142,8 @@ class ExperimentPanel(QWidget):
             meta['files'] = {key: [str(v) for v in value] if isinstance(value, (list, tuple)) else str(value) for key, value in files.items()}
         if analysis:
             meta['experiment']['analysis'] = analysis
+        if report:
+            meta['report'] = report
         with path.open('wb') as f:
             tomli_w.dump(meta, f)
         return path
