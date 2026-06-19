@@ -114,6 +114,7 @@ class ConfigPanel(QWidget):
         form = QFormLayout(self._report_fields)
         # Reference info file picker
         self._reference = QLineEdit()
+        self._reference.setMinimumWidth(360)
         self._reference.setPlaceholderText('reference annotation TSV/CSV')
         self._reference.textChanged.connect(self._on_changed)
         ref_browse = QPushButton('Select file')
@@ -126,6 +127,7 @@ class ConfigPanel(QWidget):
         form.addRow('Reference info', ref_row)
         # Contaminant CSV picker
         self._contaminant = QLineEdit()
+        self._contaminant.setMinimumWidth(360)
         self._contaminant.setPlaceholderText('contaminant list CSV')
         self._contaminant.textChanged.connect(self._on_changed)
         cont_browse = QPushButton('Select file')
@@ -138,6 +140,7 @@ class ConfigPanel(QWidget):
         form.addRow('Contaminants', cont_row)
         # Organism prefix (moved from ExperimentPanel)
         self._organism_prefix = QLineEdit()
+        self._organism_prefix.setMinimumWidth(360)
         self._organism_prefix.setPlaceholderText('primary organism id prefix')
         self._organism_prefix.textChanged.connect(self._on_changed)
         form.addRow('Primary organism prefix', self._organism_prefix)
