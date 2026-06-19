@@ -15,7 +15,7 @@ from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_quantify: runs dNSAF spectral counting on per-organism assign-confidence PSM files and writes results to output
+# -- run_quantify: runs dNSAF spectral counting on assign-confidence PSM files (discovering single/multi-species results) and writes results to output
 def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('quantify')
@@ -23,8 +23,11 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     input_dir = resolve_results_input(ctx, 'rescore', input_dir)
     database = resolve_database(ctx, database)
-    logMsg.debug(f'Scanning {input_dir} subdirectories for assign-confidence PSMs')
-    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
+    # Discover both layouts: per-organism subdirectories and flat
+    logMsg.debug(f'Scanning {input_dir} for assign-confidence PSMs')
+    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))  # multi (per-organism)
+    psm_files += sorted(input_dir.glob('[!.]*.assign-confidence.target.txt'))    # single (flat)
+
     if not psm_files:
         logMsg.error(f'No assign-confidence PSM files found in {input_dir}')
         raise SystemExit(1)

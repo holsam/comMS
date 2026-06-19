@@ -100,7 +100,7 @@ class TestResolve:
 # ===========================================================================
 # ExperimentContext stored-input properties (data_files, database, sample_sheet, organism_prefix, ref_info, cont_csv)
 # ===========================================================================
-class TestStoredInputs:
+class TestExperimentContextProperties:
     '''ExperimentContext properties for stored inputs from [files] and [report]'''
     def test_data_files_returns_list_when_present(self, tmp_path):
         files = [tmp_path / f'f{i}.RAW' for i in range(2)]
@@ -135,9 +135,32 @@ class TestStoredInputs:
         ctx = _make_ctx(tmp_path)
         assert ctx.sample_sheet is None
 
+    def test_analysis_mode_returns_stored_string(self, experiment_ctx):
+        experiment_ctx.metadata["experiment"] = {"analysis": "single"}
+        assert experiment_ctx.analysis_mode == 'single'
+
+    def test_analysis_mode_returns_none_when_absent(self, experiment_ctx):
+        assert experiment_ctx.analysis_mode is None
+
+    def test_multispecies_true_when_mode_is_multi(self, experiment_ctx):
+        experiment_ctx.metadata["experiment"] = {"analysis": "multi"}
+        assert experiment_ctx.multispecies is True
+
+    def test_multispecies_false_when_mode_is_single(self, experiment_ctx):
+        experiment_ctx.metadata["experiment"] = {"analysis": "single"}
+        assert experiment_ctx.multispecies is False
+
+    def test_multispecies_fallback_to_config_organism(self, experiment_ctx, monkeypatch):
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {'EUK': 'TESTEUK'})
+        assert experiment_ctx.multispecies is True
+
+    def test_multispecies_false_when_no_mode_and_no_config_organism(self, experiment_ctx, monkeypatch):
+        monkeypatch.setitem(experiment_ctx.config, 'organism', {})
+        assert experiment_ctx.multispecies is False
+
     def test_organism_prefix_returns_string_when_present(self, tmp_path):
-        ctx = _make_ctx(tmp_path, metadata={'report': {'organism_prefix': 'Mtrun'}})
-        assert ctx.organism_prefix == 'Mtrun'
+        ctx = _make_ctx(tmp_path, metadata={'report': {'organism_prefix': 'EUK'}})
+        assert ctx.organism_prefix == 'EUK'
 
     def test_organism_prefix_returns_none_when_absent(self, tmp_path):
         ctx = _make_ctx(tmp_path)

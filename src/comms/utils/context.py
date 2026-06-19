@@ -53,6 +53,20 @@ class ExperimentContext:
         return self._file('sample_sheet')
 
     @property
+    def analysis_mode(self) -> Optional[str]:
+        value = self.metadata.get('experiment', {}).get('analysis')
+        return str(value) if value else None
+    
+    @property
+    def multispecies(self) -> bool:
+        if self.analysis_mode == 'multi':
+            return True
+        if self.analysis_mode == 'single':
+            return False
+        # Fall back to infer from config
+        return bool(self.config.get('organism'))
+
+    @property
     def organism_prefix(self) -> Optional[str]:
         return self.metadata.get('report', {}).get('organism_prefix')
 

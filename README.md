@@ -117,10 +117,20 @@ Running `comms pipeline` carries out the following stages:
 1. `.RAW` to `.mzML` conversion (ThermoRawFileParser)
 2. Peptide index construction (Crux `tide-index`)
 3. Peptide-spectrum matching (Crux `tide-search`)
-4. Per-organism PSM rescoring (Crux `percolator` with picked-protein FDR)
+4. PSM rescoring (Crux `percolator` with picked-protein FDR)
 5. Quantification by MS1 label-free quantification (`lfq`) and dNSAF spectral counting (`quantify`)
 
 An optional report stage then generates figures and spreadsheets from the quantification output.
+
+### single- and multi-species analysis modes
+comMS supports two analysis modes for single- and multi-species experiments, which are selected via the analysis field in `experiment.toml`:
+
+Mode | `[analysis]` value | Pipeline runs | Suitable for
+-- | -- | --
+Single-species | `single` | Percolator and `assign-confidence` on the combined protein database, resulting in one set of PSMs per sample | Analysing proteins from one organism or where cross-organism FDR control is not a priority
+Multi-species | `multi` | Percolator is called on the combined protein database, with results split by organism before `assign-confidence` runs on individual organisms to apply per-organism picked-protein FDR | Analysing proteins from two (or more) organisms where target/decoy ratios differ substantially
+
+Analysis mode is resolved when `rescore` runs: if `analysis` is not set, the pipeline infers `multi` if organism tags are supplied or configured, otherwise defaults to `single`. N.B. contaminants should not be counted as an organism.
 
 ## Documentation
 Page | Contents

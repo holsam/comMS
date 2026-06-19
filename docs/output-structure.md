@@ -21,8 +21,8 @@ All outputs are written under the experiment root, inside `comms/results/`. Each
         ├─ convert/                # indexed .mzML files
         ├─ index/                  # Crux tide-index output
         ├─ search/                 # Crux tide-search target PSM files
-        ├─ rescore/                # combined Percolator rescored PSM files
-        │  └─ <organism>/          # per-organism split PSMs and assign-confidence output
+        ├─ rescore/                # Percolator rescored PSM files
+        │  └─ <organism>/          # per-organism split PSMs and assign-confidence output (only in multi-species analysis mode)
         ├─ lfq/                    # MS1 label-free quantification output
         │  └─ <fraction>/          # FlashLFQ output for each fraction
         ├─ quantify/               # dNSAF spectral-counts output

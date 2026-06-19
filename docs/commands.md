@@ -73,17 +73,15 @@ Command | Description
 `version` | Print the installed comMS version
 
 ## Per-organism FDR
-When a combined multi-species FASTA is searched, comMS can apply picked-protein FDR separately per organism. The patterns that split the database can be set once in configuration (`comms config set --organism`, see the [configuration reference](./config-reference.md#protocol-flags)), or supplied at runtime to `rescore` and `pipeline` with `--organism-tags`.
-
-`--organism-tags` takes a comma-separated list of alternating label and pattern pairs:
-
+When a combined multi-species FASTA is searched, comMS can apply picked-protein FDR separately per organism. The patterns that split the database can be set once in configuration (`comms config set --organism`, see the [configuration reference](./config-reference.md#protocol-flags)), or supplied at runtime to `rescore` and `pipeline` with `--organism-tags` which takes a comma-separated list of alternating label and pattern pairs:
 ```bash
 comms rescore search_dir/ \
     --database combined_proteome.fasta \
     --organism-tags "Org1,Pattern1,Org2,Pattern2"
 ```
 
-comMS then splits the combined FASTA into one sub-FASTA per organism (appending contaminants to each), runs Percolator against each separately, and merges the rescored PSMs into a single output file per sample.
+comMS then splits the combined FASTA into one sub-FASTA per organism (appending contaminants to each), runs Percolator against each separately, and merges the rescored PSMs into a single output file per sample. This feature is optional, however, and single-species analyses are supported.
+
 
 ## The report command
 The `report` command runs a set of R-based analysis sections over the quantification output, writing figures and spreadsheets. It requires R (≥ 4.3.0) and the packages listed below.
