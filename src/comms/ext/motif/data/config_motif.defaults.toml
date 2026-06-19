@@ -8,3 +8,19 @@ discovery_seed = 42
 sequence_window_default = "full"
 elm_database_version = ""
 motif_library_version = ""
+
+[input]
+da_workbook = "da/da_summary.xlsx"
+da_sheet_per_contrast = True
+da_col_protein_id = "protein_id"
+da_col_direction = "direction"
+da_foreground_directions = ["Up", "Down"]
+da_background_directions = "Unchanged"
+secondary_workbook = "secondary_species/secondary_species.xlsx"
+secondary_sheet = "secondary_species_candidates"
+secondary_col_protein_id = "protein_id"
+secondary_col_fraction = "fraction"
+secondary_foreground_fractions = ["fraction1", "fraction2"]
+secondary_background_fractions = "fraction3"
+signalp_protein_id = "protein_id"
+signalp_cleavage_site = "cleavage_site"
