@@ -22,6 +22,7 @@ class SampleRow:
     replicate: int | None = None
     batch: str = ''
     replicate_overridden: bool = False
+    source_path: str = ''
 
 # -- render_sample_sheet: build the TSV text for a list of SampleRow
 def render_sample_sheet(rows) -> str:

@@ -53,16 +53,19 @@ class TestMainWindowCloseLogging:
 class TestRunExperimentHeadless:
     def test_writes_three_files(self, tmp_path):
         raw = tmp_path / 'raw'; raw.mkdir()
-        (raw / 'sample_mock.mzML').write_text('')
+        raw_file = raw / 'sample_mock.mzML'; raw_file.write_text('')
         base = tmp_path / 'exp'
         prompts = iter([
-            'exp',                 # name
-            str(base),             # save to
-            '',                    # bin dir (blank)
-            'MOCK', '',            # treatments
-            'WCL', '',             # fractions
-            str(raw),              # input dir
-            'MOCK', 'WCL',         # per-file assignment
+            'exp',                           # experiment name
+            str(base),                       # save to
+            '',                              # bin dir (blank → auto-resolve)
+            str(tmp_path / 'db.fasta'),      # combined database FASTA (new prompt)
+            'MOCK', '',                      # treatments: 'MOCK', then '' to finish
+            'WCL', '',                       # fractions: 'WCL', then '' to finish
+            str(raw),                        # input directory
+            str(raw_file), '',               # _prompt_list('data file'): path then '' to finish
+            'MOCK',                          # treatment for sample_mock.mzML
+            'WCL',                           # fraction for sample_mock.mzML
         ])
         with patch('typer.prompt', side_effect=lambda *a, **k: next(prompts)), \
              patch('typer.confirm', return_value=False):

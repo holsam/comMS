@@ -189,18 +189,22 @@ def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path
         return runCrux(crux_bin, 'spectral-counts', args)
 
 # -- lfq: returns True if LFQ quantification completed successfully, False on failure
-def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
+def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
     logMsg.debug(f'lfq for {len(psm_files)} PSM file(s)')
     # Resolve mzML files by matching stems to PSM file stems
-    mzml_files = []
+    by_stem = {}
+    for f in mzml_files:
+        stem = f.name.removesuffix('.gz').removesuffix('.mzML')
+        by_stem.setdefault(stem, f)
+    matched = []
     for psm_file in psm_files:
         stem = psm_file.name.removesuffix('.percolator.target.psms.txt')
-        matches = list(mzml_dir.glob(f'{stem}.mzML')) + list(mzml_dir.glob(f'{stem}.mzML.gz'))
-        if not matches:
+        match = by_stem.get(stem)
+        if match is None:
             logMsg.warn(f'No mzML for PSM file, skipping {psm_file.name}')
             continue
-        mzml_files.append(matches[0])
-    if not mzml_files:
+        matched.append(match)
+    if not matched:
         logMsg.warn('No mzML files matched any PSM file, aborting lfq')
         return False
     logMsg.debug(f'Matched {len(mzml_files)} mzML file(s)')
@@ -220,7 +224,7 @@ def lfq(crux_bin: Path, psm_files: list[Path], mzml_dir: Path, out_dir: Path, fi
         '--num-threads', str(config['search']['threads']),
         str(tmp_psm),
     ]
-    args += [str(f) for f in mzml_files]
+    args += [str(f) for f in matched]
     ok = runCrux(crux_bin, 'lfq', args)
     # Clean up temp PSM file
     try:

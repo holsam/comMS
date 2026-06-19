@@ -84,16 +84,32 @@ On Linux and macOS, [ThermoRawFileParser][trfp-url] versions <2.0.0 require [Mon
 The `lfq` command requires Crux >= 5.0.0, which introduced the `crux lfq` subcommand wrapping FlashLFQ. All other comMS commands are compatible with Crux >= 4.0.0. comMS will raise an error at startup if the installed Crux version does not meet the requirement for the command being run.
 
 ## Quick start
+### Using an experiment
 ```bash
-comms pipeline sample_sheet.tsv \
-    --database combined_proteome.fasta \
-    --input /path/to/raw_files/ \
+# 1. Create a comMS experiment
+comms experiment                    # via GUI
+comms experiment --headless         # via terminal
+
+# 2. Run comMS analysis pipeline
+comms pipeline -e /path/to/experiment/dir
+```
+Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step.
+
+You need two inputs to run the pipeline: a sample sheet (TSV or CSV) and a combined FASTA database containing your proteome(s) and contaminants. Both are described in [Input files](./docs/commands.md#input-files). The `--experiment-dir` option sets where comMS reads its configuration and writes its results, explained in [Configuration][docs-config].
+
+### Using command line options
+Alternatively, each file that a comMS experiment resolves can be passed directly:
+```bash
+comms pipeline \
+    --sample-sheet sample_sheet.tsv \
+    --fasta combined_proteome.fasta \
+    --data /path/to/sample1.RAW \
+    --data /path/to/sample2.RAW \
     --experiment-dir /path/to/experiment/directory/ \
     --organism-tags "<Org1>,<Pattern1>,<Org2>,<Pattern2>"
 ```
-You need two inputs to run the pipeline: a sample sheet (TSV or CSV) and a combined FASTA database containing your proteome(s) and contaminants. Both are described in [Input files](./docs/commands.md#input-files). The `--experiment-dir` option sets where comMS reads its configuration and writes its results, explained in [Configuration][docs-config].
 
-Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step.
+The `-d`/`--data` flag is repeatable and, as above, `--skip-convert` should be used if `.mzML` files are already available and `--skip-report` can be used to omit the report step.
 
 ## How comMS works
 Running `comms pipeline` carries out the following stages:

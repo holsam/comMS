@@ -5,7 +5,7 @@ comMS CLI subcommand for indexing proteomes
 # -- Import external dependencies
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import index as indexFuncs
@@ -18,14 +18,11 @@ commsIndex = typer.Typer(add_completion=False)
 @commsIndex.command(help='Generate a peptide index from a FASTA file', rich_help_panel='Protein Identification')
 def index(
     database: Annotated[
-        Path,
-        typer.Argument(
-            help='Path to FASTA file',
-            exists=True, file_okay=True, dir_okay=False, readable=True
-        )
-    ],
+        Optional[Path],
+        typer.Option('-f', '--fasta', help='Path to FASTA file [dim][default: experiment database file][/dim]')
+    ] = None,
     experiment_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
 ):

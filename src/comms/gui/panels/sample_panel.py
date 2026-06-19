@@ -43,6 +43,9 @@ class SamplePanel(QWidget):
     def sample_sheet_text(self) -> str:
         return render_sample_sheet(self._state.sample_model.rows())
 
+    def data_files(self) -> list[str]:
+        return [r.source_path for r in self._state.sample_model.rows() if r.source_path]
+
     def summary(self) -> str:
         n = len(self._state.sample_model.rows())
         return (f'{n} sample(s); {len(self._state.treatments)} treatment(s); '

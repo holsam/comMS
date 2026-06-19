@@ -2,6 +2,10 @@
 Defines shared fixtures and binary-availability guards for testing
 '''
 
+# -- Set environment variable for offscreen Qt platform
+import os
+os.environ['QT_QPA_PLATFORM'] = 'minimal'
+
 # -- Import external dependencies
 import os, pytest
 from pathlib import Path
@@ -16,9 +20,6 @@ BIN_DIR = REPO_ROOT / 'bin'
 # -- Import internal dependencies
 from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
 
-# -- Set environment variable for offscreen Qt platform
-os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-
 # -- Register custom pytest markers
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
@@ -29,7 +30,6 @@ def pytest_configure(config: pytest.Config) -> None:
         'markers',
         'trfp: mark test as requiring ThermoRawFileParser (skip if absent)',
     )
-
 
 # -- Define session-scoped binary fixtures
 def _find_crux(bin_dir: Path) -> Optional[Path]:
@@ -238,7 +238,7 @@ def qapp():
     Return a single QApplication for the test session, using the offscreen platform to avoid needing a display
     '''
     from PySide6.QtWidgets import QApplication
-    app = QApplication.instance() or QApplication([])
+    app = QApplication.instance() or QApplication([''])
     yield app
 
 def _qt_message_handler(mode: QtMsgType, context, message: str) -> None:

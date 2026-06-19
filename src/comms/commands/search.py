@@ -10,25 +10,20 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.context import ExperimentContext
+from comms.utils.context import ExperimentContext, resolve_results_input, resolve_mzml_files
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_search: runs tide-search on all mzML files in input_dir and writes results to output
-def run_search(input_dir: Path, index_dir: Path, ctx: ExperimentContext, param_medic: bool, threads: int, in_pipeline: bool = False):
+def run_search(data_files, index_dir, ctx: ExperimentContext, param_medic: bool, threads: int, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('search')
     logMsg.debug('Started command: search')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
+    index_dir = resolve_results_input(ctx, 'index', index_dir)
+    mzml_files = resolve_mzml_files(ctx, data_files)
     threads = threads or ctx.config['search']['threads']
-    logMsg.debug(f'Scanning {input_dir }for mzML files')
-    mzml_files = sorted(
-        list(input_dir.glob('[!.]*.mzML')) + list(input_dir.glob('[!.]*.mzML.gz'))
-    )
-    if not mzml_files:
-        logMsg.error(f'No mzML files found in {input_dir}')
-        raise SystemExit(1)
     logMsg.info(f'Searching {len(mzml_files)} mzML file(s)')
     out_dir = pathutil.generateOutputFileStructure(ctx.root, 'search')
     logMsg.debug(f'Output directory: {out_dir}')

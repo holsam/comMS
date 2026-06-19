@@ -8,17 +8,18 @@ from rich import print
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.context import ExperimentContext
+from comms.utils.context import ExperimentContext, resolve_database
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
 # -- run_index: builds a Tide peptide index from database and writes it to output
-def run_index(database: Path, ctx: ExperimentContext, in_pipeline: bool = False):
+def run_index(database, ctx: ExperimentContext, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('index')
     logMsg.debug('Started command: index')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
+    database = resolve_database(ctx, database)
     logMsg.info(f'Indexing database {database.name}')
     out_dir = pathutil.generateOutputFileStructure(ctx.root, 'index')
     logMsg.debug(f'Output directory: {out_dir}')

@@ -53,6 +53,7 @@ def run_experiment_headless() -> None:
     name = typer.prompt('Experiment name')
     base_dir = Path(typer.prompt('Save experiment to (directory)')).expanduser()
     bin_dir = typer.prompt('Bin directory (blank to auto-resolve)', default='', show_default=False).strip()
+    database = typer.prompt('Combined database FASTA').strip()
 
     treatments = _prompt_list('treatment')
     fractions = _prompt_list('fraction')
@@ -61,8 +62,13 @@ def run_experiment_headless() -> None:
         raise SystemExit(1)
 
     input_dir = Path(typer.prompt('Directory of .RAW / .mzML files')).expanduser()
-    patterns = ('[!.]*.raw', '[!.]*.RAW', '[!.]*.mzML', '[!.]*.mzML.gz')
-    files = sorted({p for pat in patterns for p in input_dir.glob(pat)})
+    input_files = _prompt_list('data file')
+    files = []
+    for f in input_files:
+        f = Path(Path(f).expanduser())
+        if f.name.startswith('.') or f.suffix.lower() not in ('.raw', '.mzml', '.mzml.gz'):
+            continue
+        files.append(f)
     if not files:
         logMsg.error(f'No .RAW or .mzML files found in {input_dir}')
         raise SystemExit(1)
@@ -93,6 +99,7 @@ def run_experiment_headless() -> None:
         low_res=typer.confirm('Low-resolution instrument (ion trap)?', default=False),
     )
     organisms: dict[str, str] = {}
+    organism_prefix = ''
     if typer.confirm('Multispecies analysis (per-organism FDR)?', default=False):
         while True:
             label = typer.prompt('Organism label (blank to finish)', default='', show_default=False).strip()
@@ -101,6 +108,7 @@ def run_experiment_headless() -> None:
             pattern = typer.prompt(f'Header pattern for {label}').strip()
             if pattern:
                 organisms[label] = pattern
+        organism_prefix = typer.prompt('Primary organism ID prefix (blank if single species)', default='', show_default=False).strip()
     cfg = _apply_organism(cfg, organisms)
     cfg.setdefault('index', {})['custom_mods'] = ''
 
@@ -118,7 +126,14 @@ def run_experiment_headless() -> None:
     }}
     if bin_dir:
         meta['experiment']['bin_dir'] = bin_dir
-    meta['files'] = {'sample_sheet': str(sheet_path), 'config': str(config_path)}
+    meta['files'] = {
+        'sample_sheet': str(sheet_path),
+        'config': str(config_path),
+        'database': database,
+        'data': [str(f) for f in files],
+    }
+    if organism_prefix:
+        meta.setdefault('report', {})['organism_prefix'] = organism_prefix
     with (out_dir / 'experiment.toml').open('wb') as f:
         tomli_w.dump(meta, f)
 

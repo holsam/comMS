@@ -19,7 +19,9 @@ from comms.utils.log import logMsg
 # -- Define pytest mark for crux (all tests in file require Crux)
 pytestmark = pytest.mark.crux
 
-# -- Define tests for running index command
+# ===========================================================================
+# Index
+# ===========================================================================
 class TestRunIndex:
     def test_creates_index_output_dir(self, crux_bin, synthetic_fasta, tmp_path, experiment_ctx):
         run_index(database=synthetic_fasta, ctx=experiment_ctx)
@@ -40,7 +42,7 @@ class TestRunIndex:
         run_index(database=synthetic_fasta, ctx=experiment_ctx)
         assert logMsg._instance.logger.name == 'index'
 
-# -- Define fixture for generating index using tide-index
+# Shared module-scoped index fixture
 @pytest.fixture(scope='module')
 def pipeline_index(crux_bin, tmp_path_factory):
     '''Build a shared index for all pipeline integration tests'''
@@ -55,12 +57,14 @@ def pipeline_index(crux_bin, tmp_path_factory):
         pytest.skip(f'run_index failed (exit {e.code}) — skipping pipeline tests')
     return work / 'comms' / 'results' / 'index', fasta
 
-# -- Define tests for running search command
+# ===========================================================================
+# Search
+# ===========================================================================
 class TestRunSearch:
     def test_creates_search_output_dir(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=False,
@@ -72,7 +76,7 @@ class TestRunSearch:
     def test_target_psm_file_exists(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=False,
@@ -86,7 +90,7 @@ class TestRunSearch:
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=False,
@@ -97,7 +101,7 @@ class TestRunSearch:
     def test_comms_logger_is_search(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=False,
@@ -109,7 +113,7 @@ class TestRunSearchParamMedic:
     def test_completes_without_raising(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=True,
@@ -119,18 +123,18 @@ class TestRunSearchParamMedic:
     def test_creates_search_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
-        assert (tmp_path / 'comms' / 'results' / 'search').exists(), 'No comms/results/search directory created when run with --param-medic'
+        assert (tmp_path / 'comms' / 'results' / 'search').exists()
  
     def test_creates_target_psm_file(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=True,
@@ -143,18 +147,17 @@ class TestRunSearchParamMedic:
     def test_creates_param_medic_output_directory(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path, experiment_ctx):
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=experiment_ctx,
             param_medic=True,
             threads=1,
         )
-        pm_dir = tmp_path / 'comms' / 'results' / 'param-medic'
-        assert pm_dir.exists()
+        assert (tmp_path / 'comms' / 'results' / 'param-medic').exists()
  
     def test_falls_back_to_config_defaults_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
         '''
-        When param-medic cannot estimate tolerances (as expected for synthetic data), run_search should fall back to config defaults and report those values in the terminal summary.
+        When param-medic cannot estimate tolerances (as expected for synthetic data), run_search should fall back to config defaults and report those values in the terminal summary
         '''
         from comms.utils.settings import loadDefaultConfig
         cfg = loadDefaultConfig()
@@ -163,7 +166,7 @@ class TestRunSearchParamMedic:
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
@@ -172,15 +175,13 @@ class TestRunSearchParamMedic:
         assert expected_prec in caplog.text
         assert expected_bw in caplog.text
  
-    def test_warns_when_param_medic_yields_no_estimates(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
-        '''
-        When param-medic produces no usable estimates, a warning should be
-        logged indicating fallback to defaults.
-        '''
+    def test_warns_when_param_medic_yields_no_estimates(
+        self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog
+    ):
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.WARNING):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
@@ -193,7 +194,7 @@ class TestRunSearchParamMedic:
         index_dir, _ = pipeline_index
         with caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
@@ -204,9 +205,7 @@ class TestRunSearchParamMedic:
  
     def test_produces_same_output_as_no_param_medic_when_estimates_unavailable(self, crux_bin, pipeline_index, synthetic_mzml, tmp_path):
         '''
-        When param-medic falls back to defaults, the search output (PSM file
-        existence and line count) should be identical to a run without
-        param-medic, since both use the same config tolerance values.
+        When param-medic falls back to defaults, the search output (PSM file existence and line count) should be identical to a run without param-medic, since both use the same config tolerance values
         '''
         from comms.utils.context import ExperimentContext
         out_with = tmp_path / 'with_pm'
@@ -215,14 +214,14 @@ class TestRunSearchParamMedic:
         ctx_without = ExperimentContext.resolve(out_without)
         index_dir, _ = pipeline_index
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=ctx_with,
             param_medic=True,
             threads=1,
         )
         run_search(
-            input_dir=synthetic_mzml.parent,
+            data_files=[synthetic_mzml],
             index_dir=index_dir,
             ctx=ctx_without,
             param_medic=False,
@@ -231,19 +230,18 @@ class TestRunSearchParamMedic:
         psm_with = list((out_with / 'comms' / 'results' / 'search').glob('*.tide-search.target.txt'))
         psm_without = list((out_without / 'comms' / 'results' / 'search').glob('*.tide-search.target.txt'))
         assert psm_with and psm_without
-        lines_with = psm_with[0].read_text().splitlines()
-        lines_without = psm_without[0].read_text().splitlines()
-        assert len(lines_with) == len(lines_without)
+        assert len(psm_with[0].read_text().splitlines()) == len(psm_without[0].read_text().splitlines())
 
 class TestRunSearchParamMedicMocked:
-    '''
-    Tests that verify run_search correctly uses numeric tolerance values returned by _runParamMedic, by mocking _runParamMedic to return known values and checking those values appear in the terminal summary.
-    '''
     def test_uses_mocked_precursor_tolerance(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
-        with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02)), caplog.at_level(logging.DEBUG):
-            index_dir, _ = pipeline_index
+        '''
+        Tests that verify run_search correctly uses numeric tolerance values returned by _runParamMedic, by mocking _runParamMedic to return known values and checking those values appear in the terminal summary
+        '''
+        index_dir, _ = pipeline_index
+        with patch('comms.commands.search._runParamMedic', return_value=(7.5, 0.02)), \
+             caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
@@ -252,10 +250,11 @@ class TestRunSearchParamMedicMocked:
         assert '7.5 ppm' in caplog.text
 
     def test_uses_mocked_bin_width_in_summary(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
-        with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)), caplog.at_level(logging.DEBUG):
-            index_dir, _ = pipeline_index
+        index_dir, _ = pipeline_index
+        with patch('comms.commands.search._runParamMedic', return_value=(10.0, 0.035)), \
+             caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
@@ -263,37 +262,37 @@ class TestRunSearchParamMedicMocked:
             )
         assert '0.035 Da' in caplog.text
  
-    def test_none_return_from_run_param_medic_falls_back_to_defaults(self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog):
-        '''
-        If _runParamMedic returns (None, None), run_search should fall back to config defaults without raising.
-        '''
+    def test_none_return_from_run_param_medic_falls_back_to_defaults(
+        self, crux_bin, pipeline_index, synthetic_mzml, experiment_ctx, caplog
+    ):
         from comms.utils.settings import loadDefaultConfig
         cfg = loadDefaultConfig()
-        with patch('comms.commands.search._runParamMedic', return_value=(None, None)), caplog.at_level(logging.DEBUG):
-            index_dir, _ = pipeline_index
+        index_dir, _ = pipeline_index
+        with patch('comms.commands.search._runParamMedic', return_value=(None, None)), \
+             caplog.at_level(logging.DEBUG):
             run_search(
-                input_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 index_dir=index_dir,
                 ctx=experiment_ctx,
                 param_medic=True,
                 threads=1,
             )
-        assert f'{str(cfg['search']['precursor_tolerance_ppm'])} ppm' in caplog.text
-        assert f'{str(cfg['search']['mz_bin_width'])} Da' in caplog.text
+        assert f'{str(cfg["search"]["precursor_tolerance_ppm"])} ppm' in caplog.text
+        assert f'{str(cfg["search"]["mz_bin_width"])} Da' in caplog.text
 
-# -- Define fixture for generating search output by running tide-search
+# Shared module-scoped search fixture
 @pytest.fixture(scope='module')
 def pipeline_search(crux_bin, pipeline_index, tmp_path_factory):
-    '''Run search once per module for rescore/quantify tests'''
+    '''Run search once per module for rescore/quantify tests.'''
     from tests.fixtures.generate_fixtures import write_mzml
     from comms.utils.context import ExperimentContext
     work = tmp_path_factory.mktemp('pipeline_search')
     ctx = ExperimentContext.resolve(work)
-    mzml = write_mzml(work / 'synthetic.mzml')
+    mzml = write_mzml(work / 'synthetic.mzML')
     index_dir, fasta = pipeline_index
     try:
         run_search(
-            input_dir=work,
+            data_files=[mzml],
             index_dir=index_dir,
             ctx=ctx,
             param_medic=False,
@@ -304,14 +303,21 @@ def pipeline_search(crux_bin, pipeline_index, tmp_path_factory):
     search_dir = work / 'comms' / 'results' / 'search'
     return search_dir, fasta, work
 
-# -- Define tests for running rescore command
+# ===========================================================================
+# Rescore
+# ===========================================================================
 class TestRunRescore:
     def test_creates_rescore_output_dir(self, crux_bin, pipeline_search, tmp_path, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         # run_rescore may fail with synthetic data due to insufficient PSMs
-        # for Percolator — we assert on directory creation, not success
+        # for Percolator, assert on directory creation, not success
         try:
-            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
+            run_rescore(
+                input_dir=search_dir,
+                database=fasta,
+                ctx=experiment_ctx,
+                organism_tags='EUK,SP',
+            )
         except SystemExit:
             pass
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
@@ -319,37 +325,52 @@ class TestRunRescore:
 
     def test_log_success(self, crux_bin, pipeline_search, experiment_ctx, caplog):
         search_dir, fasta, _ = pipeline_search
-        try:
-            with caplog.at_level(logging.DEBUG):
-                run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
-            assert 'Finished command: rescore' in caplog.text
-        except SystemExit:
-            pass
+        with caplog.at_level(logging.INFO):
+            try:
+                run_rescore(
+                    input_dir=search_dir,
+                    database=fasta,
+                    ctx=experiment_ctx,
+                    organism_tags='EUK,SP',
+                )
+            except SystemExit:
+                pass
+        # With synthetic data Percolator fails, but round-1 progress is still logged.
+        assert 'Rescoring' in caplog.text or 'Round 1' in caplog.text
 
     def test_log_file_is_written(self, crux_bin, pipeline_search, tmp_path, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         try:
-            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
+            run_rescore(
+                input_dir=search_dir,
+                database=fasta,
+                ctx=experiment_ctx,
+                organism_tags='EUK,SP',
+            )
         except SystemExit:
             pass
-        log = tmp_path / 'comms' / 'results' / 'rescore.log'
+        log = tmp_path / 'comms' / 'results' / 'rescore' / 'rescore.log'
         assert log.exists()
         assert log.stat().st_size > 0
 
     def test_comms_logger_is_rescore(self, crux_bin, pipeline_search, experiment_ctx):
         search_dir, fasta, _ = pipeline_search
         try:
-            run_rescore(input_dir=search_dir, database=fasta, ctx=experiment_ctx)
+            run_rescore(
+                input_dir=search_dir,
+                database=fasta,
+                ctx=experiment_ctx,
+                organism_tags='EUK,SP',
+            )
         except SystemExit:
             pass
         assert logMsg._instance.logger.name == 'rescore'
 
-# -- Define constants for rescore PSM files
+# -- Constants and helpers for mocked rescore tests ---------------------------
 PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
 PSM_ROW_MT = 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
 PSM_ROW_RI = 'synthetic_2\t1.2\t0.005\t0.003\tK.SAMPLEK.T\tsp|TP001|GENE1_TESTPRO\n'
 
-# -- Define fixtures for rescore PSM files
 @pytest.fixture()
 def two_organism_fasta(tmp_path):
     p = tmp_path / 'combined.fasta'
@@ -371,12 +392,10 @@ def synthetic_tide_search_dir(tmp_path):
     )
     return search_dir
 
-# -- Define helper function for rescore PSM files
 def _write_combined_percolator_output(rescore_dir: Path, fileroot: str) -> None:
     '''
     Write synthetic combined Percolator target and decoy PSM files at the top level of rescore_dir, as cruxutil.percolator produces them
     '''
-    PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
     for match_type in ('target', 'decoy'):
         path = rescore_dir / f'{fileroot}.percolator.{match_type}.psms.txt'
         path.write_text(
@@ -385,25 +404,27 @@ def _write_combined_percolator_output(rescore_dir: Path, fileroot: str) -> None:
             + 'synthetic_2\t1.2\t0.005\t0.003\tK.SAMPLEK.T\tsp|TP001|GENE1_TESTPRO\n'
         )
 
-# -- Define helper function to write split-organism PSM files 
 def _write_split_psm_files(rescore_dir: Path, fileroot: str, labels: list[str]) -> bool:
-    PSM_HEADER = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
-    PSM_ROW = 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
     for label in labels:
         for match_type in ('target', 'decoy'):
             path = rescore_dir / label / f'{fileroot}.{label}.percolator.{match_type}.psms.txt'
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(PSM_HEADER + PSM_ROW)
+            path.write_text(
+                PSM_HEADER
+                + 'synthetic_1\t1.5\t0.001\t0.001\tK.ACDEFGHIK.L\tsp|TE001|GENE1_TESTEUK\n'
+            )
     return True
 
-# -- Define tests for rescore command with per-organism picked-protein FDR
+
 class TestRunRescoreDirectories:
     def test_creates_rescore_output_directory(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
         def _mock_percolator(**kwargs):
             _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
-        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
@@ -417,7 +438,8 @@ class TestRunRescoreDirectories:
         def _mock_percolator(**kwargs):
             _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
-        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
+             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
@@ -426,7 +448,6 @@ class TestRunRescoreDirectories:
             )
         assert (rescore_dir / 'EUK').exists()
         assert (rescore_dir / 'PRO').exists()
-
 
 class TestRunRescoreAssignConfidence:
     def test_assign_confidence_called_once_per_organism(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
@@ -596,13 +617,15 @@ class TestRunRescoreOutput:
             )
         assert logMsg._instance.logger.name == 'rescore'
 
-# -- Define tests for lfq command
+# ===========================================================================
+# LFQ
+# ===========================================================================
 class TestRunLfqOutputDirectories:
     def test_lfq_root_directory_is_created(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -612,7 +635,7 @@ class TestRunLfqOutputDirectories:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=single_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_single_fraction,
                 ctx=experiment_ctx,
             )
@@ -621,13 +644,11 @@ class TestRunLfqOutputDirectories:
         assert len(subdirs) == 1
         assert subdirs[0].name == 'WCL'
 
-    def test_creates_per_fraction_output_directories(
-        self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx
-    ):
+    def test_creates_per_fraction_output_directories(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -641,7 +662,7 @@ class TestRunLfqCruxCalls:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -651,7 +672,7 @@ class TestRunLfqCruxCalls:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -665,7 +686,7 @@ class TestRunLfqCruxCalls:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -675,7 +696,7 @@ class TestRunLfqCruxCalls:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -689,18 +710,21 @@ class TestRunLfqEarlyExit:
         with pytest.raises(SystemExit):
             run_lfq(
                 rescore_dir=empty_rescore_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
 
-    def test_lfq_called_per_fraction_even_when_mzml_dir_empty(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
-        empty_mzml_dir = tmp_path / 'empty_mzml'
-        empty_mzml_dir.mkdir()
+    def test_lfq_called_per_fraction_even_when_no_mzml_matches(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
+        '''
+        cruxutil.lfq is called for each fraction even when the supplied mzML file does not match any PSM file stem (the mock returns False for each call)
+        '''
+        dummy_mzml = tmp_path / 'unmatched_sample.mzML'
+        dummy_mzml.touch()
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False) as mock_lfq:
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=empty_mzml_dir,
+                data_files=[dummy_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -711,7 +735,7 @@ class TestRunLfqWarnings:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False), caplog.at_level(logging.WARNING):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -725,7 +749,7 @@ class TestRunLfqWarnings:
         with patch('comms.commands.lfq.cruxutil.lfq', side_effect=_mock_lfq):
             run_lfq(
                 rescore_dir=multi_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_multiple_fractions,
                 ctx=experiment_ctx,
             )
@@ -736,39 +760,39 @@ class TestRunLfqLogger:
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
                 rescore_dir=single_fraction_psm_dir,
-                mzml_dir=synthetic_mzml.parent,
+                data_files=[synthetic_mzml],
                 sample_sheet=valid_sample_sheet_single_fraction,
                 ctx=experiment_ctx,
             )
         assert logMsg._instance.logger.name == 'lfq'
 
-# -- Define tests for quantify command
+# ===========================================================================
+# Quantify
+# ===========================================================================
 class TestRunQuantify:
     def test_creates_quantify_output_dir(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, experiment_ctx):
-        rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
+        run_quantify(input_dir=synthetic_percolator_results, database=synthetic_fasta, ctx=experiment_ctx)
         quantify_dir = tmp_path / 'comms' / 'results' / 'quantify'
         assert quantify_dir.exists()
 
     def test_spectral_counts_file_exists(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path, experiment_ctx):
-        rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
+        run_quantify(input_dir=synthetic_percolator_results, database=synthetic_fasta, ctx=experiment_ctx)
         quantify_dir = tmp_path / 'comms' / 'results' / 'quantify'
         counts_files = list(quantify_dir.glob('*.spectral-counts.target.txt'))
         assert counts_files, 'No spectral-counts file found after run_quantify'
 
     def test_logs_completion(self, crux_bin, synthetic_percolator_results, synthetic_fasta, experiment_ctx, caplog):
-        rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
         with caplog.at_level(logging.DEBUG):
-            run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
+            run_quantify(input_dir=synthetic_percolator_results, database=synthetic_fasta, ctx=experiment_ctx)
         assert 'Finished command: quantify' in caplog.text
 
     def test_comms_logger_is_quantify(self, crux_bin, synthetic_percolator_results, synthetic_fasta, experiment_ctx):
-        rescore_dir, fasta = synthetic_percolator_results, synthetic_fasta
-        run_quantify(input_dir=rescore_dir, database=fasta, ctx=experiment_ctx)
+        run_quantify(input_dir=synthetic_percolator_results, database=synthetic_fasta, ctx=experiment_ctx)
         assert logMsg._instance.logger.name == 'quantify'
 
-# -- Define tests for running end-to-end pipeline
+# ===========================================================================
+# Pipeline (end-to-end)
+# ===========================================================================
 class TestRunPipeline:
     def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, valid_sample_sheet, experiment_ctx):
         fasta, mzml = synthetic_fixtures
@@ -776,7 +800,7 @@ class TestRunPipeline:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
-                input_dir=mzml.parent,
+                data=[mzml],
                 ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,
@@ -798,7 +822,7 @@ class TestRunPipeline:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
-                input_dir=mzml.parent,
+                data=[mzml],
                 ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,
@@ -822,7 +846,7 @@ class TestRunPipeline:
             run_pipeline(
                 sample_sheet=valid_sample_sheet,
                 database=fasta,
-                input_dir=mzml.parent,
+                data=[mzml],
                 ctx=experiment_ctx,
                 param_medic=False,
                 skip_convert=True,

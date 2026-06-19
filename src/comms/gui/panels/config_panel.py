@@ -127,6 +127,10 @@ class ConfigPanel(QWidget):
             pattern = pattern_item.text().strip() if pattern_item else ''
             result.append((label, pattern))
         return result
+    
+    def has_organism_patterns(self) -> bool:
+        '''True when at least one organism row has both a label and a pattern'''
+        return any(label and pattern for label, pattern in self._organism_rows())
 
     # -- _organisms_complete: a row is valid only if both label and pattern are set (or both empty)
     def _organisms_complete(self) -> bool:
