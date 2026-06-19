@@ -3,11 +3,11 @@ Unit tests for src/comms/gui/panels/*
 '''
 
 # -- Import external dependencies
-import pytest
-import tomllib
-from unittest.mock import patch
+import pytest, tomllib
+from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTableWidgetItem
+from unittest.mock import patch
 
 # -- Import functions under test
 from comms.commands.config import MET_OX_MOD
@@ -18,6 +18,17 @@ from comms.gui.panels.config_panel import ConfigPanel
 from comms.gui.panels.experiment_panel import ExperimentPanel
 from comms.gui.panels.sample_panel import SamplePanel
 from comms.gui.panels.save_panel import SavePanel
+
+# -- Helper: bring a sample panel's state to completeness
+def _complete_sample(state):
+    state.add_treatment('MOCK')
+    state.add_fraction('WCL')
+    model = state.sample_model
+    if not model.rows():
+        model.add_files(['/data/sample_a.RAW'])
+    for r in range(len(model.rows())):
+        model.setData(model.index(r, COL_TREATMENT), 'MOCK', Qt.ItemDataRole.EditRole)
+        model.setData(model.index(r, COL_FRACTION), 'WCL', Qt.ItemDataRole.EditRole)
 
 pytestmark = pytest.mark.usefixtures('qapp')
 
@@ -111,10 +122,31 @@ class TestExperimentPanel:
         p._dir.setText(str(tmp_path))
         assert p.output_dir() == tmp_path / 'comms'
 
+    def test_is_valid_requires_name_dir_and_database(self, tmp_path):
+        # is_valid() checks all three: experiment name, base directory, and database
+        p = ExperimentPanel()
+        assert p.is_valid() is False
+        p._name.setText('exp')
+        assert p.is_valid() is False
+        p._dir.setText(str(tmp_path))
+        assert p.is_valid() is False
+        p._database.setText(str(tmp_path / 'db.fasta'))
+        assert p.is_valid() is True
+
+    def test_tracker_incomplete_until_valid(self, tmp_path):
+        p = ExperimentPanel()
+        p._name.setText('exp')
+        assert p.tracker.status is PanelStatus.INCOMPLETE
+        p._dir.setText(str(tmp_path))
+        assert p.tracker.status is PanelStatus.INCOMPLETE
+        p._database.setText(str(tmp_path / 'db.fasta'))
+        assert p.tracker.status is PanelStatus.COMPLETE
+
     def test_bin_dir_optional_and_written(self, tmp_path):
         p = ExperimentPanel()
         p._name.setText('exp')
         p._dir.setText(str(tmp_path))
+        p._database.setText(str(tmp_path / 'db.fasta'))
         p._bin.setText(str(tmp_path / 'bin'))
         assert p.is_valid() is True   # bin dir does not affect validity
         meta_path = p.write_metadata(tmp_path / 'comms')
@@ -123,31 +155,40 @@ class TestExperimentPanel:
             meta = tomllib.load(f)
         assert meta['experiment']['bin_dir'] == str(tmp_path / 'bin')
 
-    def test_is_valid_requires_name_and_dir(self, tmp_path):
-        p = ExperimentPanel()
-        assert p.is_valid() is False
-        p._name.setText('exp')
-        assert p.is_valid() is False
-        p._dir.setText(str(tmp_path))
-        assert p.is_valid() is True
-
-    def test_tracker_incomplete_until_valid(self, tmp_path):
+    def test_empty_bin_dir_omitted_from_metadata(self, tmp_path):
         p = ExperimentPanel()
         p._name.setText('exp')
-        assert p.tracker.status is PanelStatus.INCOMPLETE
-        p._dir.setText(str(tmp_path))
-        assert p.tracker.status is PanelStatus.COMPLETE
+        meta_path = p.write_metadata(tmp_path / 'comms')
+        import tomllib
+        with meta_path.open('rb') as f:
+            meta = tomllib.load(f)
+        assert 'bin_dir' not in meta.get('experiment', {})
 
-# -- Helper: bring a sample panel's state to completeness
-def _complete_sample(state):
-    state.add_treatment('MOCK')
-    state.add_fraction('WCL')
-    model = state.sample_model
-    if not model.rows():
-        model.add_files(['/data/sample_a.RAW'])
-    for r in range(len(model.rows())):
-        model.setData(model.index(r, COL_TREATMENT), 'MOCK', Qt.ItemDataRole.EditRole)
-        model.setData(model.index(r, COL_FRACTION), 'WCL', Qt.ItemDataRole.EditRole)
+    def test_write_metadata_coerces_list_to_strings(self, tmp_path):
+        p = ExperimentPanel()
+        p._name.setText('exp')
+        path = p.write_metadata(
+            tmp_path / 'comms',
+            files={'data': [Path('/some/file.RAW'), Path('/other/file.RAW')]},
+        )
+        import tomllib
+        with path.open('rb') as f:
+            meta = tomllib.load(f)
+        assert meta['files']['data'] == ['/some/file.RAW', '/other/file.RAW']
+        assert all(isinstance(v, str) for v in meta['files']['data'])
+
+    def test_write_metadata_keeps_single_values_as_strings(self, tmp_path):
+        p = ExperimentPanel()
+        p._name.setText('exp')
+        path = p.write_metadata(
+            tmp_path / 'comms',
+            files={'database': Path('/path/to/db.fasta')},
+        )
+        import tomllib
+        with path.open('rb') as f:
+            meta = tomllib.load(f)
+        assert meta['files']['database'] == '/path/to/db.fasta'
+        assert isinstance(meta['files']['database'], str)
 
 class TestSamplePanel:
     def test_is_complete_proxies_model(self):
@@ -181,11 +222,34 @@ class TestSamplePanel:
         assert path == tmp_path / 'sample_sheet.tsv'
         assert 'sample_a' in path.read_text()
 
+    def test_data_files_returns_paths_in_order(self, tmp_path):
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        paths = [str(tmp_path / f'f{i}.RAW') for i in range(3)]
+        state.sample_model.add_files(paths)
+        result = panel.data_files()
+        assert result == paths
+
+    def test_data_files_skips_empty_paths(self, tmp_path):
+        from comms.utils.sheet import SampleRow
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        path = str(tmp_path / 'sample.RAW')
+        state.sample_model.add_files([path])
+        # Inject a row with no source_path to verify it is filtered out.
+        state.sample_model._rows.append(
+            SampleRow(sample_id='nosrc', raw_file='nosrc.RAW', source_path='')
+        )
+        result = panel.data_files()
+        assert path in result
+        assert '' not in result
+
 class TestSavePanel:
     def _build(self, tmp_path):
         header = ExperimentPanel()
         header._name.setText('exp')
         header._dir.setText(str(tmp_path))
+        header._database.setText(str(tmp_path / 'db.fasta'))
         state = ExperimentState()
         sample = SamplePanel(state)
         _complete_sample(state)
