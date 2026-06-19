@@ -1,0 +1,10 @@
+[motifs]
+discovery_algorithm = "streme"
+discovery_min_width = 6
+discovery_max_width = 15
+discovery_n_motifs = 5
+discovery_evalue_threshold = 0.05
+discovery_seed = 42
+sequence_window_default = "full"
+elm_database_version = ""
+motif_library_version = ""
