@@ -78,10 +78,24 @@ class SavePanel(QWidget):
             panel.sync_tracker()
         sheet_path = self._sample.write(out_dir)
         config_path = self._config.write(out_dir)
+        report_meta = {}
+        if self._config.report_enabled():
+            pfx = self._config.organism_prefix()
+            ref = self._config.reference_path()
+            cont = self._config.contaminant_path()
+            report_meta['enabled'] = True
+            if pfx:
+                report_meta['organism_prefix'] = pfx
+            if ref:
+                report_meta['ref_info'] = str(ref)
+            if cont:
+                report_meta['cont_csv'] = str(cont)
+        else:
+            report_meta['enabled'] = False
         meta_path = self._experiment.write_metadata(
             out_dir,
             files={'sample_sheet': sheet_path, 'config': config_path, 'database': self._experiment.database_path(), 'data': self._sample.data_files()},
-            analysis = self._config.analysis_mode()
+            analysis = self._config.analysis_mode(), report=report_meta if report_meta else None,
         )
         self._experiment.tracker.mark_saved()
         self._sample.tracker.mark_saved()
