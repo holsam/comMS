@@ -3,7 +3,7 @@ comMS ENTRYPOINT
 '''
 
 # -- Import external dependencies
-import logging, typer
+import importlib, logging, pkgutil, typer
 from typing import Annotated
 
 # -- Import internal utility functions
@@ -68,6 +68,15 @@ def experiment(
     else:
         experimentFuncs.launch_experiment_gui()
 
+# -- load_extensions: import extension CLIs
+def load_extensions():
+    import comms.ext as extensions_dir
+    for _, extension, _ in pkgutil.iter_modules(extensions_dir.__path__):
+        module = importlib.import_module(f'comms.ext.{extension}')
+        register = getattr(module, 'register_command', None)
+        if callable(register):
+            register(comms)
+
 # ====================
 # Top-level callback: --verbose / --debug flags
 # ====================
@@ -90,3 +99,5 @@ def main(
         log_level = logging.INFO
     log_state.log_level = log_level
     configureStreamLogging()
+
+load_extensions()
