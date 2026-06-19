@@ -9,7 +9,7 @@ from rich import print
 
 # -- Import internal classes/functionsc
 from comms.utils.log import logMsg
-from comms.utils.settings import userConfigPath
+from comms.utils.settings import globalConfigPath
 
 # -- _generated_targets: returns a list of Paths to files/directories created by comMS
 def _generated_targets() -> list[Path]:
@@ -17,7 +17,7 @@ def _generated_targets() -> list[Path]:
     Collect files and directories comMS has created outside of analysis outputs
     '''
     targets: list[Path] = []
-    config_path = userConfigPath()
+    config_path = globalConfigPath()
     if config_path.exists():
         targets.append(config_path)
     # Only include config directory if it only holds comMS-created files

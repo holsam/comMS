@@ -10,24 +10,29 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.context import ExperimentContext, resolve_database, resolve_results_input
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_quantify: runs dNSAF spectral counting on per-organism assign-confidence PSM files and writes results to output
-def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: bool = False):
+# -- run_quantify: runs dNSAF spectral counting on assign-confidence PSM files (discovering single/multi-species results) and writes results to output
+def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('quantify')
     logMsg.debug('Started command: quantify')
-    crux_bin, _ = validate(check_crux=True)
-    logMsg.debug(f'Scanning {input_dir} subdirectories for assign-confidence PSMs')
-    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))
+    crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
+    input_dir = resolve_results_input(ctx, 'rescore', input_dir)
+    database = resolve_database(ctx, database)
+    # Discover both layouts: per-organism subdirectories and flat
+    logMsg.debug(f'Scanning {input_dir} for assign-confidence PSMs')
+    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))  # multi (per-organism)
+    psm_files += sorted(input_dir.glob('[!.]*.assign-confidence.target.txt'))    # single (flat)
+
     if not psm_files:
         logMsg.error(f'No assign-confidence PSM files found in {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Quantifying {len(psm_files)} PSM file(s)')
-    out_dir = pathutil.generateOutputFileStructure(output, 'quantify')
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'quantify')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'quantify.log'
     configureFileLogging(log_path)
@@ -43,7 +48,7 @@ def run_quantify(input_dir: Path, database: Path, output: Path, in_pipeline: boo
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=config,
+                config=ctx.config,
             )
             if ok:
                 n_ok += 1

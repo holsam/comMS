@@ -5,11 +5,11 @@ comMS CLI subcommand for running entire pipeline
 # -- Import external dependencies
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 # -- Import internal functions
 from comms.commands import pipeline as pipelineFuncs
-from comms.utils.settings import config
+from comms.utils.context import ExperimentContext
 
 # -- Initialise pipeline Typer class
 commsPipeline = typer.Typer(add_completion=False)
@@ -18,24 +18,24 @@ commsPipeline = typer.Typer(add_completion=False)
 @commsPipeline.command(help='Run the comMS pipeline end-to-end', rich_help_panel='Pipelines')
 def pipeline(
     sample_sheet: Annotated[
-        Path,
-        typer.Argument(help='Path to the comMS sample sheet (TSV/CSV)', exists=True, file_okay=True, dir_okay=False, readable=True)
-    ],
+        Optional[Path],
+        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: config sample sheet][/dim]')
+    ] = None,
     database: Annotated[
-        Path,
-        typer.Option('-d', '--database', help='Path to proteome FASTA', exists=True, file_okay=True, dir_okay=False)
-    ],
-    input: Annotated[
-        Path,
-        typer.Option('-i', '--input', help='Directory containing .RAW or .mzML files', exists=True, file_okay=False, dir_okay=True)
-    ],
+        Optional[Path],
+        typer.Option('-f', '--fasta', help='Path to FASTA file [dim][default: config database file][/dim]')
+    ] = None,
+    data: Annotated[
+        Optional[list[Path]],
+        typer.Option('-d', '--data', help='Path to data (.RAW/.mzML) file; repeatable [dim][default: experiment data files][/dim]')
+    ] = None,
     organism_tags: Annotated[
-        str,
-        typer.Option('--organism-tags', help='Comma-separated patterns to use for splitting FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>")')
-    ],
-    output: Annotated[
-        Path | None,
-        typer.Option('-o', '--out-dir', help='Root output directory', file_okay=False, dir_okay=True, writable=True)
+        Optional[str],
+        typer.Option('-o', '--organism-tags', help='Patterns to split FASTA file by organism (e.g. "org1, <pattern1>, org2, <pattern2>") [dim][default: experiment organism tags][/dim]')
+    ] = None,
+    experiment_dir: Annotated[
+        Optional[Path],
+        typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
     param_medic: Annotated[
         bool,
@@ -60,13 +60,14 @@ def pipeline(
     threads: Annotated[
         int,
         typer.Option('--threads', help='Number of threads to use', min=1)
-    ] = config['search']['threads'],
+    ] = None,
 ):
+    ctx = ExperimentContext.resolve(experiment_dir)
     pipelineFuncs.run_pipeline(
         sample_sheet=sample_sheet,
         database=database,
-        input_dir=input,
-        output_dir=output,
+        data=data,
+        ctx=ctx,
         param_medic=param_medic,
         skip_convert=skip_convert,
         skip_lfq=skip_lfq,

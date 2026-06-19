@@ -15,7 +15,7 @@ from typing import Annotated
 
 # -- Import internal functions
 from comms.utils.log import logMsg
-from comms.utils.settings import loadDefaultConfig, userConfigPath
+from comms.utils.settings import loadDefaultConfig, globalConfigPath
 
 # -- Define modification constants
 CARBAMIDOMETHYL_MOD = 'C+57.0215'    # static carbamidomethylation of Cys
@@ -39,57 +39,56 @@ SCORE_FUNC_LOW_RES = 'combined-p-value'    # low-resolution instruments
 # ========================= #
 # DEFINE CONFIG SUBCOMMANDS #
 # ========================= #
-# -- config_init: creates a user config file with default settings in the OS config directory
-def config_init():
+# -- config_init: creates a config file with default settings in the OS config directory
+def config_init(config_path: Path | None = None):
     logMsg('config')
-    logMsg.debug(f'Checking config path: {userConfigPath()}')
-    config_path = userConfigPath()
+    config_path = config_path or globalConfigPath()
+    logMsg.debug(f'Checking config path: {config_path}')
     if not _configCheck(config_path, exists=False):
         raise SystemExit(1)
     try:
         logMsg.progress(f'Writing default config to {config_path}')
-        defaults = loadDefaultConfig()
-        _writeConfig(defaults)
-        logMsg.info(f'User config file written to {config_path}')
+        _writeConfigTo(loadDefaultConfig(), config_path)
+        logMsg.info(f'Config file written to {config_path}')
     except Exception as e:
         logMsg.error(f'Failed to write config: {e}')
         raise SystemExit(1)
 
-# -- config_exists: reports whether a user config file exists and prints its path
-def config_exists():
+# -- config_exists: reports whether a config file exists and prints its path
+def config_exists(config_path: Path | None = None):
     logMsg('config')
-    logMsg.debug(f'Checking for user config at {userConfigPath()}')
-    config_path = userConfigPath()
+    config_path = config_path or globalConfigPath()
+    logMsg.debug(f'Checking for config at {config_path}')
     if config_path.exists():
-        logMsg.info(f'User config file found at {config_path}')
+        logMsg.info(f'Config file found at {config_path}')
     else:
-        logMsg.error(f'No user config at {config_path}')
+        logMsg.error(f'No config file at {config_path}')
         raise SystemExit(1)
 
 # -- config_list: prints current config values, highlighting differences from bundled defaults
-def config_list():
+def config_list(config_path: Path | None = None):
     logMsg('config')
     logMsg.debug(f'Listing config values')
-    config_path = userConfigPath()
+    config_path = config_path or globalConfigPath()
     default_config = _flatten(loadDefaultConfig())
     if _configCheck(config_path, exists=True):
         print(f'[bold blue]Current config:[/bold blue] [cyan]{config_path}[/cyan]\n')
-        current_config = _flatten(_loadUserConfig())
+        current_config = _flatten(_loadConfigFile(config_path))
     else:
         print(f'[bold blue]Current config:[/bold blue] built-in defaults\n')
         current_config = default_config
     _printTable(current_config, default_config)
     print()
 
-# -- config_verify: checks that all expected keys are present in the user config file
-def config_verify():
+# -- config_verify: checks that all expected keys are present in the config file
+def config_verify(config_path: Path | None = None):
     logMsg('config')
-    logMsg.debug(f'Verifying config keys at {userConfigPath()}')
-    config_path = userConfigPath()
+    config_path = config_path or globalConfigPath()
+    logMsg.debug(f'Verifying config keys at {config_path}')
     if not _configCheck(config_path, exists=True):
-        logMsg.error(f'No user config to verify at {config_path}')
+        logMsg.error(f'No config to verify at {config_path}')
         raise SystemExit(1)
-    user_config = _flatten(_loadUserConfig())
+    user_config = _flatten(_loadConfigFile(config_path))
     default_config = _flatten(loadDefaultConfig())
     missing = [k for k in default_config if k not in user_config]
     unexpected = [k for k in user_config if k not in default_config]
@@ -98,36 +97,37 @@ def config_verify():
         return
     logMsg.error(f'User config invalid: {len(missing)} missing, {len(unexpected)} unexpected key(s)')
     if missing:
-        logMsg.warn(f'Missing keys in user config: {missing}')
+        logMsg.warn(f'Missing keys in config: {missing}')
         print(f'[bold red]ERROR:[/bold red] {len(missing)} missing key(s):')
         for k in sorted(missing):
             print(f'\t[red]✗[/red] {k} [dim](expected: {default_config[k]})[/dim]')
     if unexpected:
-        logMsg.warn(f'Unexpected keys in user config: {unexpected}')
+        logMsg.warn(f'Unexpected keys in config: {unexpected}')
         print(f'[bold red]ERROR:[/bold red] {len(unexpected)} unexpected key(s):')
         for k in sorted(unexpected):
             print(f'\t[red]?[/red] {k}: {user_config[k]}')
     print(f'Run [bold]comms config reset[/bold] to restore defaults.\n')
     raise SystemExit(1)
 
-# -- config_reset: overwrites the user config file with comMS built-in defaults
-def config_reset(force: bool = False):
+# -- config_reset: overwrites the config file with comMS built-in defaults
+def config_reset(config_path: Path | None = None, force: bool = False):
     logMsg('config')
-    config_path = userConfigPath()
+    config_path = config_path or globalConfigPath()
     if not force:
         logMsg.warn(f'This will overwrite {config_path} with comMS defaults.')
         if not typer.confirm('All custom settings will be lost. Continue?'):
-            logMsg.debug(f'Reset cancelled by user')
+            logMsg.debug(f'Reset cancelled')
             raise SystemExit(0)
     try:
-        _writeConfig(loadDefaultConfig())
+        _writeConfigTo(loadDefaultConfig(), config_path)
         logMsg.info(f'{config_path} reset to comMS defaults')
     except Exception as e:
         logMsg.error(f'Failed to reset config: {e}')
         raise SystemExit(1)
 
-# -- config_set: apply named flags to the user config
+# -- config_set: apply named flags to the config
 def config_set(
+    config_path: Path | None = None,
     iodo: bool | None = None,
     low_res: bool | None = None,
     organism: list[str] | None = None,
@@ -145,16 +145,16 @@ def config_set(
     if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, custom, clip_met)):
         logMsg.error(f'No flags supplied to config set')
         raise SystemExit(1)
-    # Check if user config exists
-    config_path = userConfigPath()
+    # Check if  config exists
+    config_path = config_path or globalConfigPath()
     if not config_path.exists():
-        logMsg.debug(f'No user config found, creating from defaults at {config_path}')
-        _writeConfig(loadDefaultConfig())
-    # Load user config
+        logMsg.debug(f'No config found, creating from defaults at {config_path}')
+        _writeConfigTo(loadDefaultConfig(), path=config_path)
+    # Load config
     try:
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile(config_path)
     except Exception as e:
-        logMsg.error(f'Failed to read user config: {e}')
+        logMsg.error(f'Failed to read config file: {e}')
         raise SystemExit(1)
     # Apply any passed flags
     cfg = _apply_protocol_flags(
@@ -170,13 +170,13 @@ def config_set(
     if organism is not None:
         cfg = _apply_organism(cfg, _parse_organism_arg(organism))
     if custom is not None:
-        current = cfg.get('search', {}).get('custom_mods', '')
-        cfg.setdefault('search', {})['custom_mods'] = _apply_custom_mod(current, custom)
+        current = cfg.get('index', {}).get('custom_mods', '')
+        cfg.setdefault('index', {})['custom_mods'] = _apply_custom_mod(current, custom)
     # Write updated config
     try:
-        _writeConfig(cfg)
+        _writeConfigTo(cfg, config_path)
     except Exception as e:
-        logMsg.error(f'Failed to write user config: {e}')
+        logMsg.error(f'Failed to write config file: {e}')
         raise SystemExit(1)
     # Print summary
     _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, custom=custom, clip_met=clip_met)
@@ -186,11 +186,17 @@ def config_set(
 # ======================= #
 # DEFINE INTERNAL HELPERS #
 # ======================= #
-# -- _loadUserConfig: returns the user config as a dict
-def _loadUserConfig() -> dict:
-    config_path = userConfigPath()
+# -- _resolveConfigTarget: returns the Path to edit (global user config or a local file)
+def _resolveConfigTarget(target: str | None) -> Path:
+    if target is None or target.upper() == 'GLOBAL':
+        return globalConfigPath()
+    return Path(target)
+
+# -- _loadConfigFile: returns the config as a dict
+def _loadConfigFile(config_path: Path | None = None) -> dict:
+    config_path = config_path or globalConfigPath()
     if not config_path.exists():
-        raise FileNotFoundError(f'No user config found at {config_path}.')
+        raise FileNotFoundError(f'No config found at {config_path}.')
     with config_path.open('rb') as f:
         return tomllib.load(f)
 
@@ -200,9 +206,9 @@ def _writeConfigTo(config: dict, path: Path) -> None:
     with path.open('wb') as f:
         tomli_w.dump(config, f)
 
-# -- _writeConfig: writes config dict to the user config path
+# -- _writeConfig: writes config dict to the global config path
 def _writeConfig(config: dict):
-    _writeConfigTo(config, userConfigPath())
+    _writeConfigTo(config, globalConfigPath())
 
 # -- _flatten: returns a flat dict from a nested dict, with dot-separated keys
 def _flatten(d: dict, prefix: str = '') -> dict:
@@ -220,7 +226,7 @@ def _configCheck(config_path: Path, exists: bool) -> bool:
     if exists:
         if config_path.exists():
             return True
-        print(f'\n[bold yellow]WARNING:[/bold yellow] No user config at [cyan]{config_path}[/cyan]\nRun [bold]comms config init[/bold] to create one.\n')
+        print(f'\n[bold yellow]WARNING:[/bold yellow] No config at [cyan]{config_path}[/cyan]\nRun [bold]comms config init[/bold] to create one.\n')
         return False
     else:
         if config_path.exists():
@@ -430,28 +436,28 @@ def _printSetSummary(
     Print a summary of what config_set changed
     '''
     print()
-    _mod_summary_line(iodo, CARBAMIDOMETHYL_MOD, f'search.{'fixed_mods'}')
-    _mod_summary_line(ox, MET_OX_MOD, 'search.mods_spec')
-    _mod_summary_line(phos, PHOSPHO_MOD, 'search.mods_spec')
+    _mod_summary_line(iodo, CARBAMIDOMETHYL_MOD, f'index.{'fixed_mods'}')
+    _mod_summary_line(ox, MET_OX_MOD, 'index.mods_spec')
+    _mod_summary_line(phos, PHOSPHO_MOD, 'index.mods_spec')
     if custom is not None:
         if custom == '':
-            print(f'[bold green]✓[/bold green] Custom mods cleared: [dim]search.custom_mods[/dim] → [cyan](empty)[/cyan]')
+            print(f'[bold green]✓[/bold green] Custom mods cleared: [dim]index.custom_mods[/dim] → [cyan](empty)[/cyan]')
         else:
-            print(f'[bold green]✓[/bold green] Custom mod added: [dim]search.custom_mods[/dim] → [cyan]{custom}[/cyan]')
-    _mod_summary_line(n_cyc, NCYC_MOD, f'search.{'nterm_peptide_mods_spec'}')
-    _mod_summary_line(n_ace, NACE_MOD, f'search.{'nterm_protein_mods_spec'}')
+            print(f'[bold green]✓[/bold green] Custom mod added: [dim]index.custom_mods[/dim] → [cyan]{custom}[/cyan]')
+    _mod_summary_line(n_cyc, NCYC_MOD, f'index.{'nterm_peptide_mods_spec'}')
+    _mod_summary_line(n_ace, NACE_MOD, f'index.{'nterm_protein_mods_spec'}')
+    if clip_met is not None:
+        value = 'true' if clip_met else 'false'
+        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]index.clip_n_met[/dim] → to [cyan]{value}[/cyan]')
     if low_res is not None:
         if low_res:
-            print(f'[bold green]✓[/bold green] Low-resolution mode set: [dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], [dim]score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]')
+            print(f'[bold green]✓[/bold green] Low-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]')
         else:
-            print(f'[bold green]✓[/bold green] High-resolution mode set: [dim]mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], [dim]score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]')
+            print(f'[bold green]✓[/bold green] High-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]')
     if organism is not None:
         for item in organism:
             key, _, pattern = item.partition('=')
             key = ''.join(key.split())
             pattern = ''.join(pattern.split())
             print(f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]')
-    if clip_met is not None:
-        value = 'true' if clip_met else 'false'
-        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]clip_n_met[/dim] → to [cyan]{value}[/cyan]')
     print()

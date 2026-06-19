@@ -1,56 +1,86 @@
 '''
-comMS rescore functions
+src/comms/commands/rescore.py
 '''
 
 # -- Import external dependencies
+from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
-from rich import print
+from typing import Dict, Optional
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-from typing import Optional
 
 # -- Import internal functions
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import configureFileLogging, logMsg
-from comms.utils.settings import config
+from comms.utils.context import ExperimentContext, resolve_database, resolve_results_input
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then splits output by organism and runs assign-confidence per organism for per-organism q-values
-def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Optional[str] = None, in_pipeline: bool = False):
+# -- run_rescore: rescores all Tide-search PSM files using Percolator on the full combined database, then:
+# - single-species: run assign-confidence
+# - multi-species: split output by organism and run assign-confidence per organism for per-organism q-values
+def run_rescore(
+    input_dir,
+    database,
+    ctx: ExperimentContext,
+    organism_tags: Optional[str] = None,
+    in_pipeline: bool = False,
+):
     if not in_pipeline:
         logMsg('rescore')
     logMsg.debug('Started command: rescore')
-    crux_bin, _ = validate(check_crux=True)
-    logMsg.debug(f'Scanning {input_dir }for Tide-search PSMs')
+    crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
+    input_dir = resolve_results_input(ctx, 'search', input_dir)
+    database = resolve_database(ctx, database)
     target_files = sorted(input_dir.glob('[!.]*.tide-search.target.txt'))
     if not target_files:
         logMsg.error(f'No Tide-search target PSM files found in {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Rescoring {len(target_files)} PSM file(s)')
-    # Parse organism tags
-    logMsg.debug('Resolving organism tags')
-    if organism_tags:
-        organism_tags = _parseOrganismTags(organism_tags)
-    else:
-        if config['organism']:
-            organism_tags = config['organism']
-        else:
-            logMsg.error(f'No organism tags supplied and none found in config')
-            raise SystemExit(1)
-    logMsg.debug(f'Organism tags: {organism_tags}')
-    # Generate output file structure
-    out_dir = pathutil.generateOutputFileStructure(output, 'rescore')
+    # Resolve analysis mode
+    mode = ctx.analysis_mode
+    if mode is None:
+        mode = 'multi' if (organism_tags or ctx.config.get('organism')) else 'single'
+    multispecies = mode != 'single'
+    if not multispecies and organism_tags:
+        logMsg.warn('Single-species analysis: ignoring supplied organism tags')
+
+    out_dir = pathutil.generateOutputFileStructure(ctx.root, 'rescore')
     logMsg.debug(f'Output directory: {out_dir}')
     log_path = out_dir / 'rescore.log'
     configureFileLogging(log_path)
     logMsg.debug(f'Output log file: {log_path}')
-    # Build per-organism sub-FASTAs (used by assign-confidence in round 2)
-    sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
-    logMsg.debug(f'Built {len(sub_fastas)} per-organism sub-FASTA(s)')
     # Round 1: Percolator on the full combined database, with one call per sample file
-    logMsg.progress(f'Round 1: Rescoring {len(target_files)} file(s) using full combined database')
+    combined_target_files = _run_percolator_round(
+        crux_bin, target_files, database, out_dir, ctx
+    )
+    if not combined_target_files:
+        logMsg.error('No combined Percolator output found after round 1, cannot continue')
+        raise SystemExit(1)
+    # Round 2: branch on analysis mode
+    if multispecies:
+        organism_tags = (
+            _parseOrganismTags(organism_tags)
+            if organism_tags
+            else ctx.config.get('organism')
+        )
+        if not organism_tags:
+            logMsg.error('No organism tags supplied or configured for multi-species analysis')
+            raise SystemExit(1)
+        logMsg.debug(f'Organism tags: {organism_tags}')
+        sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
+        logMsg.debug(f'Built {len(sub_fastas)} per-organism sub-FASTA(s)')
+        _assign_confidence_per_organism(
+            crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir
+        )
+    else:
+        _assign_confidence_single(crux_bin, combined_target_files, out_dir)
+    logMsg.debug('Finished command: rescore')
+
+# -- _run_percolator_round: returns list of PSM files after runn Percolator (via Crux) on database, with one call per sample file
+def _run_percolator_round(crux_bin, target_files, database, out_dir, ctx) -> list:
+    logMsg.progress(f'Round 1: rescoring {len(target_files)} file(s) using the combined database')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for target_file in tqdm(target_files, desc='Files rescored'):
@@ -62,22 +92,19 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=config,
+                config=ctx.config,
             )
             if ok:
                 n_ok += 1
                 logMsg.debug(f'Round 1: rescored {target_file.name} saved to {out_dir / fileroot}.percolator.target.psms.txt')
             else:
-                logMsg.warn(f'Round 1: rescoring failed for {target_file.name}')
                 n_fail += 1
+                logMsg.warn(f'Round 1: rescoring failed for {target_file.name}')
     logMsg.info(f'Round 1 complete: {n_ok} succeeded, {n_fail} failed')
-    # Collect the combined Percolator outputs for splitting
-    combined_target_files = sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
-    if not combined_target_files:
-        logMsg.error('Round 2: no combined Percolator output files found after round 1, cannot continue')
-        raise SystemExit(1)
-    
-    # Round 2: split Percolator output by organism prefix, then run assign-confidence per organism for per-organism PSM-level q-values
+    return sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
+
+# -- _assign_confidence_per_organism: returns None but splits combined Percolator outputs by organism and runs assign-confidence
+def _assign_confidence_per_organism(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir):
     logMsg.progress(f'Round 2: splitting and assigning confidence to {len(combined_target_files)} file(s)')
     ac_n_ok, ac_n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -114,14 +141,32 @@ def run_rescore(input_dir: Path, database: Path, output: Path, organism_tags: Op
                 )
                 if ok:
                     ac_n_ok += 1
-                    logMsg.debug(
-                        f'Round 2: processed {combined_file.name} saved to {org_out_dir / ac_fileroot}.assign-confidence.target.txt'
-                    )
+                    logMsg.debug(f'Round 2: processed {combined_file.name} saved to {org_out_dir / ac_fileroot}.assign-confidence.target.txt')
                 else:
-                    logMsg.warn(f'Round 2: processing failed for {label}: {org_target.name}')
                     ac_n_fail += 1
+                    logMsg.warn(f'Round 2: processing failed for {label}: {org_target.name}')
     logMsg.info(f'Round 2 complete: {ac_n_ok} succeeded, {ac_n_fail} failed')
-    logMsg.debug(f'Finished command: rescore')
+
+# _assign_confidence_single: returns None but runs assign-confidence on Percolator output
+def _assign_confidence_single(crux_bin, combined_target_files, out_dir):
+    logMsg.progress(f'Assigning confidence to {len(combined_target_files)} file(s)')
+    n_ok, n_fail = 0, 0
+    with logging_redirect_tqdm():
+        for combined_file in tqdm(combined_target_files, desc='Files processed'):
+            fileroot = combined_file.name.removesuffix('.percolator.target.psms.txt')
+            ok = cruxutil.assignConfidence(
+                crux_bin=crux_bin,
+                target_psm_file=combined_file,
+                out_dir=out_dir,
+                fileroot=fileroot,
+            )
+            if ok:
+                n_ok += 1
+                logMsg.debug(f'Round 2: processed {combined_file.name} saved to {out_dir / fileroot}.assign-confidence.target.txt')
+            else:
+                n_fail += 1
+                logMsg.warn(f'assign-confidence failed for {combined_file.name}')
+    logMsg.info(f'assign-confidence complete: {n_ok} succeeded, {n_fail} failed')
 
 # -- _splitPsmsByOrganism: returns True on success, False on any file error
 def _splitPsmsByOrganism(

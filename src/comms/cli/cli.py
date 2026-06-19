@@ -49,16 +49,24 @@ comms.add_typer(commsRescore)
 comms.add_typer(commsLfq)
 comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
-comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='Utilities')
+comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='comMS Configuration')
 comms.add_typer(commsLicense)
 comms.add_typer(commsUninstall)
 comms.add_typer(commsVersion)
 
 # -- Register experiment command
-@comms.command(rich_help_panel='Utilities')
-def experiment():
-    '''Launch the experiment setup GUI to build a sample sheet and config'''
-    experimentFuncs.launch_experiment_gui()
+@comms.command(rich_help_panel='comMS Configuration')
+def experiment(
+    headless: Annotated[
+        bool,
+        typer.Option('--headless', help='Run setup in terminal instead of GUI')
+    ] = False,
+):
+    '''Set up a comMS experiment (sample sheet + config + metadata)'''
+    if headless:
+        experimentFuncs.run_experiment_headless()
+    else:
+        experimentFuncs.launch_experiment_gui()
 
 # ====================
 # Top-level callback: --verbose / --debug flags

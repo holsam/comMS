@@ -252,6 +252,18 @@ class TestCheckCrux:
             with pytest.raises(SystemExit):
                 _check_crux(tmp_path, allow_lfq=False)
 
+    def test_not_found_error_names_all_resolution_sources(self, tmp_path, caplog):
+        '''The not-found error should mention experiment.toml, COMMS_BIN_DIR
+        and the walk-up path so the user knows all three ways to fix it'''
+        with patch('comms.utils.validate._find_all_crux', return_value=[]), \
+             caplog.at_level(logging.ERROR):
+            with pytest.raises(SystemExit):
+                _check_crux(tmp_path, allow_lfq=False)
+        error_text = caplog.text.lower()
+        assert 'experiment' in error_text or 'experiment.toml' in error_text
+        assert 'comms_bin_dir' in error_text
+        assert str(tmp_path).lower() in error_text
+
     def test_raises_when_all_versions_unparseable(self, tmp_path):
         candidates = [_fake_bin(tmp_path, 'crux')]
         with self._patches(tmp_path, candidates, {'crux': None}):
@@ -337,6 +349,18 @@ class TestCheckTrfp:
         with patch('comms.utils.validate._find_all_trfp', return_value=[]):
             with pytest.raises(SystemExit):
                 _check_trfp(tmp_path)
+
+    def test_not_found_error_names_all_resolution_sources(self, tmp_path, caplog):
+        '''The not-found error should mention experiment.toml, COMMS_BIN_DIR
+        and the walk-up path so the user knows all three ways to fix it'''
+        with patch('comms.utils.validate._find_all_trfp', return_value=[]), \
+             caplog.at_level(logging.ERROR):
+            with pytest.raises(SystemExit):
+                _check_trfp(tmp_path)
+        error_text = caplog.text.lower()
+        assert 'experiment' in error_text or 'experiment.toml' in error_text
+        assert 'comms_bin_dir' in error_text
+        assert str(tmp_path).lower() in error_text
 
     def test_raises_when_all_versions_unparseable(self, tmp_path):
         candidate = _fake_bin(tmp_path, 'ThermoRawFileParser.exe')
@@ -554,3 +578,71 @@ class TestValidate:
                 validate(check_trfp=True)
         assert any(r.levelno >= logging.ERROR for r in caplog.records)
         assert 'Mono not found' in caplog.text
+
+class TestValidateBinDirForwarding:
+    '''
+    Tests that validate() passes its bin_dir argument to repoBinDir as the experiment_bin_dir keyword, allowing the experiment context to override binary resolution without environment variables
+    '''
+    @pytest.fixture(autouse=True)
+    def init_logmsg(self):
+        logMsg('validate')
+
+    def test_bin_dir_forwarded_to_repobindir(self, tmp_path):
+        '''validate(bin_dir=<path>) calls repoBinDir(experiment_bin_dir=<path>)'''
+        fake_crux = tmp_path / 'crux'
+        fake_crux.touch()
+        with patch('comms.utils.validate.pathutil.repoBinDir',
+                   return_value=tmp_path) as mock_rbd, \
+             patch('comms.utils.validate._find_all_crux',
+                   return_value=[fake_crux]), \
+             patch('comms.utils.validate._get_crux_version',
+                   return_value=(4, 3, 2)):
+            validate(check_crux=True, bin_dir=tmp_path)
+        mock_rbd.assert_called_once_with(experiment_bin_dir=tmp_path)
+
+    def test_none_bin_dir_forwards_none(self, tmp_path):
+        '''validate(bin_dir=None) calls repoBinDir(experiment_bin_dir=None), which then falls through to env-var / walk-up resolution'''
+        fake_crux = tmp_path / 'crux'
+        fake_crux.touch()
+        with patch('comms.utils.validate.pathutil.repoBinDir',
+                   return_value=tmp_path) as mock_rbd, \
+             patch('comms.utils.validate._find_all_crux',
+                   return_value=[fake_crux]), \
+             patch('comms.utils.validate._get_crux_version',
+                   return_value=(4, 3, 2)):
+            validate(check_crux=True)
+        mock_rbd.assert_called_once_with(experiment_bin_dir=None)
+
+    def test_bin_dir_reaches_check_crux(self, tmp_path):
+        '''The resolved bin_dir is passed into _find_all_crux as its search root'''
+        exp_bin = tmp_path / 'experiment_bin'
+        exp_bin.mkdir()
+        fake_crux = exp_bin / 'crux'
+        fake_crux.touch()
+        with patch('comms.utils.validate.pathutil.repoBinDir',
+                   return_value=exp_bin), \
+             patch('comms.utils.validate._find_all_crux',
+                   return_value=[fake_crux]) as mock_find, \
+             patch('comms.utils.validate._get_crux_version',
+                   return_value=(4, 3, 2)):
+            validate(check_crux=True, bin_dir=exp_bin)
+        mock_find.assert_called_once_with(exp_bin)
+
+    def test_bin_dir_reaches_check_trfp(self, tmp_path):
+        '''The resolved bin_dir is passed into _find_all_trfp as its search root'''
+        exp_bin = tmp_path / 'experiment_bin'
+        exp_bin.mkdir()
+        fake_trfp = exp_bin / 'ThermoRawFileParser'
+        fake_trfp.touch()
+        with patch('comms.utils.validate.pathutil.repoBinDir',
+                   return_value=exp_bin), \
+             patch('comms.utils.validate._find_all_trfp',
+                   return_value=[fake_trfp]) as mock_find, \
+             patch('comms.utils.validate._get_trfp_version',
+                   return_value=(2, 0, 0)), \
+             patch('comms.utils.validate.platform.system',
+                   return_value='Linux'), \
+             patch('comms.utils.validate.shutil.which',
+                   return_value='/usr/bin/mono'):
+            validate(check_trfp=True, bin_dir=exp_bin)
+        mock_find.assert_called_once_with(exp_bin)

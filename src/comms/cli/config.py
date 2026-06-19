@@ -12,6 +12,12 @@ from comms.commands import config as configFuncs
 # -- Initialise config Typer class
 commsConfig = typer.Typer(add_completion=False, invoke_without_command=True)
 
+# Define config file option used in all commands
+_CONFIG_OPT = typer.Option(
+    '-c', '--config',
+    help="Config file to edit; a path, or 'global' for the user config [default: global]",
+)
+
 # -- Define config callback
 @commsConfig.callback(invoke_without_command=True)
 def config_callback(ctx: typer.Context) -> None:
@@ -20,42 +26,44 @@ def config_callback(ctx: typer.Context) -> None:
 
 # -- Define config command: init
 @commsConfig.command(rich_help_panel='Config Commands')
-def init():
+def init(config: Annotated[Optional[str], _CONFIG_OPT] = None):
     '''Create a user config file with default settings in the OS config directory'''
-    configFuncs.config_init()
+    configFuncs.config_init(config_path=configFuncs._resolveConfigTarget(config))
 
 # -- Define config command: exists
 @commsConfig.command(rich_help_panel='Config Commands')
-def exists():
+def exists(config: Annotated[Optional[str], _CONFIG_OPT] = None):
     '''Report whether a user config file exists and print its path'''
-    configFuncs.config_exists()
+    configFuncs.config_exists(config_path=configFuncs._resolveConfigTarget(config))
 
 # -- Define config command: list
 @commsConfig.command(rich_help_panel='Config Commands')
-def list():
+def list(config: Annotated[Optional[str], _CONFIG_OPT] = None):
     '''Print current config values, highlighting differences from bundled defaults'''
-    configFuncs.config_list()
+    configFuncs.config_list(config_path=configFuncs._resolveConfigTarget(config))
 
 # -- Define config command: verify
 @commsConfig.command(rich_help_panel='Config Commands')
-def verify():
+def verify(config: Annotated[Optional[str], _CONFIG_OPT] = None):
     '''Check that all expected keys are present in the user config file'''
-    configFuncs.config_verify()
+    configFuncs.config_verify(config_path=configFuncs._resolveConfigTarget(config))
 
 # -- Define config command: reset
 @commsConfig.command(rich_help_panel='Config Commands')
 def reset(
+    config: Annotated[Optional[str], _CONFIG_OPT] = None,
     force: Annotated[
         bool,
         typer.Option('--force', help='Skip confirmation and immediately overwrite config.toml')
     ] = False
 ):
     '''Overwrite the user config file with comMS built-in defaults'''
-    configFuncs.config_reset(force=force)
+    configFuncs.config_reset(config_path=configFuncs._resolveConfigTarget(config), force=force)
 
 # -- Define config command: set
 @commsConfig.command(rich_help_panel='Config Commands')
 def set(
+    config: Annotated[Optional[str], _CONFIG_OPT] = None,
     iodo: Annotated[
         Optional[bool],
         typer.Option('--iodo/--no-iodo', help='Add (--iodo) or remove (--no-iodo) carbamidomethylation of cysteine as a static modification'),
@@ -97,6 +105,7 @@ def set(
     Set values in user configuration file
     '''
     configFuncs.config_set(
+        config_path=configFuncs._resolveConfigTarget(config),
         iodo=iodo,
         ox=ox,
         phos=phos,

@@ -11,7 +11,7 @@ from comms.commands.config import CARBAMIDOMETHYL_MOD, MET_OX_MOD, PHOSPHO_MOD, 
 
 # -- Import internal functions
 import comms.utils.settings as settings
-from comms.commands.config import _apply_custom_mod, _apply_iodo, _apply_mod, _apply_organism, _apply_protocol_flags, _flatten, _configCheck, _loadUserConfig, _parse_organism_arg, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
+from comms.commands.config import _apply_custom_mod, _apply_iodo, _apply_mod, _apply_organism, _apply_protocol_flags, _flatten, _configCheck, _loadConfigFile, _parse_organism_arg, _resolveConfigTarget, _writeConfig, config_init, config_exists, config_list, config_verify, config_reset, config_set
 
 # -- Define fixture for initialised user config file
 @pytest.fixture()
@@ -22,6 +22,32 @@ def initialised_config(isolated_config_dir):
     '''
     config_init()
     return isolated_config_dir
+
+# -- Define tests for resolving targeted config file
+class TestResolveConfigTarget:
+    def test_none_is_global(self):
+        from comms.utils.settings import globalConfigPath
+        assert _resolveConfigTarget(None) == globalConfigPath()
+
+    def test_global_keyword_case_insensitive(self):
+        from comms.utils.settings import globalConfigPath
+        assert _resolveConfigTarget('GLOBAL') == globalConfigPath()
+        assert _resolveConfigTarget('global') == globalConfigPath()
+
+    def test_path_is_returned_verbatim(self, tmp_path):
+        target = tmp_path / 'comms' / 'config.toml'
+        assert _resolveConfigTarget(str(target)) == target
+
+# -- Define tests for setting local target config file
+class TestConfigSetLocalTarget:
+    def test_set_writes_to_local_path(self, tmp_path):
+        local = tmp_path / 'comms' / 'config.toml'
+        config_set(iodo=True, config_path=local)
+        assert local.exists()
+        import tomllib
+        with local.open('rb') as f:
+            cfg = tomllib.load(f)
+        assert 'index' in cfg
 
 # -- Define tests for default config file structure
 class TestLoadDefaultConfig:
@@ -119,27 +145,27 @@ class TestWriteLoadConfig:
     def test_write_and_reload_preserves_content(self, isolated_config_dir):
         defaults = settings.loadDefaultConfig()
         _writeConfig(defaults)
-        loaded = _loadUserConfig()
+        loaded = _loadConfigFile()
         assert loaded == defaults
 
     def test_load_raises_when_no_config(self, isolated_config_dir):
         with pytest.raises(FileNotFoundError):
-            _loadUserConfig()
+            _loadConfigFile()
 
 # -- Define tests for config init subcommand
 class TestConfigInit:
     def test_creates_config_file(self, isolated_config_dir):
         config_init()
-        assert settings.userConfigPath().exists()
+        assert settings.globalConfigPath().exists()
 
     def test_created_file_is_valid_toml(self, isolated_config_dir):
         config_init()
-        with settings.userConfigPath().open('rb') as f:
+        with settings.globalConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
     def test_does_not_overwrite_existing(self, initialised_config):
-        settings.userConfigPath().write_text('[global]\nverbose = true\n')
+        settings.globalConfigPath().write_text('[global]\nverbose = true\n')
         with pytest.raises(SystemExit) as exc:
             config_init()
         assert exc.value.code != 0
@@ -161,7 +187,7 @@ class TestConfigVerify:
 
     def test_missing_key_exits_nonzero(self, initialised_config):
         # Remove one required key by writing a truncated config
-        settings.userConfigPath().write_text('[global]\nverbose = false\n')
+        settings.globalConfigPath().write_text('[global]\nverbose = false\n')
         with pytest.raises(SystemExit) as exc:
             config_verify()
         assert exc.value.code != 0
@@ -175,9 +201,9 @@ class TestConfigVerify:
 class TestConfigReset:
     def test_reset_with_force_restores_defaults(self, initialised_config):
         # Corrupt the config
-        settings.userConfigPath().write_text('[global]\nverbose = true\n')
+        settings.globalConfigPath().write_text('[global]\nverbose = true\n')
         config_reset(force=True)
-        assert _loadUserConfig() == settings.loadDefaultConfig()
+        assert _loadConfigFile() == settings.loadDefaultConfig()
 
     def test_reset_without_force_prompts(self, initialised_config, monkeypatch):
         # Simulate user declining the prompt
@@ -187,10 +213,10 @@ class TestConfigReset:
         assert exc.value.code in (0, None)
 
     def test_reset_without_force_proceeds_on_confirm(self, isolated_config_dir, monkeypatch):
-        settings.userConfigPath().write_text('[global]\nverbose = true\n')
+        settings.globalConfigPath().write_text('[global]\nverbose = true\n')
         monkeypatch.setattr('typer.confirm', lambda *a, **kw: True)
         config_reset(force=False)
-        assert _loadUserConfig() == settings.loadDefaultConfig()
+        assert _loadConfigFile() == settings.loadDefaultConfig()
 
 # -- Define tests for _apply_custom_mod_mod helper function
 class TestApplyCustom:
@@ -538,60 +564,60 @@ class TestConfigSet:
     def test_creates_config_if_absent(self, isolated_config_dir):
         '''config_set should auto-create the user config if none exists'''
         config_set(iodo=True)
-        assert settings.userConfigPath().exists()
+        assert settings.globalConfigPath().exists()
 
     def test_created_config_is_valid_toml(self, isolated_config_dir):
         config_set(iodo=True)
-        with settings.userConfigPath().open('rb') as f:
+        with settings.globalConfigPath().open('rb') as f:
             result = tomllib.load(f)
         assert isinstance(result, dict)
 
     def test_low_res_sets_bin_width_and_score(self, initialised_config):
         config_set(low_res=True)
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_high_res_sets_bin_width_and_score(self, initialised_config):
         config_set(low_res=False)
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_HIGH_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_HIGH_RES
 
     def test_low_res_is_idempotent(self, initialised_config):
         config_set(low_res=True)
         config_set(low_res=True)
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['search']['mz_bin_width']   == MZ_BIN_WIDTH_LOW_RES
         assert cfg['search']['score_function'] == SCORE_FUNC_LOW_RES
 
     def test_sets_organism_in_config(self, initialised_config):
         config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['organism'] == {'Test1': 'TEST1', 'Test2': 'TEST2'}
     
     def test_set_organism_replaces_existing(self, initialised_config):
         config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
         config_set(organism=['Test1=NEWTEST1'])
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['organism'] == {'Test1': 'NEWTEST1'}
         assert 'Test2' not in cfg['organism']
 
     def test_organism_section_written_as_toml_table(self, initialised_config):
         config_set(organism=['Test1=TEST1', 'Test2=TEST2'])
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert isinstance(cfg['organism'], dict)
         assert isinstance(cfg['organism']['Test1'], str)
 
     def test_combined_organism_and_low_res(self, initialised_config):
         config_set(low_res=True, organism=['Test1=TEST1'])
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['organism'] == {'Test1': 'TEST1'}
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_LOW_RES
 
     def test_combined_organism_and_high_res(self, initialised_config):
         config_set(low_res=False, organism=['Test1=TEST1'])
-        cfg = _loadUserConfig()
+        cfg = _loadConfigFile()
         assert cfg['organism'] == {'Test1': 'TEST1'}
         assert cfg['search']['mz_bin_width'] == MZ_BIN_WIDTH_HIGH_RES
 
@@ -601,9 +627,9 @@ class TestConfigSet:
         assert exc.value.code!= 0
 
     def test_all_other_config_keys_unchanged_after_set(self, initialised_config):
-        before = _loadUserConfig()
+        before = _loadConfigFile()
         config_set(low_res=True)
-        after = _loadUserConfig()
+        after = _loadConfigFile()
         for section, values in before.items():
             if section == 'search':
                 for key, val in values.items():
@@ -617,9 +643,9 @@ class TestConfigSet:
                 )
 
     def test_other_sections_unchanged_after_organism_set(self, initialised_config):
-        before = _loadUserConfig()
+        before = _loadConfigFile()
         config_set(organism=['Mt=MEDTR'])
-        after = _loadUserConfig()
+        after = _loadConfigFile()
         for section in ('search', 'percolator', 'quantify', 'convert', 'global'):
             assert after.get(section) == before.get(section), (
                 f'config_set --organism unexpectedly changed section [{section}]'
@@ -627,98 +653,103 @@ class TestConfigSet:
     
     def test_iodo_adds_carbamidomethyl_to_fixed_mods(self, initialised_config):
         config_set(iodo=True)
-        assert CARBAMIDOMETHYL_MOD in _loadUserConfig()['index']['fixed_mods']
+        assert CARBAMIDOMETHYL_MOD in _loadConfigFile()['index']['fixed_mods']
 
     def test_no_iodo_removes_carbamidomethyl_from_fixed_mods(self, initialised_config):
         config_set(iodo=True)
         config_set(iodo=False)
-        assert CARBAMIDOMETHYL_MOD not in _loadUserConfig()['index']['fixed_mods']
+        assert CARBAMIDOMETHYL_MOD not in _loadConfigFile()['index']['fixed_mods']
 
     def test_iodo_does_not_add_to_mods_spec(self, initialised_config):
-        before_mods = _loadUserConfig()['index']['mods_spec']
+        before_mods = _loadConfigFile()['index']['mods_spec']
         config_set(iodo=True)
-        assert _loadUserConfig()['index']['mods_spec'] == before_mods
+        assert _loadConfigFile()['index']['mods_spec'] == before_mods
 
     def test_iodo_is_idempotent(self, initialised_config):
         config_set(iodo=True)
         config_set(iodo=True)
-        assert _loadUserConfig()['index']['fixed_mods'].count(CARBAMIDOMETHYL_MOD) == 1
+        assert _loadConfigFile()['index']['fixed_mods'].count(CARBAMIDOMETHYL_MOD) == 1
 
     def test_ox_adds_met_mod(self, initialised_config):
         config_set(ox=True)
-        assert MET_OX_MOD in _loadUserConfig()['index']['mods_spec']
+        assert MET_OX_MOD in _loadConfigFile()['index']['mods_spec']
 
     def test_no_ox_removes_met_mod(self, initialised_config):
         config_set(ox=True)
         config_set(ox=False)
-        assert MET_OX_MOD not in _loadUserConfig()['index']['mods_spec']
+        assert MET_OX_MOD not in _loadConfigFile()['index']['mods_spec']
 
     def test_ox_is_idempotent(self, initialised_config):
         config_set(ox=True)
         config_set(ox=True)
-        assert _loadUserConfig()['index']['mods_spec'].count(MET_OX_MOD) == 1
+        assert _loadConfigFile()['index']['mods_spec'].count(MET_OX_MOD) == 1
 
     def test_phos_adds_phos_mod(self, initialised_config):
         config_set(phos=True)
-        assert PHOSPHO_MOD in _loadUserConfig()['index']['mods_spec']
+        assert PHOSPHO_MOD in _loadConfigFile()['index']['mods_spec']
 
     def test_no_phos_removes_phos_mod(self, initialised_config):
         config_set(phos=True)
         config_set(phos=False)
-        assert PHOSPHO_MOD not in _loadUserConfig()['index']['mods_spec']
+        assert PHOSPHO_MOD not in _loadConfigFile()['index']['mods_spec']
 
     def test_n_cyc_adds_to_nterm_peptide_spec(self, initialised_config):
         config_set(n_cyc=True)
-        assert NCYC_MOD in _loadUserConfig()['index']['nterm_peptide_mods_spec']
+        assert NCYC_MOD in _loadConfigFile()['index']['nterm_peptide_mods_spec']
 
     def test_no_n_cyc_removes_from_nterm_peptide_spec(self, initialised_config):
         config_set(n_cyc=True)
         config_set(n_cyc=False)
-        assert NCYC_MOD not in _loadUserConfig()['index']['nterm_peptide_mods_spec']
+        assert NCYC_MOD not in _loadConfigFile()['index']['nterm_peptide_mods_spec']
 
     def test_n_ace_adds_to_nterm_protein_spec(self, initialised_config):
         config_set(n_ace=True)
-        assert NACE_MOD in _loadUserConfig()['index']['nterm_protein_mods_spec']
+        assert NACE_MOD in _loadConfigFile()['index']['nterm_protein_mods_spec']
 
     def test_no_n_ace_removes_from_nterm_protein_spec(self, initialised_config):
         config_set(n_ace=True)
         config_set(n_ace=False)
-        assert NACE_MOD not in _loadUserConfig()['index']['nterm_protein_mods_spec']
+        assert NACE_MOD not in _loadConfigFile()['index']['nterm_protein_mods_spec']
 
     def test_custom_adds_entry(self, initialised_config):
         config_set(custom='1K+28.0313')
-        assert '1K+28.0313' in _loadUserConfig()['search']['custom_mods']
+        assert '1K+28.0313' in _loadConfigFile()['index']['custom_mods']
 
     def test_custom_is_additive(self, initialised_config):
         config_set(custom='1K+28.0313')
         config_set(custom='1R+14.0157')
-        mods = _loadUserConfig()['search']['custom_mods']
+        mods = _loadConfigFile()['index']['custom_mods']
         assert '1K+28.0313' in mods
         assert '1R+14.0157' in mods
 
     def test_custom_empty_string_clears_all(self, initialised_config):
         config_set(custom='1K+28.0313')
         config_set(custom='')
-        assert _loadUserConfig()['search']['custom_mods'] == ''
+        assert _loadConfigFile()['index']['custom_mods'] == ''
 
     def test_custom_managed_mod_not_added(self, initialised_config):
         config_set(custom='1M+15.9949')
-        assert '1M+15.9949' not in _loadUserConfig()['search']['custom_mods']
+        assert '1M+15.9949' not in _loadConfigFile()['index']['custom_mods']
+
+    def test_custom_reaches_resolved_modifications(self, initialised_config):
+            config_set(custom='1K+28.0313')
+            cfg = _loadConfigFile()
+            assert '1K+28.0313' in settings.resolvedModifications(cfg)
 
     def test_n_cyc_does_not_change_mods_spec(self, initialised_config):
-        before = _loadUserConfig()['index']['mods_spec']
+        before = _loadConfigFile()['index']['mods_spec']
         config_set(n_cyc=True)
-        assert _loadUserConfig()['index']['mods_spec'] == before
+        assert _loadConfigFile()['index']['mods_spec'] == before
 
     def test_n_ace_does_not_change_mods_spec(self, initialised_config):
-        before = _loadUserConfig()['index']['mods_spec']
+        before = _loadConfigFile()['index']['mods_spec']
         config_set(n_ace=True)
-        assert _loadUserConfig()['index']['mods_spec'] == before
+        assert _loadConfigFile()['index']['mods_spec'] == before
 
     def test_all_other_config_keys_unchanged_after_new_mod_set(self, initialised_config):
-        before = _loadUserConfig()
+        before = _loadConfigFile()
         config_set(ox=True, phos=True, n_cyc=True, n_ace=True)
-        after = _loadUserConfig()
+        after = _loadConfigFile()
         for section, values in before.items():
             if section == 'index':
                 for key, val in values.items():

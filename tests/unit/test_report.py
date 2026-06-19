@@ -52,8 +52,8 @@ class TestWriteIndex:
 # -- Define shared fixtures
 # -- _make_quantify_dir: returns Path to example quantify output
 def _make_quantify_dir(tmp_path: Path) -> Path:
-    d = tmp_path / 'quantify'
-    d.mkdir()
+    d = tmp_path / 'comms/results/quantify'
+    d.mkdir(parents=True, exist_ok=True)
     (d / 'sample1.spectral-counts.target.txt').write_text(
         'ProteinId\tProteinGroupId\tq-value\tpeptideIds\tspec_count_all\n'
         'Mtrun001\tMtrun001\t0.001\tPEP1 PEP2\t5\n'
@@ -61,7 +61,8 @@ def _make_quantify_dir(tmp_path: Path) -> Path:
     return d
 # _make_sample_sheet: returns Path to example sample sheet
 def _make_sample_sheet(tmp_path: Path) -> Path:
-    p = tmp_path / 'sample_sheet.tsv'
+    p = tmp_path / 'comms/sample_sheet.tsv'
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
         'sample_id\traw_file\ttreatment\tfraction\treplicate\n'
         'S1\tsample1.RAW\tmock\tEV\t1\n'
@@ -69,11 +70,11 @@ def _make_sample_sheet(tmp_path: Path) -> Path:
     )
     return p
 # _run_report_with_mocks: returns None but runs report function
-def _run_report_with_mocks(tmp_path, sections, **kwargs):
+def _run_report_with_mocks(tmp_path, experiment_ctx, sections, **kwargs):
     defaults = dict(
         quantify_dir=_make_quantify_dir(tmp_path),
         sample_sheet=_make_sample_sheet(tmp_path),
-        output_dir=tmp_path / 'out',
+        ctx=experiment_ctx,
         lfq_dir=None,
         ref_info=None,
         cont_csv=None,
@@ -92,14 +93,14 @@ def _run_report_with_mocks(tmp_path, sections, **kwargs):
 
 # -- Define tests for validating run_report function
 class TestRunReportValidation:
-    def test_raises_when_no_spectral_count_files(self, tmp_path):
+    def test_raises_when_no_spectral_count_files(self, tmp_path, experiment_ctx):
         empty = tmp_path / 'empty'; empty.mkdir()
         ss = _make_sample_sheet(tmp_path)
         with patch('shutil.which', return_value='/usr/bin/Rscript'), pytest.raises(SystemExit):
             run_report(
                 quantify_dir=empty,
                 sample_sheet=ss,
-                output_dir=tmp_path/'out',
+                ctx=experiment_ctx,
                 lfq_dir=None,
                 ref_info=None,
                 cont_csv=None,
@@ -113,14 +114,15 @@ class TestRunReportValidation:
                 in_pipeline = False,
             )
 
-    def test_raises_when_output_exists_without_overwrite(self, tmp_path):
+    def test_raises_when_output_exists_without_overwrite(self, tmp_path, experiment_ctx):
         qd = _make_quantify_dir(tmp_path); ss = _make_sample_sheet(tmp_path)
-        out = tmp_path / 'out'; out.mkdir()
+        out = experiment_ctx.root / 'comms/results/report'
+        out.mkdir(parents=True, exist_ok=True)
         with patch('shutil.which', return_value='/usr/bin/Rscript'), pytest.raises(SystemExit):
             run_report(
                 quantify_dir=qd,
                 sample_sheet=ss,
-                output_dir=out,
+                ctx=experiment_ctx,
                 lfq_dir=None,
                 ref_info=None,
                 cont_csv=None,
@@ -134,13 +136,13 @@ class TestRunReportValidation:
                 in_pipeline = False,
             )
 
-    def test_raises_when_rscript_not_found(self, tmp_path):
+    def test_raises_when_rscript_not_found(self, tmp_path, experiment_ctx):
         qd = _make_quantify_dir(tmp_path); ss = _make_sample_sheet(tmp_path)
         with patch('shutil.which', return_value=None), pytest.raises(SystemExit):
             run_report(
                 quantify_dir=qd,
                 sample_sheet=ss,
-                output_dir=tmp_path/'out',
+                ctx=experiment_ctx,
                 lfq_dir=None, 
                 ref_info=None,
                 cont_csv=None,
@@ -154,32 +156,32 @@ class TestRunReportValidation:
                 in_pipeline = False,
             )
 
-    def test_concordance_dropped_without_lfq_dir(self, tmp_path):
-        mock_run = _run_report_with_mocks(tmp_path, sections=['qc', 'concordance'])
+    def test_concordance_dropped_without_lfq_dir(self, tmp_path, experiment_ctx):
+        mock_run = _run_report_with_mocks(tmp_path, experiment_ctx, sections=['qc', 'concordance'])
         called = [c.kwargs['section'] for c in mock_run.call_args_list]
         assert 'concordance' not in called
         assert 'qc' in called
 
-    def test_creates_output_directory(self, tmp_path):
-        out = tmp_path / 'new_out'
-        _run_report_with_mocks(tmp_path, sections=['qc'], output_dir=out)
+    def test_creates_output_directory(self, tmp_path, experiment_ctx):
+        _run_report_with_mocks(tmp_path, experiment_ctx, sections=['qc'])
+        out = experiment_ctx.root / 'comms/results/report'
         assert out.exists()
 
-    def test_writes_index_file(self, tmp_path):
-        out = tmp_path / 'out'
-        _run_report_with_mocks(tmp_path, sections=['qc'], output_dir=out)
+    def test_writes_index_file(self, tmp_path, experiment_ctx):
+        _run_report_with_mocks(tmp_path, experiment_ctx, sections=['qc'])
+        out = experiment_ctx.root / 'comms/results/report'
         assert (out / 'index.md').exists()
 
-    def test_da_section_receives_lfc_and_fdr_as_positional_args(self, tmp_path):
+    def test_da_section_receives_lfc_and_fdr_as_positional_args(self, tmp_path, experiment_ctx):
         mock_run = _run_report_with_mocks(
-            tmp_path, sections=['da'], lfc_threshold=0.585, fdr_threshold=0.1
+            tmp_path, experiment_ctx, sections=['da'], lfc_threshold=0.585, fdr_threshold=0.1
         )
         da_call = next(c for c in mock_run.call_args_list if c.kwargs.get('section') == 'da')
         args = da_call.kwargs['positional_args']
         assert '0.585' in args
         assert '0.1' in args
 
-    def test_logger_named_report(self, tmp_path):
+    def test_logger_named_report(self, tmp_path, experiment_ctx):
         from comms.utils.log import logMsg
-        _run_report_with_mocks(tmp_path, sections=['qc'])
+        _run_report_with_mocks(tmp_path, experiment_ctx, sections=['qc'])
         assert logMsg._instance.logger.name == 'report'

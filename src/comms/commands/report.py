@@ -13,6 +13,7 @@ from rich.console import Console
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
+from comms.utils.context import ExperimentContext, resolve_organism_prefix, resolve_sample_sheet, resolve_results_input, results_dir
 
 # -- Initialise Rich console
 console = Console()
@@ -71,24 +72,39 @@ def _write_index(output_dir: Path, params: dict, results: dict[str, bool]) -> No
 
 # -- run_report: return None, but run report section R scripts and output script
 def run_report(
-    quantify_dir: Path,
-    sample_sheet: Path,
-    output_dir: Path,
-    lfq_dir: Path | None,
-    ref_info: Path | None,
-    cont_csv: Path | None,
-    organism_prefix: str,
-    min_reps: int,
-    lfc_threshold: float,
-    fdr_threshold: float,
-    sections: list[str],
-    overwrite: bool,
-    rscript: str,
-    in_pipeline: bool
-) -> None:
+        quantify_dir,
+        sample_sheet,
+        ctx: ExperimentContext,
+        lfq_dir,
+        ref_info,
+        cont_csv,
+        organism_prefix,
+        min_reps,
+        lfc_threshold,
+        fdr_threshold,
+        sections,
+        overwrite,
+        rscript,
+        in_pipeline,
+    ) -> None:
     if not in_pipeline:
         logMsg('report')
     logMsg.debug('Started command: report')
+    # Create path to output_dir
+    output_dir = ctx.root / 'comms/results/report'
+
+    # Required inputs resolved from the experiment context
+    quantify_dir = resolve_results_input(ctx, 'quantify', quantify_dir)
+    sample_sheet = resolve_sample_sheet(ctx, sample_sheet)
+    organism_prefix = resolve_organism_prefix(ctx, organism_prefix)
+
+    # Optional inputs: fall back to stored values, then to the conventional lfq directory
+    ref_info = ref_info or ctx.ref_info
+    cont_csv = cont_csv or ctx.cont_csv
+    if lfq_dir is None:
+        default_lfq_dir = results_dir(ctx, 'lfq')
+        if default_lfq_dir.exists():
+            lfq_dir = default_lfq_dir
     # Validate inputs
     sc_files = list(quantify_dir.glob('[!.]*.spectral-counts.target.txt'))
     if not sc_files:
@@ -99,10 +115,10 @@ def run_report(
     except ValueError as e:
         logMsg.error(f'Could not load sample sheet: {e}')
         raise SystemExit(1)
-    if ref_info is not None and not ref_info.is_file():
+    if ref_info is not None and not Path(ref_info).is_file():
         logMsg.error(f'--ref-info not found: {ref_info}')
         raise SystemExit(1)
-    if cont_csv is not None and not cont_csv.is_file():
+    if cont_csv is not None and not Path(cont_csv).is_file():
         logMsg.error(f'--cont-csv not found: {cont_csv}')
         raise SystemExit(1)
     if output_dir.exists() and not overwrite:
@@ -113,7 +129,7 @@ def run_report(
     if 'concordance' in sections and lfq_dir is None:
         logMsg.warn('No --lfq-dir provided, skipping concordance section')
         sections = [s for s in sections if s != 'concordance']
-    if lfq_dir is not None and not lfq_dir.is_dir():
+    if lfq_dir is not None and not Path(lfq_dir).is_dir():
         logMsg.error(f'--lfq-dir not found: {lfq_dir}')
         raise SystemExit(1)
     # Check Rscript is available
