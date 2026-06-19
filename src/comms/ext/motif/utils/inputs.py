@@ -15,7 +15,6 @@ from comms.utils.log import logMsg
 from comms.utils.fasta import readFasta, writeFasta
 
 # -- Define variables for inputs
-INDEX_PROVENANCE = Path('index') / 'provenance.toml'   # holds the search FASTA path
 SIGNALP_TSV = "signalp_predictions.tsv"               # SignalP output
 
 # -- Define dataclass ResolvedInput for holding the resolved input fields
@@ -25,7 +24,7 @@ class ResolvedInput:
     background_ids: list[str]
     fasta_path: Path
     label: str                 # contrast name, or 'standalone'
-    background_source: str     # human-readable description for provenance
+    background_source: str     # human-readable description for context
 
 # -- read_id_list: returns a list of strings corresponding to protein ids
 def read_id_list(path: Path) -> list[str]:
@@ -47,28 +46,28 @@ def _read_xlsx_rows(path: Path, sheet: str | None) -> list[dict]:
     header = [str(h) if h is not None else '' for h in rows[0]]
     return [dict(zip(header, r)) for r in rows[1:]]
 
-# -- resolve_search_fasta: returns a Path to search FASTA
-def resolve_search_fasta(explicit: Path | None, source_dir: Path | None) -> Path:
+# -- resolve_search_fasta: returns a Path to FASTA database used
+def resolve_search_fasta(explicit: Path | None, experiment_dir: Path | None) -> Path:
     if explicit is not None:
         if not explicit.exists():
             raise FileNotFoundError(f'--fasta not found: {explicit}')
         return explicit
-    if source_dir is None:
+    if experiment_dir is None:
         raise ValueError('No --fasta given and no source directory to auto-resolve from')
-    prov = source_dir.parent / INDEX_PROVENANCE
-    if not prov.exists():
-        raise FileNotFoundError(f'Could not auto-resolve the search FASTA, expected index provenance at {prov}; pass --fasta explicitly')
-    with prov.open('rb') as fh:
+    ctx = experiment_dir / 'experiment.toml'   # experiment context
+    if not ctx.exists():
+        raise FileNotFoundError(f'Could not auto-resolve the search FASTA, expected experiment context at {ctx}; pass --fasta explicitly')
+    with ctx.open('rb') as fh:
         table = tomllib.load(fh)
     fasta = table.get('database', {}).get('fasta')
     if not fasta:
-        raise KeyError(f'No FASTA path recorded in {prov}, pass --fasta explicitly')
+        raise KeyError(f'No FASTA path recorded in {ctx}, pass --fasta explicitly')
     return Path(fasta)
 
 # -- resolve_from_report_da: returns tuple of list of strings/strings corresponding to resolved foreground and background protein sets
 def resolve_from_report_da(
     cfg,
-    report_dir: Path,
+    experiment_dir: Path,
     contrast: str,
     background_choice: str,
     background_ids_file: Path | None,
@@ -81,7 +80,7 @@ def resolve_from_report_da(
     fg_directions = cfg.get('input', {}).get('da_foreground_directions')
     bg_directions = cfg.get('input', {}).get('da_background_directions')
     # Read workbook
-    rows = _read_xlsx_rows(report_dir / workbook, contrast) if sheet_per_contrast else [r for r in rows if r.get('contrast') == contrast]
+    rows = _read_xlsx_rows(experiment_dir / 'comms/results/report' / workbook, contrast) if sheet_per_contrast else [r for r in rows if r.get('contrast') == contrast]
     # Get foreground proteins
     foreground = [r[protein_id] for r in rows if r.get(direction_col) in fg_directions]
     # Get background proteins
@@ -101,7 +100,7 @@ def resolve_from_report_da(
 # -- resolve_from_secondary: returns 
 def resolve_from_secondary(
     cfg,
-    report_dir: Path,
+    experiment_dir: Path,
     background_choice: str,
     background_ids_file: Path | None,
 ) -> tuple[list[str], list[str], str]:
@@ -112,7 +111,7 @@ def resolve_from_secondary(
     fraction = cfg.get('input', {}).get('secondary_fraction')
     fg_fractions = cfg.get('input', {}).get('secondary_foreground_fractions')
     # Read workbook
-    rows = _read_xlsx_rows(report_dir / workbook, sheet)
+    rows = _read_xlsx_rows(experiment_dir / 'comms/results/report' / workbook, sheet)
     # Get foreground proteins
     foreground = [r[protein_id] for r in rows if r.get(fraction) in fg_fractions]
     # Get background proteins
@@ -168,7 +167,7 @@ def apply_window(seq: str, window: str, sp_cleavage: int | None) -> str:
 def resolve_inputs(
     *,
     config,
-    input_path: Path,
+    experiment_dir: Path,
     mode: str,                 # 'standalone' | 'report-da' | 'report-secondary' | 'quantify'
     foreground_ids: Path | None,
     background_ids: Path | None,
@@ -186,11 +185,11 @@ def resolve_inputs(
     if mode == 'report-da':
         if contrast is None:
             raise ValueError('report-da mode requires --contrast')
-        fg, bg, source = resolve_from_report_da(config, input_path, contrast, background_choice, background_ids)
-        fasta_path = resolve_search_fasta(fasta, input_path)
+        fg, bg, source = resolve_from_report_da(config, experiment_dir, contrast, background_choice, background_ids)
+        fasta_path = resolve_search_fasta(fasta, experiment_dir)
         return ResolvedInput(fg, bg, fasta_path, contrast, source)
     if mode == 'report-secondary':
-        fg, bg, source = resolve_from_secondary(config, input_path, background_choice, background_ids)
-        fasta_path = resolve_search_fasta(fasta, input_path)
+        fg, bg, source = resolve_from_secondary(config, experiment_dir, background_choice, background_ids)
+        fasta_path = resolve_search_fasta(fasta, experiment_dir)
         return ResolvedInput(fg, bg, fasta_path, "secondary_species_candidates", source)
     raise NotImplementedError(f'Input mode {mode!r} not implemented')
