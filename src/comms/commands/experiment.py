@@ -98,8 +98,9 @@ def run_experiment_headless() -> None:
         clip_met=typer.confirm('Clip N-terminal methionine?', default=True),
         low_res=typer.confirm('Low-resolution instrument (ion trap)?', default=False),
     )
+    cfg.setdefault('index', {})['custom_mods'] = ''
+    # Analysis mode: single- or multi-species
     organisms: dict[str, str] = {}
-    organism_prefix = ''
     multispecies = typer.confirm('Multispecies analysis (per-organism FDR)?', default=False)
     if multispecies:
         while True:
@@ -109,10 +110,15 @@ def run_experiment_headless() -> None:
             pattern = typer.prompt(f'Header pattern for {label}').strip()
             if pattern:
                 organisms[label] = pattern
-        organism_prefix = typer.prompt('Primary organism ID prefix (blank if single species)', default='', show_default=False).strip()
     cfg = _apply_organism(cfg, organisms)
-    cfg.setdefault('index', {})['custom_mods'] = ''
-
+    # Report settings
+    organism_prefix = ''
+    include_report = typer.confirm('Create report?', default=True)
+    if include_report:
+        reference = typer.prompt('Reference protein annotation file (blank to skip)', default='', show_default=False).strip()
+        contaminants = typer.prompt('Contaminants list CSV path (blank to skip)', default='', show_default=False).strip()
+        if multispecies:
+            organism_prefix = typer.prompt('Primary organism ID prefix', default='', show_default=False).strip()
     # Write all three files
     out_dir = base_dir / 'comms'
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +126,6 @@ def run_experiment_headless() -> None:
     sheet_path.write_text(render_sample_sheet(rows), encoding='utf-8')
     config_path = out_dir / 'config.toml'
     _writeConfigTo(cfg, config_path)
-
     meta = {'experiment': {
         'name': name,
         'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'),
@@ -133,13 +138,21 @@ def run_experiment_headless() -> None:
         'database': database,
         'data': [str(f) for f in files],
     }
-    if organism_prefix:
-        meta.setdefault('report', {})['organism_prefix'] = organism_prefix
     if multispecies:
         meta['experiment']['analysis_mode'] = 'multi'
+    if include_report:
+        meta.setdefault('report', {})['enabled'] = True
+        if reference != '':
+            meta['report']['ref_info'] = reference
+        if contaminants != '':
+            meta['report']['cont_csv'] = contaminants
+        if multispecies and organism_prefix != '':
+            meta['report']['organism_prefix'] = organism_prefix
+    else:
+        meta.setdefault('report', {})['enabled'] = False
+    # Save metadata file
     with (out_dir / 'experiment.toml').open('wb') as f:
         tomli_w.dump(meta, f)
-
     logMsg.info(f'Experiment written to {out_dir}')
     print(f'\nRun the pipeline with:\n'
           f'\t[bold]comms pipeline {sheet_path} --database <db.fasta> --input {input_dir} --experiment-dir {base_dir}[/bold]\n')
