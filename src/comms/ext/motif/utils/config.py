@@ -14,9 +14,21 @@ from comms.utils.log import logMsg
 # -- Define filename for configuration file
 CONFIG_FILENAME = 'config_motif.toml'
 
+# -- Define dataclass DiscoverConfig to hold configuration for discover command
+@dataclass
+class DiscoverConfig:
+    algorithm: str = 'streme'
+    min_width: int = 6
+    max_width: int = 15
+    n_motifs: int = 5
+    evalue_threshold: float = 0.05
+    seed: int = 42
+    window: str = 'full'
+
 # -- Define dataclass MotifConfig to hold motif configuration
 @dataclass
 class MotifConfig:
+    discover: DiscoverConfig = field(default_factory=DiscoverConfig)
     raw: dict = field(default_factory=dict)
 
 # -- _bundled_default: returns a Traversable to the bundled default motif configuration
@@ -39,15 +51,18 @@ def load_motif_config(experiment_dir: Path) -> MotifConfig:
     with path.open('rb') as f:
         table = tomllib.load(f)
     m = table.get('motifs', {})
+    discover = DiscoverConfig(
+        algorithm=m.get('discovery_algorithm', 'streme'),
+        min_width=int(m.get('discovery_min_width', 6)),
+        max_width=int(m.get('discovery_max_width', 15)),
+        n_motifs=int(m.get('discovery_n_motifs', 5)),
+        evalue_threshold=float(m.get('discovery_evalue_threshold', 0.05)),
+        seed=int(m.get('discovery_seed', 42)),
+        window=m.get('sequence_window_default', 'full'),
+    )
     return MotifConfig(
+        discover=discover,
         raw=table,
-        algorithm=m.get('algorithm'),
-        min_width=m.get('min_width'),
-        max_width=m.get('max_width'),
-        n_motifs=m.get('n_motifs'),
-        evalue_threshold=m.get('evalue_threshold'),
-        seed=m.get('seed'),
-        window=m.get('window'),
         elm_database_version=m.get('elm_database_version', ''),
         motif_library_version=m.get('motif_library_version', ''),
     )
