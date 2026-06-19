@@ -54,7 +54,8 @@ class ExperimentContext:
 
     @property
     def analysis_mode(self) -> Optional[str]:
-        return self.metadata.get('experiment', {}).get('analysis', '')
+        value = self.metadata.get('experiment', {}).get('analysis')
+        return str(value) if value else None
     
     @property
     def multispecies(self) -> bool:
