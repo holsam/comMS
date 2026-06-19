@@ -266,9 +266,16 @@ Unit tests covering `src/comms/utils/context.py`.
 
 Class | Test description
 --  | --
-`TestNormaliseDirs` | a plain root returns (root, root/comms); a path whose final component is comms returns (parent, comms); a directory containing experiment.toml directly is treated as a comms directory and returns (parent, dir)
-`TestResolve` | with no experiment.toml present, config falls back to the bundled default, bin_dir is None, and root equals the input directory; a local comms/config.toml is preferred and config_source begins with "local"; a bin_dir set in experiment.toml is parsed to a Path and exposed on the context
-
+`TestNormaliseDirs` | a plain root returns `(root, root/comms)`; a path whose final component is `comms` returns `(parent, comms)`; a directory containing `experiment.toml` directly is treated as a `comms` directory and returns `(parent, dir)`
+`TestResolve` | with no `experiment.toml` present, config falls back to the bundled default, `bin_dir` is `None`, and root equals the input directory; a local `comms/config.toml` is preferred and `config_source` begins with `"local"`; a `bin_dir` set in `experiment.toml` is parsed to a `Path` and exposed on the context
+`TestStoredInputs` | each stored-input `@property` (`data_files`, `database`, `sample_sheet`, `organism_prefix`, `ref_info`, `cont_csv`) returns the correct typed value when the corresponding `metadata` key is present, and `None` / empty list when absent; properties are **not** constructor parameters — they are read from `self.metadata`
+`TestResultsDir` | returns the canonical `<root>/comms/results/<command>` path; the path is correct even when the directory does not yet exist
+`TestChoose` | override is returned when given; a warning containing the label is logged when override differs from stored; no warning when override equals stored; stored is returned when no override; raises `SystemExit` when neither is supplied; raises `SystemExit` when resolved path is missing and `must_exist=True`; returns a non-existent path without raising when `must_exist=False`
+`TestCheckFiles` | all-existing files returns a `list[Path]` equal to the inputs (not `True`); a missing file raises `SystemExit`; empty input returns an empty list (not `True`)
+`TestResolveDataFiles` | stored list returned when no override; override wins and a warning is logged when it differs from stored; raises `SystemExit` when neither stored nor override is present; raises `SystemExit` when any file is missing; result is a `list[Path]`
+`TestResolveMzmlFiles` | explicit override list returned directly; raises when override file missing; globs `*.mzML` and `*.mzML.gz` from the convert results directory when no override; raises when no files found in convert directory
+`TestResolveSingleFileInputs` | `resolve_database` and `resolve_sample_sheet` return stored value; override wins with warning; raises when neither supplied; raises when resolved file is missing
+`TestResolveOrganismPrefix` | stored prefix returned; override wins with warning; raises when neither is available; return type is `str`
 
 ---
 
@@ -279,7 +286,7 @@ Class | Test description
 -- | --
 `TestLaunchExperimentGui` | exits with `run_app`'s return code; logs a launch message; `logMsg` instance is named `'experiment'`
 `TestMainWindowCloseLogging` | closing the window logs a message containing "closed"; `logMsg` instance is named `'experiment'`
-`TestRunExperimentHeadless` | with `typer.prompt`/`typer.confirm` patched and a temporary input directory of .mzML files, writes `sample_sheet.tsv`, `config.toml` and `experiment.toml` under `<base>/comms/`; requires at least one treatment and one fraction (exits non-zero otherwise); records a bin_dir in `experiment.toml` only when one is supplied
+`TestRunExperimentHeadless` | with `typer.prompt`/`typer.confirm` patched and a temporary `.mzML` file, writes `sample_sheet.tsv`, `config.toml` and `experiment.toml` under `<base>/comms/`; the prompt sequence now includes the database FASTA prompt (between bin-dir and treatments) and an explicit data-file list via `_prompt_list('data file')` (between the input directory and per-file assignment); requires at least one treatment and one fraction (exits non-zero otherwise); records a `bin_dir` in `experiment.toml` only when one is supplied
 
 ---
 
@@ -433,9 +440,9 @@ Unit tests covering `src/comms/gui/panels/config_panel.py`, `src/comms/gui/panel
 Class | Test description
 -- | --
 `TestConfigPanel` | defaults to single species; organism table is disabled for single species and enabled for multispecies; single species is complete without organisms; multispecies is incomplete without organisms; incomplete with a half-filled organism row; complete with a full organism row; `_build_config` returns a dict with a `search` section; default includes Met oxidation; single species writes an empty organism section; multispecies writes the organism patterns; `changed` signal fires and the tracker becomes complete; `summary` reports the analysis type
-`TestExperimentPanel` | name strips whitespace; `base_dir` is `None` when empty; `output_dir` appends `comms`; `is_valid` requires both name and directory; the tracker is incomplete until valid; the bin-directory field is optional and does not affect `is_valid`; a supplied bin directory is written to `experiment.toml` under `[experiment].bin_dir`; an empty bin directory is omitted from the metadata
-`TestSamplePanel` | `is_complete` proxies the model; `contentChanged` is re-emitted; the tracker moves from incomplete to complete; `write` creates `sample_sheet.tsv`
-`TestSavePanel` | save button disabled when incomplete; enabled when all three panels are complete; `_save_all` writes the sample sheet, config and metadata together; output paths recorded under `[files]` and the experiment name under `[experiment]` in `experiment.toml`; all three trackers marked saved; the `saved` signal is emitted (`QMessageBox.information` is patched throughout)
+`TestExperimentPanel` | name strips whitespace; `base_dir` is `None` when empty; `output_dir` appends `comms`; `is_valid` requires **all three** of name, base directory, and database path (tracker remains `INCOMPLETE` until all three are set); the bin-directory field is optional and does not affect `is_valid`; a supplied bin directory is written to `experiment.toml` under `[experiment].bin_dir`; an empty bin directory is omitted from metadata; `write_metadata` coerces list-valued `files` entries to lists of strings, and scalar `Path` values to plain strings
+`TestSamplePanel` | `is_complete` proxies the model; `contentChanged` is re-emitted; the tracker moves from incomplete to complete; `write` creates `sample_sheet.tsv`; `data_files()` returns source paths in insertion order; `data_files()` skips rows with an empty `source_path`
+`TestSavePanel` | save button disabled when incomplete; enabled when all three panels are complete (requires name, dir, **and** database on `ExperimentPanel`); `_save_all` writes the sample sheet, config and metadata together; output paths recorded under `[files]` and the experiment name under `[experiment]` in `experiment.toml`; all three trackers marked saved; the `saved` signal is emitted (`QMessageBox.information` is patched throughout)
 
 ---
 
@@ -467,15 +474,15 @@ Integration tests call external binaries and verify that the command-level orche
 Note that these tests do not validate the 'accuracy' of either external binary, as this falls outside the remit of comMS and would be covered by the binary's respective test suite.
 
 ### `tests/integration/test_convert.py`
-Integration tests covering the `run_convert` function's orchestration logic, as opposed to ThermoRawFileParser internals (which are covered in [`test_trfp.py`](#testsintegrationtest_trfppy)). All tests require ThermoRawFileParser (`pytest.mark.trfp`).
+Integration tests covering the `run_convert` function's orchestration logic, as opposed to ThermoRawFileParser internals (which are covered in [`test_trfp.py`](#testsintegrationtest_trfppy)). All tests require ThermoRawFileParser (`pytest.mark.trfp`). Data files are supplied via the `data_files` parameter (a list of `Path` objects) rather than a directory.
 
-The test `TestRunConvertRealFile` is gated behind `tests/fixtures/real_sample.RAW` - for more information see more information [above](#real-raw--fixture).
+The test `TestRunConvertRealFile` is gated behind `tests/fixtures/real_sample.RAW` — for more information see [above](#real-raw--fixture).
 
 Class | Description
--- | -- 
-`TestRunConvertNoFiles` | `run_convert` returns cleanly and a warning is logged when the input directory is empty
-`TestRunConvertInvalidFile` | a deliberately malformed file causes TRFP to exit non-zero; the summary reports a failure
-`TestRunConvertRealFile` (optional) | verifies that the output directory is created; verifies that at least one `.mzML` file is produced; verifies that the summary reports success; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
+-- | --
+`TestRunConvertNoFiles` | `run_convert` returns cleanly with a warning logged when a non-`.RAW` file is supplied; the `.RAW` filter produces an empty list and the function exits early without calling TRFP
+`TestRunConvertInvalidFile` | a deliberately malformed `.RAW` file causes TRFP to exit non-zero; the failure count is captured in the log
+`TestRunConvertRealFile` (optional) | verifies that the output directory is created; verifies that at least one `.mzML` file is produced; verifies that the completion summary is logged; gated behind a real `.RAW` file being present (see [above](#real-raw--fixture))
 
 ---
 
@@ -498,20 +505,21 @@ Integration tests and smoke tests that assert the pipeline stages complete witho
 Class | Description
 -- | -- 
 `TestRunIndex` | output directory is created and non-empty; logs a completion message; `logMsg` instance is named `'index'`
-`TestRunSearch` | output directory is created; target PSM file exists; logs a completion message; `logMsg` instance is named `'search'`
-`TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values; output is identical to a non-param-medic run when estimates are unavailable
-`TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the log summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising
-`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when the real `_splitPsmsByOrganism` runs on the combined Percolator output. Percolator is mocked with a side effect that writes combined PSM files; `assignConfidence` is also mocked
+`TestRunSearch` | output directory is created; target PSM file exists; logs a completion message; `logMsg` instance is named `'search'`; data files supplied as `data_files=[synthetic_mzml]`
+`TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values; output is identical to a non-param-medic run when estimates are unavailable; data files supplied as `data_files=[synthetic_mzml]`
+`TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the log summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising; data files supplied as `data_files=[synthetic_mzml]`
+`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when the real `_splitPsmsByOrganism` runs on the combined Percolator output; Percolator is mocked with a side effect that writes combined PSM files; `assignConfidence` is also mocked
 `TestRunRescoreAssignConfidence` | verifies that `assignConfidence` is called once per organism (twice for a two-organism run) when both Percolator and `_splitPsmsByOrganism` are mocked with side effects that write the files each round expects to find; verifies that `run_rescore` raises `SystemExit` when Percolator fails and produces no output files, which prevents round 2 from running
 `TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `organism_tags` nor config organism is available (monkeypatched to empty dict); uses config organism when `organism_tags` is falsy; verifies Percolator is called exactly once per file
 `TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails (and `SystemExit` is caught); warning is printed when `_splitPsmsByOrganism` returns `False`; `logMsg` instance is named `'rescore'`
-`TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created
-`TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call
-`TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the mzML directory is empty
-`TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails
+`TestRunRescore` | real (unmocked) integration path with synthetic data: verifies the output directory is created (requires `organism_tags='EUK,SP'`; the directory is created after tag resolution); verifies that round-1 progress is logged even though Percolator fails on synthetic data; verifies the log file is written; `logMsg` instance is named `'rescore'`
+`TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created; mzML files supplied as `data_files=[synthetic_mzml]`
+`TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call; mzML files supplied as `data_files=[synthetic_mzml]`
+`TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the supplied mzML file does not match any PSM stem (`cruxutil.lfq` is mocked to return `False`)
+`TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails; mzML files supplied as `data_files=[synthetic_mzml]`
 `TestRunLfqLogger` | the `logMsg` instance is named `'lfq'`
 `TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; logs a completion message; `logMsg` instance is named `'quantify'`
-`TestRunPipeline` | full end-to-end smoke test with `--skip-convert`, `--skip-lfq` and `--skip-report` flags; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
+`TestRunPipeline` | full end-to-end smoke test with `--skip-convert`, `--skip-lfq` and `--skip-report` flags; data supplied as `data=[mzml]`; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
 
 ---
 

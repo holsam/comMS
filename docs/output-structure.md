@@ -35,7 +35,9 @@ All outputs are written under the experiment root, inside `comms/results/`. Each
            └─ concordance/         # LFQ vs dNSAF concordance (only if --lfq-dir is provided)
 ```
 
-If a command's output directory already exists, comMS does not overwrite it. Instead it adds an incremental suffix, for example `search-1/`, then `search-2/`, so earlier results are preserved.
+If a command's output directory already exists, comMS does not overwrite it. Instead it adds an incremental suffix, for example `search-1/`, then `search-2/`, so earlier results are preserved. 
+
+comMS commands which rely on the output of other commands will resolve the input directory by following the above convention, unless overridden on the command-line. It will not, however, use the latest version of an output directory (i.e. `search-1/`) but instead default to the expected `<command>/`.
 
 ## Logging
 comMS logs to both the terminal and a file.
