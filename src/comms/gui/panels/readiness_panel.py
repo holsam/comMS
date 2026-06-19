@@ -53,9 +53,8 @@ class CommandReadinessPanel(QWidget):
             has_data=len(self._sample.data_files()) > 0,
             has_database=bool(self._experiment.database_path()),
             has_sample_sheet=self._sample.is_complete(),
-            has_organism_prefix=bool(self._experiment.organism_prefix()),
-            multispecies=True,
-            # multispecies=self._config.analysis_mode() == 'multi',
+            has_organism_prefix=bool(self._config.organism_prefix()),
+            multispecies=self._config.analysis_mode() == 'multi',
             has_organism_tags=self._config.has_organism_patterns(),
         )
 
