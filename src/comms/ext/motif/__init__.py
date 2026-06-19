@@ -1,1 +1,1 @@
-from comms.ext.motifs.cli import register_command
+from comms.ext.motif.cli import register_command
