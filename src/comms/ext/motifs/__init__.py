@@ -1,0 +1,1 @@
+from comms.ext.motifs.cli import register_command
