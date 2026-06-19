@@ -6,7 +6,7 @@ comMS experiment GUI: comMS configuration panel
 from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QCheckBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QFormLayout, QGroupBox, QCheckBox,
     QComboBox, QLineEdit, QPushButton, QTableWidget,
 )
 
@@ -26,15 +26,22 @@ class ConfigPanel(QWidget):
         self.tracker = PanelStateTracker(self)
         # Define layout
         layout = QVBoxLayout(self)
-        top_row = QHBoxLayout()
-        top_row.addWidget(self._build_mods_box(), 1, Qt.AlignmentFlag.AlignTop)
-        top_row.addWidget(self._build_resolution_box(), 0, Qt.AlignmentFlag.AlignTop)
-        top_row.addWidget(self._build_analysis_type_box(), 0, Qt.AlignmentFlag.AlignTop)
-        layout.addLayout(top_row)
-        layout.addWidget(self._build_organism_box())
+        # Row 1: modifications/instrument resolution 
+        row1 = QHBoxLayout()
+        row1.addWidget(self._build_mods_box(), 1, Qt.AlignmentFlag.AlignTop)
+        row1.addWidget(self._build_resolution_box(), 0, Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(row1)
+        # Row 2: analysis type/organism table
+        row2 = QHBoxLayout()
+        row2.addWidget(self._build_analysis_type_box(), 0, Qt.AlignmentFlag.AlignTop)
+        row2.addWidget(self._build_organism_box(), 1, Qt.AlignmentFlag.AlignTop)
+        layout.addLayout(row2)
+        # Row 3: report setting
+        layout.addWidget(self._build_report_box())
         layout.addStretch(1)
-
+        # Update enabled boxes
         self._update_organism_enabled()
+        self._update_report_fields_enabled()
 
     # -- form construction --
     def _build_mods_box(self) -> QGroupBox:
@@ -95,6 +102,48 @@ class ConfigPanel(QWidget):
         buttons.addWidget(self._remove_org_btn)
         layout.addLayout(buttons)
         return self._org_box
+    
+    def _build_report_box(self) -> QGroupBox:
+        box = QGroupBox('Report settings')
+        outer = QVBoxLayout(box)
+        self._report_enabled = QCheckBox('Create report?')
+        self._report_enabled.setChecked(True)
+        self._report_enabled.stateChanged.connect(self._on_report_enabled_changed)
+        outer.addWidget(self._report_enabled)
+        self._report_fields = QWidget()
+        form = QFormLayout(self._report_fields)
+        # Reference info file picker
+        self._reference = QLineEdit()
+        self._reference.setPlaceholderText('reference annotation TSV/CSV')
+        self._reference.textChanged.connect(self._on_changed)
+        ref_browse = QPushButton('Select file')
+        ref_browse.clicked.connect(self._browse_reference)
+        ref_row = QWidget()
+        ref_layout = QHBoxLayout(ref_row)
+        ref_layout.setContentsMargins(0, 0, 0, 0)
+        ref_layout.addWidget(self._reference)
+        ref_layout.addWidget(ref_browse)
+        form.addRow('Reference info', ref_row)
+        # Contaminant CSV picker
+        self._contaminant = QLineEdit()
+        self._contaminant.setPlaceholderText('contaminant list CSV')
+        self._contaminant.textChanged.connect(self._on_changed)
+        cont_browse = QPushButton('Select file')
+        cont_browse.clicked.connect(self._browse_contaminant)
+        cont_row = QWidget()
+        cont_layout = QHBoxLayout(cont_row)
+        cont_layout.setContentsMargins(0, 0, 0, 0)
+        cont_layout.addWidget(self._contaminant)
+        cont_layout.addWidget(cont_browse)
+        form.addRow('Contaminants', cont_row)
+        # Organism prefix (moved from ExperimentPanel)
+        self._organism_prefix = QLineEdit()
+        self._organism_prefix.setPlaceholderText('primary organism id prefix')
+        self._organism_prefix.textChanged.connect(self._on_changed)
+        form.addRow('Primary organism prefix', self._organism_prefix)
+
+        outer.addWidget(self._report_fields)
+        return box
 
     # -- analysis type --
     def _is_multispecies(self) -> bool:
@@ -143,7 +192,42 @@ class ConfigPanel(QWidget):
         if not any(label and pattern for label, pattern in rows):
             return False
         return all(bool(label) == bool(pattern) for label, pattern in rows)
+    
+    # -- report box helpers --
+    def _on_report_enabled_changed(self, *args) -> None:
+        self._update_report_fields_enabled()
+        self._on_changed()
 
+    def _update_report_fields_enabled(self) -> None:
+        self._report_fields.setEnabled(self._report_enabled.isChecked())
+
+    def _browse_reference(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Select reference info file', '',
+            'Tabular files (*.tsv *.csv *.txt);;All files (*)')
+        if path:
+            self._reference.setText(path)
+
+    def _browse_contaminant(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Select contaminant list', '',
+            'CSV files (*.csv);;All files (*)')
+        if path:
+            self._contaminant.setText(path)
+
+    def organism_prefix(self) -> str:
+        return self._organism_prefix.text().strip()
+
+    def report_enabled(self) -> bool:
+        return self._report_enabled.isChecked()
+
+    def reference_path(self) -> Path | None:
+        text = self._reference.text().strip()
+        return Path(text) if text else None
+
+    def contaminant_path(self) -> Path | None:
+        text = self._contaminant.text().strip()
+        return Path(text) if text else None
     # -- state --
     def _signature(self):
         return (
@@ -151,6 +235,10 @@ class ConfigPanel(QWidget):
             self._n_cyc.isChecked(), self._n_ace.isChecked(), self._clip_met.isChecked(),
             self._custom.text().strip(), self._res.currentIndex(),
             tuple(self._organism_rows()),
+            self._report_enabled.isChecked(),
+            self._reference.text().strip(),
+            self._contaminant.text().strip(),
+            self._organism_prefix.text().strip(),
         )
 
     def _on_changed(self, *args) -> None:
@@ -180,8 +268,9 @@ class ConfigPanel(QWidget):
         else:
             org_text = 'n/a (single species)'
             mode = 'single species'
+        report = ('report: enabled' if self._report_enabled.isChecked() else 'report: disabled')
         return (f'{mode}; resolution: {res}; '
-                f'mods: {", ".join(mods) if mods else "none"}; organisms: {org_text}')
+                f'mods: {", ".join(mods) if mods else "none"}; organisms: {org_text}; {report}')
 
     # -- build config file and save --
     def _build_config(self) -> dict:
