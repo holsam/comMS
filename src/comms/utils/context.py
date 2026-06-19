@@ -65,6 +65,10 @@ class ExperimentContext:
             return False
         # Fall back to infer from config
         return bool(self.config.get('organism'))
+    
+    @property
+    def report_enabled(self) -> bool:
+        return self.metadata.get('report', {}).get('enabled')
 
     @property
     def organism_prefix(self) -> Optional[str]:
@@ -176,6 +180,21 @@ def resolve_database(ctx, override=None) -> Path:
 def resolve_sample_sheet(ctx, override=None) -> Path:
     return _choose(ctx.sample_sheet, override, 'sample sheet')
 
+# -- resolve_report: Returns whether to skip report or not (for pipeline)
+def resolve_report(ctx, override=None) -> bool:
+    # ExperimentContext and override store inverted values of one another, so convert (if context value exists)
+    if ctx.report_enabled is None:
+        ctx_skip = False if ctx.report_enabled is None else (not ctx.report_enabled)
+    # If override is not None
+    if override is not None:
+        # Set skip to override
+        skip = override
+        # If override disagrees with context
+        if override != ctx_skip:
+            logMsg.warn(f'report: command-line --skip-convert overrides the experiment report enabled value')
+    else:
+        skip = ctx_skip
+    return skip
 
 # -- resolve_organism_prefix: returns a string for report's primary-organism prefix
 def resolve_organism_prefix(ctx, override=None) -> str:
