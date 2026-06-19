@@ -37,7 +37,7 @@ def run_pipeline(
     skip_report = resolve_report(ctx, skip_report)
     # Get total steps and set current step
     num_steps = _calculate_n_steps(skip_convert, skip_lfq, skip_quantify, skip_report)
-    current_step = 1
+    current_step = 0
     START = datetime.datetime.now()
     # -- Load sample sheet
     try:
@@ -49,6 +49,7 @@ def run_pipeline(
     logMsg.info(f'Running comMS pipeline: {len(samples)} sample(s), {samples['treatment'].nunique()} treatment(s)')
     # -- Step 1: Convert (optional)
     if not skip_convert:
+        current_step += 1
         logMsg.progress(f'Step {current_step}/{num_steps}: converting .RAW files')
         convert.run_convert(data_files, ctx=ctx, gzip=True, in_pipeline=True)
         mzml_override = None # search/lfq glob the convert results
@@ -56,9 +57,11 @@ def run_pipeline(
         logMsg.progress(f'Skipped .RAW -> .mzML conversion')
         mzml_override = [f for f in data_files if f.suffix.lower() == '.mzml' or f.name.endswith('.mzML.gz')]
     # -- Step 2: Build index
+    current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: building peptide index')
     index.run_index(database=database, ctx=ctx, in_pipeline=True)
     # -- Step 3: Search
+    current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: searching spectra')
     search.run_search(
         mzml_override,
@@ -69,6 +72,7 @@ def run_pipeline(
         in_pipeline=True
     )
     # -- Step 4: Rescore
+    current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: rescoring PSMs')
     rescore.run_rescore(
         input_dir=None,
@@ -83,11 +87,12 @@ def run_pipeline(
     else:
         if not skip_lfq:
             # -- MS1 label free quantification
+            current_step += 1
             logMsg.progress(f'Step {current_step}/{num_steps}: quantifying with MS1 label-free quantification')
             lfq.run_lfq(rescore_dir=None, data_files=mzml_override, sample_sheet=sample_sheet, ctx=ctx, in_pipeline=True)
-            step += 1
         if not skip_quantify:
             # -- dNSAF spectral counting
+            current_step += 1
             logMsg.progress(f'Step {current_step}/{num_steps}: quantifying with dNSAF spectral counting')
             quantify.run_quantify(input_dir=None, database=database, ctx=ctx, in_pipeline=True)
 
@@ -95,6 +100,7 @@ def run_pipeline(
     if skip_report:
         logMsg.progress(f'Skipped report generation')
     else:
+        current_step += 1
         logMsg.report(f'Step {current_step}/{num_steps}: generating report')
         report.run_report(ctx=ctx, sample_sheet=sample_sheet, in_pipeline=True)
 
