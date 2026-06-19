@@ -55,6 +55,7 @@ The experiment root (`my_experiment/`) or the `comms/` folder itself can be pass
 name = "Example comMS experiment"
 updated = "2025-10-01T12:00:00+00:00"
 bin_dir = "/absolute/path/to/comMS/bin"   # optional
+analysis = "single"
 
 [files]
 sample_sheet = "/path/to/my_experiment/comms/sample_sheet.tsv"
