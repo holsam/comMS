@@ -101,7 +101,7 @@ def run_pipeline(
         logMsg.progress(f'Skipped report generation')
     else:
         current_step += 1
-        logMsg.report(f'Step {current_step}/{num_steps}: generating report')
+        logMsg.progress(f'Step {current_step}/{num_steps}: generating report')
         report.run_report(ctx=ctx, sample_sheet=sample_sheet, in_pipeline=True)
 
     END = datetime.datetime.now()
