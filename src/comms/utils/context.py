@@ -183,8 +183,7 @@ def resolve_sample_sheet(ctx, override=None) -> Path:
 # -- resolve_report: Returns whether to skip report or not (for pipeline)
 def resolve_report(ctx, override=None) -> bool:
     # ExperimentContext and override store inverted values of one another, so convert (if context value exists)
-    if ctx.report_enabled is None:
-        ctx_skip = False if ctx.report_enabled is None else (not ctx.report_enabled)
+    ctx_skip = False if ctx.report_enabled is None else (not ctx.report_enabled)
     # If override is not None
     if override is not None:
         # Set skip to override
