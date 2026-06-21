@@ -447,8 +447,10 @@ class TestRunRescoreDirectories:
             if call_count['n'] == 1:
                 _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
+        def _mock_split(**kwargs):
+            return _write_split_psm_files(kwargs['out_dir'], kwargs['fileroot'], ['EUK', 'PRO'])
         with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
-             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True):
+            patch('comms.commands.rescore._splitPsmsByOrganism', side_effect=_mock_split):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
@@ -468,7 +470,7 @@ class TestRunRescorePerOrganismPercolator:
                 _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
         def _mock_split(**kwargs):
-            return _write_split_psm_files(rescore_dir, 'synthetic', ['EUK', 'PRO'])
+            return _write_split_psm_files(kwargs['out_dir'], kwargs['fileroot'], ['EUK', 'PRO'])
         with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator) as mock_perc, \
              patch('comms.commands.rescore._splitPsmsByOrganism', side_effect=_mock_split):
             run_rescore(
@@ -525,21 +527,24 @@ class TestRunRescoreOrganismTags:
     def test_uses_config_organism_when_organism_tags_falsy(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, monkeypatch):
         monkeypatch.setitem(experiment_ctx.config, 'organism', {'EUK': 'TESTEUK', 'PRO': 'TESTPRO'})
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
-
+        call_count = {'n': 0}
         def _mock_percolator(**kwargs):
-            _write_combined_percolator_output(rescore_dir, 'synthetic')
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
-
-        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator), \
-             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
-             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True) as mock_ac:
+        def _mock_split(**kwargs):
+            return _write_split_psm_files(kwargs['out_dir'], kwargs['fileroot'], ['EUK', 'PRO'])
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator) as mock_perc, \
+            patch('comms.commands.rescore._splitPsmsByOrganism', side_effect=_mock_split):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 ctx=experiment_ctx,
                 organism_tags='',
             )
-        assert mock_ac.call_count == 0
+        # 1 combined round + 1 per EUK + 1 per PRO = 3 total
+        assert mock_perc.call_count == 3
 
     def test_percolator_called_once_per_file(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx):
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
@@ -548,16 +553,15 @@ class TestRunRescoreOrganismTags:
             _write_combined_percolator_output(rescore_dir, 'synthetic')
             return True
 
-        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator) as mock_perc, \
-             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True), \
-             patch('comms.commands.rescore.cruxutil.assignConfidence', return_value=True):
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator) as mock_p, \
+             patch('comms.commands.rescore._splitPsmsByOrganism', return_value=True):
             run_rescore(
                 input_dir=synthetic_tide_search_dir,
                 database=two_organism_fasta,
                 ctx=experiment_ctx,
                 organism_tags='EUK,TESTEUK,PRO,TESTPRO',
             )
-        assert mock_perc.call_count == 1
+        assert mock_p.call_count == 1
 
 class TestRunRescoreOutput:
     def test_prints_success_summary(self, crux_bin, two_organism_fasta, synthetic_tide_search_dir, tmp_path, experiment_ctx, caplog):
@@ -648,13 +652,18 @@ class TestRunRescoreSingleSpecies:
         return search_dir
 
     @patch('comms.commands.rescore.cruxutil.percolator')
-    def test_percolator_called_once_per_file(self, mock_perc, single_species_context, mock_search_output, two_organism_fasta):
+    def test_percolator_called_once_per_file(
+        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path
+    ):
         '''Single-species mode: only the combined round runs, one call per input file.'''
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+
         def _side_effect(**kwargs):
-            fileroot = kwargs['fileroot']
-            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
-            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            kwargs['out_dir'].mkdir(parents=True, exist_ok=True)
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.decoy.psms.txt').touch()
             return True
+
         mock_perc.side_effect = _side_effect
         run_rescore(
             input_dir=mock_search_output,
@@ -664,12 +673,15 @@ class TestRunRescoreSingleSpecies:
         assert mock_perc.call_count == 2
 
     @patch('comms.commands.rescore.cruxutil.percolator')
-    def test_no_per_organism_subdirectories_created(self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path):
+    def test_no_per_organism_subdirectories_created(
+        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path
+    ):
         def _side_effect(**kwargs):
-            fileroot = kwargs['fileroot']
-            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
-            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            kwargs['out_dir'].mkdir(parents=True, exist_ok=True)
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.decoy.psms.txt').touch()
             return True
+
         mock_perc.side_effect = _side_effect
         run_rescore(
             input_dir=mock_search_output,
@@ -681,12 +693,15 @@ class TestRunRescoreSingleSpecies:
         assert len(subdirs) == 0, f'Unexpected subdirectories: {subdirs}'
 
     @patch('comms.commands.rescore.cruxutil.percolator')
-    def test_ignores_supplied_organism_tags_with_warning(self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, caplog):
+    def test_ignores_supplied_organism_tags_with_warning(
+        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, caplog
+    ):
         def _side_effect(**kwargs):
-            fileroot = kwargs['fileroot']
-            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').touch()
-            (kwargs['out_dir'] / f'{fileroot}.percolator.decoy.psms.txt').touch()
+            kwargs['out_dir'].mkdir(parents=True, exist_ok=True)
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.target.psms.txt').touch()
+            (kwargs['out_dir'] / f'{kwargs["fileroot"]}.percolator.decoy.psms.txt').touch()
             return True
+
         mock_perc.side_effect = _side_effect
         with caplog.at_level(logging.WARNING):
             run_rescore(
@@ -873,8 +888,10 @@ class TestRunQuantify:
 # -- Define test class for quantifying single-species analysis rescore results
 class TestQuantifyFlatOutput:
     @patch('comms.commands.quantify.cruxutil.spectralCounts')
-    def test_quantify_finds_flat_output(self, mock_sc, tmp_path, experiment_ctx, monkeypatch, two_organism_fasta):
-        '''quantify discovers flat Percolator PSM files in rescore root (single-species layout).'''
+    def test_quantify_finds_flat_output(
+        self, mock_sc, tmp_path, experiment_ctx, monkeypatch, two_organism_fasta
+    ):
+        '''quantify discovers flat Percolator PSM files in the rescore root (single-species layout)'''
         rescore_dir = tmp_path / 'rescore'
         rescore_dir.mkdir()
         (rescore_dir / 'sample1.percolator.target.psms.txt').touch()

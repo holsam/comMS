@@ -256,7 +256,11 @@ qInstallMessageHandler(_qt_message_handler)
 
 # -- Add a function-scoped experiment context for most tests
 @pytest.fixture()
-def experiment_ctx(tmp_path):
+def experiment_ctx(tmp_path, monkeypatch):
     '''A bare ExperimentContext rooted at tmp_path (no experiment.toml)'''
+    monkeypatch.setattr(
+        'comms.utils.settings.globalConfigPath',
+        lambda: tmp_path / '_no_global_config.toml',
+    )
     from comms.utils.context import ExperimentContext
     return ExperimentContext.resolve(tmp_path)
