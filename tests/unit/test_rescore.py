@@ -68,32 +68,35 @@ class TestParseOrganismTags:
 
 # -- Define tests for _classifyPsmRow helper function
 class TestClassifyPsmRow:
+    def test_returns_list_for_matching_row(self):
+        result = _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS)
+        assert isinstance(result, list)
+
     def test_returns_correct_label_for_euk_row(self):
-        assert _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS) == 'EUK'
+        assert _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS) == ['EUK']
 
     def test_returns_correct_label_for_pro_row(self):
-        assert _classifyPsmRow(row=PSM_ROW_PRO, id_index=5, organism_tags=ORGANISM_TAGS) == 'PRO'
+        assert _classifyPsmRow(row=PSM_ROW_PRO, id_index=5, organism_tags=ORGANISM_TAGS) == ['PRO']
 
-    def test_returns_contaminants_for_unmatched_row(self):
+    def test_returns_contaminants_string_for_unmatched_row(self):
         assert _classifyPsmRow(row=PSM_ROW_CONT, id_index=5, organism_tags=ORGANISM_TAGS) == 'contaminants'
 
-    def test_returns_string(self):
-        result = _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=ORGANISM_TAGS)
-        assert isinstance(result, str)
-
-    def test_returns_contaminants_for_empty_row(self):
+    def test_returns_contaminants_string_for_empty_row(self):
         assert _classifyPsmRow(row='', id_index=5, organism_tags=ORGANISM_TAGS) == 'contaminants'
 
     def test_uses_last_column_for_protein_id(self):
         # Construct a row where only the last column matches
         row = 'id\t1.0\t0.01\t0.001\tK.PEP.K\tsp|TE001|GENE1_TESTEUK\n'
-        assert _classifyPsmRow(row=row, id_index=5, organism_tags=ORGANISM_TAGS) == 'EUK'
+        assert _classifyPsmRow(row=row, id_index=5, organism_tags=ORGANISM_TAGS) == ['EUK']
 
-    def test_first_matching_tag_wins(self):
-        # Row matches both tags if tags overlap; first key in dict wins
-        overlapping_tags = {'EUK': 'TESTEUK', 'ALSO': 'TE001'}
+    def test_returns_multiple_labels_for_shared_psm(self):
+        '''A protein ID matching two tags should produce a list with both labels.'''
+        overlapping_tags = {'EUK': 'TESTEUK', 'ALSO': 'TESTEUK'}
         result = _classifyPsmRow(row=PSM_ROW_EUK, id_index=5, organism_tags=overlapping_tags)
-        assert result == 'EUK'
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert 'EUK' in result
+        assert 'ALSO' in result
 
 
 # -- Define tests for _splitPsmsByOrganism helper function
@@ -109,6 +112,10 @@ class TestSplitPsmsByOrganism:
         path = tmp_path / 'synthetic.percolator.decoy.psms.txt'
         _write_combined_psm(path, [PSM_ROW_EUK])
         return path
+    
+    # -- Define helper function to write a PSM which matches two organisms labels
+    def _psm_matching_both(self) -> str:
+        return 'synthetic_shared\t1.0\t0.001\t0.001\tK.PEP.K\tsp|TE001|TESTEUK_TESTPRO_fusion\n'
 
     def test_returns_true_on_success(self, combined_target, combined_decoy, tmp_path):
         result = _splitPsmsByOrganism(
@@ -117,38 +124,81 @@ class TestSplitPsmsByOrganism:
             organism_tags=ORGANISM_TAGS,
             out_dir=tmp_path,
             fileroot='synthetic',
+            shared_policy='drop',
         )
         assert result is True
 
     def test_creates_per_organism_target_files(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').exists()
         assert (tmp_path / 'PRO' / 'synthetic.PRO.percolator.target.psms.txt').exists()
 
     def test_creates_per_organism_decoy_files(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.decoy.psms.txt').exists()
 
     def test_euk_file_contains_only_euk_rows(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         content = (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').read_text()
         assert 'TESTEUK' in content
         assert 'TESTPRO' not in content
 
     def test_pro_file_contains_only_pro_rows(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         content = (tmp_path / 'PRO' / 'synthetic.PRO.percolator.target.psms.txt').read_text()
         assert 'TESTPRO' in content
         assert 'TESTEUK' not in content
 
     def test_contaminant_rows_go_to_contaminants_bucket(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         cont_file = tmp_path / 'contaminants' / 'synthetic.contaminants.percolator.target.psms.txt'
         assert cont_file.exists()
         assert 'CONT' in cont_file.read_text()
 
     def test_header_is_preserved_in_each_output_file(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         for label in ('EUK', 'PRO'):
             content = (tmp_path / label / f'synthetic.{label}.percolator.target.psms.txt').read_text()
             assert content.startswith('PSMId\t')
@@ -156,7 +206,14 @@ class TestSplitPsmsByOrganism:
     def test_returns_bool_when_target_file_missing(self, tmp_path):
         missing = tmp_path / 'nonexistent.percolator.target.psms.txt'
         decoy = tmp_path / 'nonexistent.percolator.decoy.psms.txt'
-        result = _splitPsmsByOrganism(missing, decoy, ORGANISM_TAGS, tmp_path, 'nonexistent')
+        result = _splitPsmsByOrganism(
+            target_file=missing,
+            decoy_file=decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         assert isinstance(result, bool)
 
     def test_skips_decoy_file_gracefully_when_absent(self, combined_target, tmp_path):
@@ -167,12 +224,58 @@ class TestSplitPsmsByOrganism:
             organism_tags=ORGANISM_TAGS,
             out_dir=tmp_path,
             fileroot='synthetic',
+            shared_policy='drop',
         )
         assert result is True
         assert (tmp_path / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt').exists()
 
     def test_output_files_are_non_empty(self, combined_target, combined_decoy, tmp_path):
-        _splitPsmsByOrganism(combined_target, combined_decoy, ORGANISM_TAGS, tmp_path, 'synthetic')
+        _splitPsmsByOrganism(
+            target_file=combined_target,
+            decoy_file=combined_decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
         for label in ('EUK', 'PRO'):
             path = tmp_path / label / f'synthetic.{label}.percolator.target.psms.txt'
             assert path.stat().st_size > 0
+
+    def test_shared_policy_drop_excludes_shared_psms_from_all_buckets(self, tmp_path):
+        shared_row = self._psm_matching_both()
+        target = tmp_path / 'synthetic.percolator.target.psms.txt'
+        _write_combined_psm(target, [shared_row])
+        decoy = tmp_path / 'synthetic.percolator.decoy.psms.txt'
+        decoy.write_text(PSM_HEADER)
+        _splitPsmsByOrganism(
+            target_file=target,
+            decoy_file=decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='drop',
+        )
+        for label in ('EUK', 'PRO'):
+            out = tmp_path / label / f'synthetic.{label}.tide-search.target.txt'
+            if out.exists():
+                assert 'TESTEUK_TESTPRO_fusion' not in out.read_text()
+
+    def test_shared_policy_include_duplicates_shared_psms_to_both_buckets(self, tmp_path):
+        shared_row = self._psm_matching_both()
+        target = tmp_path / 'synthetic.percolator.target.psms.txt'
+        _write_combined_psm(target, [shared_row])
+        decoy = tmp_path / 'synthetic.percolator.decoy.psms.txt'
+        decoy.write_text(PSM_HEADER)
+        _splitPsmsByOrganism(
+            target_file=target,
+            decoy_file=decoy,
+            organism_tags=ORGANISM_TAGS,
+            out_dir=tmp_path,
+            fileroot='synthetic',
+            shared_policy='include',
+        )
+        for label in ('EUK', 'PRO'):
+            out = tmp_path / label / f'synthetic.{label}.tide-search.target.txt'
+            if out.exists():
+                assert 'TESTEUK_TESTPRO_fusion' in out.read_text()
