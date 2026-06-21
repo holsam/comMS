@@ -129,7 +129,7 @@ Fixture | Description
 
 Fixture | Description
 ---|---
-`synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic assign-confidence PSM file at `rescore/EUK/synthetic.EUK.assign-confidence.target.txt`, matching the per-organism subdirectory structure produced by `run_rescore` round 2 and bypassing the need to run Percolator and assign-confidence on synthetic data (which does not provide enough PSMs for Percolator to converge)
+`synthetic_percolator_results(tmp_path)` | Writes a minimal synthetic Percolator PSM file at `rescore/EUK/synthetic.EUK.percolator.target.psms.txt`, matching the per-organism subdirectory structure produced by `run_rescore` round 2 and bypassing the need to run Percolator on synthetic data (which does not provide enough PSMs for convergence)
 
 ### LFQ fixtures
 
@@ -351,8 +351,8 @@ Unit tests covering helper functions in `src/comms/commands/rescore.py`. No exte
 Class | Test description
 -- | --
 `TestParseOrganismTags` | parses two-organism comma-separated string; parses single-organism string; strips internal and leading/trailing whitespace; preserves regex characters in values; raises `SystemExit` on odd item count, single item, or empty string; returns `dict[str, str]`; keys and values are strings
-`TestClassifyPsmRow` | returns the correct organism label for a matching EUK row; returns the correct label for a PRO row; returns `'contaminants'` for an unmatched row; returns a string; returns `'contaminants'` for an empty row; uses the last tab-delimited column as the protein ID; first matching tag wins when multiple tags could match
-`TestSplitPsmsByOrganism` | returns `True` on success; creates per-organism target files in labelled subdirectories; creates per-organism decoy files; EUK file contains only EUK rows; PRO file contains only PRO rows; contaminant rows go to a `contaminants/` bucket; header is preserved in each output file; returns a bool without raising when the target file is missing; skips a missing decoy file gracefully and still succeeds for the target; output files are non-empty
+`TestClassifyPsmRow` | returns a `list` for matching rows; returns `['EUK']` for a matching EUK row; returns `['PRO']` for a matching PRO row; returns the string `'contaminants'` for an unmatched row; returns `'contaminants'` for an empty row; uses the last tab-delimited column as the protein ID; returns a list with multiple labels when the protein ID matches more than one organism tag
+`TestSplitPsmsByOrganism` | returns `True` on success; creates per-organism target files in labelled subdirectories; creates per-organism decoy files; EUK file contains only EUK rows; PRO file contains only PRO rows; contaminant rows go to a `contaminants/` bucket; header is preserved in each output file; returns a bool without raising when the target file is missing; skips a missing decoy file gracefully and still succeeds for the target; output files are non-empty; with `shared_policy='drop'`, rows matching more than one organism are excluded from all output files; with `shared_policy='include'`, rows matching more than one organism appear in all matching output files
 
 ---
 
@@ -495,7 +495,7 @@ Class | Description
 `TestTideIndex` | creates and populates the index directory; writes a log file; returns `False` for an invalid FASTA.
 `TestTideSearch` | creates the target PSM file; file has at least a header and one data row; log file is written.
 `TestPercolator` | *n.b. this class is currently commented out as synthetic data does not provide sufficient PSMs for Percolator to converge; the `synthetic_percolator_results` fixture provides a hand-written PSM file at the expected path so that downstream `TestSpectralCounts` can run.*
-`TestSpectralCounts` | uses the synthetic Percolator PSM fixture to bypass Percolator (which requires more PSMs than the synthetic data provides); creates a spectral-counts output file with content.
+`TestSpectralCounts` | uses the `synthetic_percolator_results` fixture (which produces `synthetic.EUK.percolator.target.psms.txt`) to bypass Percolator; creates a spectral-counts output file with content
 
 ---
 
@@ -508,19 +508,19 @@ Class | Description
 `TestRunSearch` | output directory is created; target PSM file exists; logs a completion message; `logMsg` instance is named `'search'`; data files supplied as `data_files=[synthetic_mzml]`
 `TestRunSearchParamMedic` | full `--param-medic` path completes without raising; search output directory and target PSM file are created; a `param-medic/` output directory is created; warns and falls back to config defaults when param-medic yields no usable estimates; summary reports numeric tolerance values; output is identical to a non-param-medic run when estimates are unavailable; data files supplied as `data_files=[synthetic_mzml]`
 `TestRunSearchParamMedicMocked` | mocks `_runParamMedic` to return known values and verifies those values appear in the log summary; verifies that `(None, None)` from `_runParamMedic` falls back to config defaults without raising; data files supplied as `data_files=[synthetic_mzml]`
-`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when the real `_splitPsmsByOrganism` runs on the combined Percolator output; Percolator is mocked with a side effect that writes combined PSM files; `assignConfidence` is also mocked
-`TestRunRescoreAssignConfidence` | verifies that `assignConfidence` is called once per organism (twice for a two-organism run) when both Percolator and `_splitPsmsByOrganism` are mocked with side effects that write the files each round expects to find; verifies that `run_rescore` raises `SystemExit` when Percolator fails and produces no output files, which prevents round 2 from running
+`TestRunRescoreDirectories` | verifies that `comms/results/rescore/` is created; verifies that per-organism subdirectories (`EUK/`, `PRO/`) are created when `_splitPsmsByOrganism` runs after the combined Percolator round; `cruxutil.percolator` is mocked with a counter-based side effect that writes combined output files on the first (combined) call and returns `True` on subsequent (per-organism) calls
+`TestRunRescorePerOrganismPercolator` | verifies that `cruxutil.percolator` is called three times total for a one-file, two-organism run (1 combined + 2 per-organism) when both the combined Percolator mock and `_splitPsmsByOrganism` write the files each round expects; verifies that `run_rescore` raises `SystemExit` when the combined round produces no output files, which prevents round 2 from running
 `TestRunRescoreOrganismTags` | raises `SystemExit` on no PSM files in input directory; raises `SystemExit` on an invalid (odd-count) tag string; raises `SystemExit` when neither `organism_tags` nor config organism is available (monkeypatched to empty dict) if `analysis_mode` is explicitly set to "multi"; uses config organism when `organism_tags` is falsy; verifies Percolator is called exactly once per file
 `TestRunRescoreOutput` | success summary is printed; warning is printed when Percolator fails (and `SystemExit` is caught); warning is printed when `_splitPsmsByOrganism` returns `False`; `logMsg` instance is named `'rescore'`
 `TestRunRescore` | real (unmocked) integration path with synthetic data: verifies the output directory is created (requires `organism_tags='EUK,SP'`; the directory is created after tag resolution); verifies that round-1 progress is logged even though Percolator fails on synthetic data; verifies the log file is written; `logMsg` instance is named `'rescore'`
-`TestRunRescoreSingleSpecies` | verifies assignConfidence is called once per Percolator output; output is written to rescore root not per-organism subdirectories; supplied `organism_tags` are ignored but logged with a warning
+`TestRunRescoreSingleSpecies` | verifies that only the combined Percolator round runs for single-species analysis (percolator called once per input file, not per organism); verifies no per-organism subdirectories are created under the rescore root; verifies that supplied `organism_tags` are ignored with a warning; no `assignConfidence` mock is used
 `TestRunLfqOutputDirectories` | `run_lfq` creates one subdirectory per fraction under `comms/results/lfq/`; a single-fraction run creates exactly one subdirectory; the `comms/results/lfq/` root itself is created; mzML files supplied as `data_files=[synthetic_mzml]`
 `TestRunLfqCruxCalls` | `cruxutil.lfq` is called exactly once per fraction; each call receives only the PSM files belonging to that fraction; an orphaned PSM file with no sample sheet entry does not produce an extra call; the `fileroot` kwarg equals the fraction label for each call; mzML files supplied as `data_files=[synthetic_mzml]`
 `TestRunLfqEarlyExit` | raises `SystemExit` when the rescore directory contains no PSM files; verifies that `cruxutil.lfq` is called once per fraction even when the supplied mzML file does not match any PSM stem (`cruxutil.lfq` is mocked to return `False`)
 `TestRunLfqWarnings` | a `WARNING`-level message is logged when `cruxutil.lfq` returns `False` for a fraction; processing continues for remaining fractions even when one fails; mzML files supplied as `data_files=[synthetic_mzml]`
 `TestRunLfqLogger` | the `logMsg` instance is named `'lfq'`
 `TestRunQuantify` | uses `synthetic_percolator_results` fixture; output directory is created; spectral-counts file exists; logs a completion message; `logMsg` instance is named `'quantify'`
-`TestQuantifyFlatOutput` | `run_quantify` discovers and processes flat `assign-confidence` output files from single-species analysis
+`TestQuantifyFlatOutput` | `run_quantify` discovers and processes flat `.percolator.target.psms.txt` output files from single-species analysis
 `TestRunPipeline` | full end-to-end smoke test with `--skip-convert`, `--skip-lfq` and `--skip-report` flags; data supplied as `data=[mzml]`; pipeline completes without raising; all expected stage directories (`index`, `search`, `rescore`, `quantify`) are created under `comms/results/`; `logMsg` instance is named `'pipeline'`
 
 ---

@@ -143,7 +143,6 @@ def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: P
     args = [
         '--verbosity', '40',
         '--protein-enzyme', config['percolator']['protein_enzyme'],
-        '--spectral-counting-fdr', str(config['percolator']['psm_fdr']),
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
         '--overwrite', 'T',
@@ -152,23 +151,6 @@ def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: P
     if config['percolator']['picked_protein']:
         args = ['--picked-protein', str(database)] + args
     return runCrux(crux_bin, 'percolator', args)
-
-# -- assignConfidence: returns True if assign-confidence completed successfully, False on failure
-def assignConfidence(crux_bin: Path, target_psm_file: Path, out_dir: Path, fileroot: str) -> bool:
-    '''
-    Run crux assign-confidence on a per-organism split PSM file to estimate per-organism PSM-level q-values using target-decoy competition (TDC)
-    '''
-    logMsg.debug(f'assign-confidence: {target_psm_file.name}')
-    args = [
-        '--verbosity', '40',
-        '--estimation-method', 'tdc',
-        '--score', 'percolator score',
-        '--output-dir', str(out_dir),
-        '--fileroot', fileroot,
-        '--overwrite', 'T',
-        str(target_psm_file),
-    ]
-    return runCrux(crux_bin, 'assign-confidence', args)
 
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
 def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:

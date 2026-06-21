@@ -127,8 +127,8 @@ comMS supports two analysis modes for single- and multi-species experiments, whi
 
 Mode | `[analysis]` value | Pipeline runs | Suitable for
 -- | -- | --
-Single-species | `single` | Percolator and `assign-confidence` on the combined protein database, resulting in one set of PSMs per sample | Analysing proteins from one organism or where cross-organism FDR control is not a priority
-Multi-species | `multi` | Percolator is called on the combined protein database, with results split by organism before `assign-confidence` runs on individual organisms to apply per-organism picked-protein FDR | Analysing proteins from two (or more) organisms where target/decoy ratios differ substantially
+Single-species | `single` | Percolator on the combined protein database, resulting in one set of PSMs per sample | Analysing proteins from one organism or where cross-organism FDR control is not a priority
+Multi-species | `multi` | Percolator is called on the combined protein database, with results split by organism before a second round of Percolator runs on individual organisms to apply per-organism picked-protein FDR | Analysing proteins from two (or more) organisms where target/decoy ratios differ substantially
 
 Analysis mode is resolved when `rescore` runs: if `analysis` is not set, the pipeline infers `multi` if organism tags are supplied or configured, otherwise defaults to `single`. N.B. contaminants should not be counted as an organism.
 

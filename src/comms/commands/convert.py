@@ -25,6 +25,12 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     if not raw_files:
         logMsg.warn('No .RAW files among the resolved data files')
         return
+    try:
+        from comms.utils.samples import loadSampleSheet
+        samples = loadSampleSheet(ctx.sample_sheet)
+    except Exception as e:
+        logMsg.debug(f'Could not load sample sheet: {e}')
+        samples = None
     logMsg.info(f'Converting {len(raw_files)} .RAW file(s) to indexed mzML file(s)')
     out_dir = pathutil.generateOutputFileStructure(ctx.root, 'convert')
     logMsg.debug(f'Output directory: {out_dir}')
@@ -33,11 +39,17 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     logMsg.debug(f'Output log file: {log_path}')
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
-        logMsg.progress(f'Converting {raw_file.name}')
+        # Create output name from sample sheet if present
+        if samples:
+            sample_id = samples['sample_id'][samples['raw_file']==raw_file].values[0]
+            out_file = out_dir / f'{sample_id}'
+        else:
+            out_file = out_dir / f'{raw_file.stem}'
+        logMsg.progress(f'Converting {raw_file.name} to {out_file.name}')
         ok = trfputil.convertRaw(
             trfp_path=trfp_path,
             raw_file=raw_file,
-            out_dir=out_dir,
+            out_file=out_file,
             output_format=ctx.config['convert']['format'],
             gzip=gzip,
             metadata=ctx.config['convert']['metadata'],

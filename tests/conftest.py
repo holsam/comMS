@@ -176,7 +176,8 @@ def isolated_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
 @pytest.fixture()
 def synthetic_percolator_results(tmp_path):
     '''
-    Write a minimal synthetic assign-confidence PSM file in the per-organism subdirectory structure produced by run_rescore round 2, bypassing the need to run Percolator and assign-confidence on synthetic data (which does not provide enough PSMs for Percolator to converge)
+    Write a minimal synthetic Percolator PSM file in the per-organism subdirectory structure produced by run_rescore round 2, bypassing the need to run Percolator
+    on synthetic data (which does not provide enough PSMs for Percolator to converge)
     '''
     rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
     rescore_dir.mkdir(parents=True)
@@ -186,18 +187,15 @@ def synthetic_percolator_results(tmp_path):
         'synthetic_3_2_1\t1.3\t0.01\t0.002\tR.LMNPQR.S\tSP|PROT1|GENE1\n'
         'synthetic_4_2_1\t1.2\t0.01\t0.003\tK.SAMPLEK.T\tSP|PROT2|GENE2\n'
     )
-    # Per-organism subdirectory with assign-confidence output
     org_dir = rescore_dir / 'EUK'
     org_dir.mkdir()
-    (org_dir / 'synthetic.EUK.assign-confidence.target.txt').write_text(psm_content)
+    (org_dir / 'synthetic.EUK.percolator.target.psms.txt').write_text(psm_content)
     return rescore_dir
 
 @pytest.fixture()
 def multi_fraction_psm_dir(tmp_path: Path) -> Path:
     '''
-    Write synthetic Percolator PSM files for three fractions (WCL, AWF, EV),
-    two samples per fraction, matching the filenames in
-    valid_multi_fraction_sample_sheet. Returns the directory path.
+    Write synthetic Percolator PSM files for three fractions (WCL, AWF, EV), two samples per fraction, matching the filenames in valid_multi_fraction_sample_sheet. and return the directory path
     '''
     rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
     rescore_dir.mkdir(parents=True)
@@ -219,8 +217,7 @@ def multi_fraction_psm_dir(tmp_path: Path) -> Path:
 @pytest.fixture()
 def single_fraction_psm_dir(tmp_path: Path) -> Path:
     '''
-    Write synthetic Percolator PSM files for a single fraction (WCL), matching
-    the filenames in valid_sample_sheet_single_fraction.
+    Write synthetic Percolator PSM files for a single fraction (WCL), matching the filenames in valid_sample_sheet_single_fraction
     '''
     rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
     rescore_dir.mkdir(parents=True)
@@ -259,7 +256,11 @@ qInstallMessageHandler(_qt_message_handler)
 
 # -- Add a function-scoped experiment context for most tests
 @pytest.fixture()
-def experiment_ctx(tmp_path):
+def experiment_ctx(tmp_path, monkeypatch):
     '''A bare ExperimentContext rooted at tmp_path (no experiment.toml)'''
+    monkeypatch.setattr(
+        'comms.utils.settings.globalConfigPath',
+        lambda: tmp_path / '_no_global_config.toml',
+    )
     from comms.utils.context import ExperimentContext
     return ExperimentContext.resolve(tmp_path)

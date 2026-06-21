@@ -51,14 +51,14 @@ def run_rescore(
     log_path = out_dir / 'rescore.log'
     configureFileLogging(log_path)
     logMsg.debug(f'Output log file: {log_path}')
-    # Round 1: Percolator on the full combined database, with one call per sample file
-    combined_target_files = _run_percolator_round(
-        crux_bin, target_files, database, out_dir, ctx
+    # Round 1: run Percolator on the full combined database, with one call per sample file
+    combined_target_files = _run_combined_percolator_round(
+        crux_bin, target_files, database, out_dir, ctx,
     )
     if not combined_target_files:
-        logMsg.error('No combined Percolator output found after round 1, cannot continue')
+        logMsg.error('No combined Percolator output found, cannot continue')
         raise SystemExit(1)
-    # Round 2: branch on analysis mode
+    # Round 2: run Percolator on each organism sub-FASTA if multispecies analysis
     if multispecies:
         organism_tags = (
             _parseOrganismTags(organism_tags)
@@ -71,20 +71,19 @@ def run_rescore(
         logMsg.debug(f'Organism tags: {organism_tags}')
         sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
         logMsg.debug(f'Built {len(sub_fastas)} per-organism sub-FASTA(s)')
-        _assign_confidence_per_organism(
-            crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir
+        _run_per_organism_percolator_round(
+            crux_bin, target_files, sub_fastas, organism_tags, out_dir, ctx
         )
-    else:
-        _assign_confidence_single(crux_bin, combined_target_files, out_dir)
+    # Log command as complete
     logMsg.debug('Finished command: rescore')
 
 # -- _run_percolator_round: returns list of PSM files after runn Percolator (via Crux) on database, with one call per sample file
-def _run_percolator_round(crux_bin, target_files, database, out_dir, ctx) -> list:
-    logMsg.progress(f'Round 1: rescoring {len(target_files)} file(s) using the combined database')
+def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, ctx) -> list:
+    logMsg.progress(f'Rescoring {len(target_files)} file(s) using combined database')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for target_file in tqdm(target_files, desc='Files rescored'):
-            logMsg.progress(f'Round 1: rescoring {target_file.name}')
+            logMsg.progress(f'Rescoring {target_file.name}')
             fileroot = target_file.name.removesuffix('.tide-search.target.txt')
             ok = cruxutil.percolator(
                 crux_bin=crux_bin,
@@ -96,22 +95,23 @@ def _run_percolator_round(crux_bin, target_files, database, out_dir, ctx) -> lis
             )
             if ok:
                 n_ok += 1
-                logMsg.debug(f'Round 1: rescored {target_file.name} saved to {out_dir / fileroot}.percolator.target.psms.txt')
+                logMsg.debug(f'Rescored {target_file.name} saved to {out_dir / fileroot}.percolator.target.psms.txt')
             else:
                 n_fail += 1
-                logMsg.warn(f'Round 1: rescoring failed for {target_file.name}')
-    logMsg.info(f'Round 1 complete: {n_ok} succeeded, {n_fail} failed')
+                logMsg.warn(f'Rescoring failed for {target_file.name}')
+    logMsg.info(f'Combined rescoring complete: {n_ok} succeeded, {n_fail} failed')
     return sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
 
-# -- _assign_confidence_per_organism: returns None but splits combined Percolator outputs by organism and runs assign-confidence
-def _assign_confidence_per_organism(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir):
-    logMsg.progress(f'Round 2: splitting and assigning confidence to {len(combined_target_files)} file(s)')
-    ac_n_ok, ac_n_fail = 0, 0
+# -- _run_per_organism_percolator_round: returns None but splits combined Tide search outputs by organism and runs Percolator (via Crux)
+def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir, ctx):
+    logMsg.progress(f'Rescoring {len(combined_target_files)} file(s) using per-organism sub-FASTAs')
+    n_ok, n_fail = 0, 0
+    shared_policy = ctx.config['percolator']['shared_psm']
     with logging_redirect_tqdm():
-        for combined_file in tqdm(combined_target_files, desc='Files processed'):
-            logMsg.progress(f'Round 2: processing {combined_file.name}')
-            fileroot = combined_file.name.removesuffix('.percolator.target.psms.txt')
-            combined_decoy_file = out_dir / f'{fileroot}.percolator.decoy.psms.txt'
+        for combined_file in tqdm(combined_target_files, desc='Files rescored'):
+            logMsg.progress(f'Rescoring {combined_file.name}')
+            fileroot = combined_file.name.removesuffix('.tide-search.target.txt')
+            combined_decoy_file = combined_file.parent / f'{fileroot}.tide-search.decoy.txt'
             # Split target and decoy files by organism
             split_ok = _splitPsmsByOrganism(
                 target_file=combined_file,
@@ -119,54 +119,36 @@ def _assign_confidence_per_organism(crux_bin, combined_target_files, sub_fastas,
                 organism_tags=organism_tags,
                 out_dir=out_dir,
                 fileroot=fileroot,
+                shared_policy = shared_policy,
             )
             if not split_ok:
-                logMsg.warn(f'Round 2: {combined_file.name} PSMs could not be split')
-                ac_n_fail += len(sub_fastas)
+                logMsg.warn(f'{combined_file.name} PSMs could not be split by organism')
+                n_fail += len(sub_fastas)
                 continue
-            # Run assign-confidence on each organism's split target file
+            # Run percolator on each organism's split target file
             for label in sub_fastas.keys():
                 org_out_dir = out_dir / label
-                org_target = org_out_dir / f'{fileroot}.{label}.percolator.target.psms.txt'
+                org_target = org_out_dir / f'{fileroot}.{label}.tide-search.target.txt'
                 if not org_target.exists():
-                    logMsg.warn(f'Round 2: split target missing for {label}: {org_target.name}')
-                    ac_n_fail += 1
+                    logMsg.warn(f'Split target missing for {label}: {org_target.name}')
+                    n_fail += 1
                     continue
-                ac_fileroot = f'{fileroot}.{label}'
-                ok = cruxutil.assignConfidence(
+                org_fileroot = f'{fileroot}.{label}'
+                ok = cruxutil.percolator(
                     crux_bin=crux_bin,
                     target_psm_file=org_target,
+                    database=sub_fastas[label],
                     out_dir=org_out_dir,
-                    fileroot=ac_fileroot,
+                    fileroot=org_fileroot,
+                    config=ctx.config,
                 )
                 if ok:
-                    ac_n_ok += 1
-                    logMsg.debug(f'Round 2: processed {combined_file.name} saved to {org_out_dir / ac_fileroot}.assign-confidence.target.txt')
+                    n_ok += 1
+                    logMsg.debug(f'Rescored {combined_file.name} saved to {org_out_dir / org_fileroot}.percolator.target.psms.txt')
                 else:
-                    ac_n_fail += 1
+                    n_fail += 1
                     logMsg.warn(f'Round 2: processing failed for {label}: {org_target.name}')
-    logMsg.info(f'Round 2 complete: {ac_n_ok} succeeded, {ac_n_fail} failed')
-
-# _assign_confidence_single: returns None but runs assign-confidence on Percolator output
-def _assign_confidence_single(crux_bin, combined_target_files, out_dir):
-    logMsg.progress(f'Assigning confidence to {len(combined_target_files)} file(s)')
-    n_ok, n_fail = 0, 0
-    with logging_redirect_tqdm():
-        for combined_file in tqdm(combined_target_files, desc='Files processed'):
-            fileroot = combined_file.name.removesuffix('.percolator.target.psms.txt')
-            ok = cruxutil.assignConfidence(
-                crux_bin=crux_bin,
-                target_psm_file=combined_file,
-                out_dir=out_dir,
-                fileroot=fileroot,
-            )
-            if ok:
-                n_ok += 1
-                logMsg.debug(f'Round 2: processed {combined_file.name} saved to {out_dir / fileroot}.assign-confidence.target.txt')
-            else:
-                n_fail += 1
-                logMsg.warn(f'assign-confidence failed for {combined_file.name}')
-    logMsg.info(f'assign-confidence complete: {n_ok} succeeded, {n_fail} failed')
+    logMsg.info(f'Round 2 complete: {n_ok} succeeded, {n_fail} failed')
 
 # -- _splitPsmsByOrganism: returns True on success, False on any file error
 def _splitPsmsByOrganism(
@@ -175,27 +157,47 @@ def _splitPsmsByOrganism(
     organism_tags: dict[str, str],
     out_dir: Path,
     fileroot: str,
+    shared_policy: str,
 ) -> bool:
     try:
         for psm_type, psm_file in [('target', target_file), ('decoy', decoy_file)]:
             if not psm_file.exists():
-                logMsg.warn(f'Round 2: PSM file not found, skipping split: {psm_file.name}')
+                logMsg.warn(f'PSM file {psm_file.name} not found, skipping split')
                 continue
             with psm_file.open('r') as f:
                 header = f.readline()
                 rows = f.readlines()
-            # Get indice for proteinIds column in header
-            id_index = _findProteinIdsIndex(header)
+            # Get indice for protein id column in header
+            id_index = _findProteinIdsIndex(header, 'protein id')
             # Partition rows by organism tag
+            shared_count = 0
+            dropped_rows = []
             buckets: dict[str, list[str]] = {}
             for row in rows:
+                # Get organism labels for row
                 label = _classifyPsmRow(row, id_index, organism_tags)
-                buckets.setdefault(label, []).append(row)
+                # If in more than one organism:
+                if len(label) > 1:
+                    if shared_policy == 'drop':
+                        shared_count += 1
+                        dropped_rows.append(row)
+                    elif shared_policy == 'include':
+                        shared_count += 1
+                        for l in label:
+                            buckets.setdefault(l, []).append(row)
+                    else:
+                        logMsg.warn(f'Unknown shared PSM policy {shared_policy}, falling back to "drop"')
+                        shared_count += 1
+                        dropped_rows.append(row)
+                else:
+                    buckets.setdefault(label[0], []).append(row)
+            # If shared_count > 0, print an info message
+            logMsg.info(f'{psm_type}: {shared_count} shared-organism PSMs detected, handled with shared PSM policy {shared_policy}')
             # Write each bucket
             for label, label_rows in buckets.items():
                 label_dir = out_dir / label
                 label_dir.mkdir(parents=True, exist_ok=True)
-                out_file = label_dir / f'{fileroot}.{label}.percolator.{psm_type}.psms.txt'
+                out_file = label_dir / f'{fileroot}.{label}.tide-search.{psm_type}.txt'
                 with out_file.open('w') as f:
                     f.write(header)
                     f.writelines(label_rows)
@@ -206,20 +208,21 @@ def _splitPsmsByOrganism(
         return False
 
 # -- _findProteinIdsIndex: returns the column indice for the proteinIds column from a PSM file header
-def _findProteinIdsIndex(header: str):
+def _findProteinIdsIndex(header: str, col_name: str):
     header = header.rstrip('\n').split('\t')
-    return [i for i, x in enumerate(header) if x == 'proteinIds'][0]
+    return [i for i, x in enumerate(header) if x == col_name][0]
 
 # -- _classifyPsmRow: returns the organism label for a single PSM row based on the protein ID column
-def _classifyPsmRow(row: str, id_index: int, organism_tags: dict[str, str]) -> str:
+def _classifyPsmRow(row: str, id_index: int, organism_tags: dict[str, str]) -> list[str]:
     parts = row.rstrip('\n').split('\t')
     if not parts or parts == ['']:
-        return 'contaminants'
+        return ['contaminants']
+    label_matches = []
     protein_id = parts[id_index]
     for label, tag in organism_tags.items():
         if tag in protein_id:
-            return label
-    return 'contaminants'
+            label_matches.append(label)
+    return label_matches if label_matches else ['contaminants']
 
 # -- _parseOrganismTags: returns dictionary of strings corresponding to organism tags from comma-separated input
 def _parseOrganismTags(input_string: str):

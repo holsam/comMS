@@ -78,10 +78,15 @@ class ConfigPanel(QWidget):
     def _build_analysis_type_box(self) -> QGroupBox:
         box = QGroupBox('Analysis type')
         form = QFormLayout(box)
+        # Analysis type combobox
         self._analysis = QComboBox()
         self._analysis.addItems(['Single species', 'Multispecies'])
         self._analysis.currentIndexChanged.connect(self._on_analysis_changed)
-        form.addRow('Mode', self._analysis)
+        # Shared PSM handler policy
+        self._sharedpsm = QComboBox()
+        self._sharedpsm.addItems(['Drop', 'Include'])
+        form.addRow('Analysis Mode', self._analysis)
+        form.addRow('Shared PSM handling policy', self._sharedpsm)
         return box
 
     def _build_organism_box(self) -> QGroupBox:
@@ -157,10 +162,14 @@ class ConfigPanel(QWidget):
         self._on_changed()
 
     def _update_organism_enabled(self) -> None:
+        self._sharedpsm.setEnabled(self._is_multispecies())
         self._org_box.setEnabled(self._is_multispecies())
 
     def analysis_mode(self) -> str:
         return 'multi' if self._is_multispecies() else 'single'
+    
+    def shared_policy(self) -> str:
+        return 'drop' if self._sharedpsm.currentIndex() == 0 else 'include'
 
     # -- organism table helpers --
     def _add_org_row(self) -> None:
@@ -293,6 +302,7 @@ class ConfigPanel(QWidget):
             organisms = {
                 label: pattern for label, pattern in self._organism_rows() if label and pattern
             }
+            cfg['percolator']['shared_psm'] = self.shared_policy()
         cfg = _apply_organism(cfg, organisms)
         cfg.setdefault('index', {})
         cfg['index']['custom_mods'] = ''

@@ -15,7 +15,7 @@ from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_quantify: runs dNSAF spectral counting on assign-confidence PSM files (discovering single/multi-species results) and writes results to output
+# -- run_quantify: runs dNSAF spectral counting on rescored PSM files (discovering single/multi-species results) and writes results to output
 def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool = False):
     if not in_pipeline:
         logMsg('quantify')
@@ -24,12 +24,12 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
     input_dir = resolve_results_input(ctx, 'rescore', input_dir)
     database = resolve_database(ctx, database)
     # Discover both layouts: per-organism subdirectories and flat
-    logMsg.debug(f'Scanning {input_dir} for assign-confidence PSMs')
-    psm_files = sorted(input_dir.glob('[!.]*/*.assign-confidence.target.txt'))  # multi (per-organism)
-    psm_files += sorted(input_dir.glob('[!.]*.assign-confidence.target.txt'))    # single (flat)
+    logMsg.debug(f'Scanning {input_dir} for rescored PSMs')
+    psm_files = sorted(input_dir.glob('[!.]*/*.percolator.target.psms.txt'))  # multi (per-organism)
+    psm_files += sorted(input_dir.glob('[!.]*.percolator.target.psms.txt'))    # single (flat)
 
     if not psm_files:
-        logMsg.error(f'No assign-confidence PSM files found in {input_dir}')
+        logMsg.error(f'No rescored PSM files found in {input_dir}')
         raise SystemExit(1)
     logMsg.info(f'Quantifying {len(psm_files)} PSM file(s)')
     out_dir = pathutil.generateOutputFileStructure(ctx.root, 'quantify')
@@ -41,7 +41,7 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
     with logging_redirect_tqdm():
         for psm_file in tqdm(psm_files, desc='Files quantified'):
             logMsg.progress(f'Quantifying {psm_file.name}')
-            fileroot = psm_file.name.removesuffix('.assign-confidence.target.txt')
+            fileroot = psm_file.name.removesuffix('.percolator.target.psms.txt')
             ok = cruxutil.spectralCounts(
                 crux_bin=crux_bin,
                 psm_file=psm_file,
