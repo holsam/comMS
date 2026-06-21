@@ -98,9 +98,9 @@ class ExperimentPanel(QWidget):
 
     def _browse_database(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, 'Select FASTA database', '', 'FASTA file (*.fa, *.fasta);;All files (*)')
+            self, 'Select FASTA database', '', 'FASTA file (*.fa *.fasta);;All files (*)')
         if path:
-            self._state.sample_model.add_files(path)
+            self._database.setText(path)
 
     def experiment_name(self) -> str:
         return self._name.text().strip()
