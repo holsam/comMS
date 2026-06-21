@@ -29,9 +29,9 @@ precursor_tolerance_ppm = 10.0
 threads = 2
 
 [percolator]
-psm_fdr = 0.01    # psm-level FDR threshold
 protein_enzyme = "trypsin"
 picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015)
+shared_psm = "drop"
 
 [lfq]
 match_between_runs = true
