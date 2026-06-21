@@ -53,7 +53,7 @@ def run_rescore(
     logMsg.debug(f'Output log file: {log_path}')
     # Round 1: run Percolator on the full combined database, with one call per sample file
     combined_target_files = _run_combined_percolator_round(
-        crux_bin, target_files, database, out_dir, ctx, 1, 'combined FASTA'
+        crux_bin, target_files, database, out_dir, ctx,
     )
     if not combined_target_files:
         logMsg.error('No combined Percolator output found, cannot continue')
@@ -128,7 +128,7 @@ def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fast
             # Run percolator on each organism's split target file
             for label in sub_fastas.keys():
                 org_out_dir = out_dir / label
-                org_target = org_out_dir / f'{fileroot}.{label}.tide-search.target.psms.txt'
+                org_target = org_out_dir / f'{fileroot}.{label}.tide-search.target.txt'
                 if not org_target.exists():
                     logMsg.warn(f'Split target missing for {label}: {org_target.name}')
                     n_fail += 1
