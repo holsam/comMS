@@ -94,7 +94,7 @@ Threads | 2 | Default search threads
 ## Percolator settings
 By default, PSM rescoring uses picked-protein FDR ([Savitski et al., 2015](https://doi.org/10.1074/mcp.M114.046995), doi:10.1074/mcp.M114.046995) at a 1% PSM-level FDR threshold, requiring at least two unique peptides per protein for a confident identification.
 
-When a combined multi-species FASTA is used, picked-protein FDR is applied separately per organism. Organism patterns are configured with `comms config set --organism`, or supplied at runtime with `--organism-tags` on the `rescore` and `pipeline` commands. See the [rescore command documentation](./commands.md#per-organism-fdr) for details.
+When a combined multi-species FASTA is used, picked-protein FDR is applied separately per organism. Organism patterns are configured with `comms config set --organism`, or supplied at runtime with `--organism-tags` on the `rescore` and `pipeline` commands. See the [rescore command documentation](./commands.md#per-organism-fdr) for details. For multi-species analyses, the handling policy used in the case of shared PSMs can be set to `'drop'` (default; do not include in either organism) or `'include'` (include in both organisms). The latter option may inflate downstream spectral counts for shared PSMs, so the default option is `'drop'`.
 
 ---
 

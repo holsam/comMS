@@ -60,7 +60,7 @@ Command | Description
 `convert` | Convert `.RAW` files to indexed `.mzML` using ThermoRawFileParser
 `index` | Build a tryptic peptide index from a FASTA file using Crux `tide-index`
 `search` | Match spectra to peptides using Crux `tide-search`
-`rescore` | Rescore PSMs using Crux `percolator` on the combined database, then split by organism and run `assign-confidence` per organism for calibrated per-organism FDR
+`rescore` | Rescore PSMs using Crux `percolator` on the combined database, then split by organism and run `percolator` per organism for calibrated per-organism FDR
 `lfq` | Run MS1 label-free quantification using grouped fractions
 `quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
 `report` | Generate a static analysis report from `quantify` and, optionally, `lfq` output
