@@ -5,6 +5,8 @@ comMS wrapper around ThermoRawFileParser
 # -- Import external dependencies
 import platform, shutil, subprocess
 from pathlib import Path
+from rich.live import Live
+from rich.text import Text
 from typing import Optional
 
 # -- Import internal functions
@@ -47,12 +49,24 @@ def convertRaw(
             logMsg.warn('Mono not found, but is reqired by ThermoRawFileParser on  non-Windows systems')
             return False
         cmd = [mono] + cmd
-    logMsg.debug(f'TFRP converting {" ".join(cmd)}')
     log_fh = open(log_path, 'a') if log_path else subprocess.DEVNULL
     try:
-        result = subprocess.run(cmd, stdout=log_fh, stderr=log_fh, check=False)
-        if result.returncode != 0:
-            logMsg.warn(f'ThermoRawFileParser exited {result.returncode} for {raw_file.name}')
+        logMsg.debug(f'TFRP converting {" ".join(cmd)}')
+        stderr_lines = []
+        with subprocess.Popen(
+            cmd,
+            stderr=subprocess.PIPE,
+            stdout=log_fh,
+            text=True
+        ) as proc:
+            with Live('', refresh_per_second=10, transient=True) as live:
+                for line in proc.stderr:
+                    line = line.rstrip()
+                    if line:
+                        stderr_lines.append(line)
+                        live.update(Text(line, style='dim'))
+        if proc.returncode != 0:
+            logMsg.warn(f'ThermoRawFileParser exited {proc.returncode} for {raw_file.name}')
             return False
     except Exception as e:
         logMsg.error(f'Unexpected error converting {raw_file.name}: {e}')
