@@ -7,6 +7,7 @@ import tomli_w, typer
 from datetime import datetime, timezone
 from pathlib import Path
 from rich import print
+from typing import Literal
 
 # -- Import internal functions
 from comms.utils.log import logMsg
@@ -111,6 +112,8 @@ def run_experiment_headless() -> None:
             if pattern:
                 organisms[label] = pattern
     cfg = _apply_organism(cfg, organisms)
+    if multispecies:
+        cfg['percolator']['shared_psm'] = typer.prompt(f'Shared PSM handling policy', default='drop', type=Literal['drop','include'], show_choices=True, show_default=True).strip()
     # Report settings
     organism_prefix = ''
     include_report = typer.confirm('Create report?', default=True)
