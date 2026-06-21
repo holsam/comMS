@@ -156,7 +156,7 @@ def _get_crux_version(crux_bin: Path) -> Optional[tuple[int, ...]]:
         return None
     return _parse_version(match.group(1))
 
-# -- _get_crux_version: returns a tuple of ints corresponding to parsed version number
+# -- _get_trfp_version: returns a tuple of ints corresponding to parsed version number
 def _get_trfp_version(trfp_path) -> Optional[tuple[int, ...]]:
     '''
     Run ThermoRawFileParser with no arguments and parse the version from its output.  On non-Windows, direct invocation is attempted first (works for native builds >= 2.0.0); if that yields no parseable version, falls back to invoking via Mono
