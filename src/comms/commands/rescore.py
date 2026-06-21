@@ -72,7 +72,7 @@ def run_rescore(
         sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
         logMsg.debug(f'Built {len(sub_fastas)} per-organism sub-FASTA(s)')
         _run_per_organism_percolator_round(
-            crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir, ctx
+            crux_bin, target_files, sub_fastas, organism_tags, out_dir, ctx
         )
     # Log command as complete
     logMsg.debug('Finished command: rescore')
@@ -111,7 +111,7 @@ def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fast
         for combined_file in tqdm(combined_target_files, desc='Files rescored'):
             logMsg.progress(f'Rescoring {combined_file.name}')
             fileroot = combined_file.name.removesuffix('.tide-search.target.txt')
-            combined_decoy_file = out_dir / f'{fileroot}.tide-search.decoy.txt'
+            combined_decoy_file = combined_file.parent / f'{fileroot}.tide-search.decoy.txt'
             # Split target and decoy files by organism
             split_ok = _splitPsmsByOrganism(
                 target_file=combined_file,
@@ -140,7 +140,7 @@ def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fast
                     database=sub_fastas[label],
                     out_dir=org_out_dir,
                     fileroot=org_fileroot,
-                    config=ctx,
+                    config=ctx.config,
                 )
                 if ok:
                     n_ok += 1
@@ -190,7 +190,7 @@ def _splitPsmsByOrganism(
                         shared_count += 1
                         dropped_rows.append(row)
                 else:
-                    buckets.setdefault(label, []).append(row)
+                    buckets.setdefault(label[0], []).append(row)
             # If shared_count > 0, print an info message
             logMsg.info(f'{psm_type}: {shared_count} shared-organism PSMs detected, handled with shared PSM policy {shared_policy}')
             # Write each bucket
@@ -216,13 +216,13 @@ def _findProteinIdsIndex(header: str, col_name: str):
 def _classifyPsmRow(row: str, id_index: int, organism_tags: dict[str, str]) -> list[str]:
     parts = row.rstrip('\n').split('\t')
     if not parts or parts == ['']:
-        return 'contaminants'
+        return ['contaminants']
     label_matches = []
     protein_id = parts[id_index]
     for label, tag in organism_tags.items():
         if tag in protein_id:
             label_matches.append(label)
-    return label_matches if label_matches else 'contaminants'
+    return label_matches if label_matches else ['contaminants']
 
 # -- _parseOrganismTags: returns dictionary of strings corresponding to organism tags from comma-separated input
 def _parseOrganismTags(input_string: str):
