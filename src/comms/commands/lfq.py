@@ -79,4 +79,4 @@ def _groupPsmsByFraction(psm_files: list[Path], samples: pd.DataFrame) -> dict[s
 
 # -- _get_stem: return str corresponding to stem of file from raw_file in sample sheet
 def _get_stem(row):
-    return Path(row['raw_file']).stem
+    return str(row['sample_id'])
