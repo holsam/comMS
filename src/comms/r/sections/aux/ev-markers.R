@@ -19,9 +19,9 @@ script_dir <- local({
 })
 
 # Import utility functions
-source(file.path(script_dir, "..", "utils", "import.R"))
-source(file.path(script_dir, "..", "utils", "normalise.R"))
-source(file.path(script_dir, "..", "utils", "theme.R"))
+source(file.path(script_dir, "..", "..", "utils", "import.R"))
+source(file.path(script_dir, "..", "..", "utils", "normalise.R"))
+source(file.path(script_dir, "..", "..", "utils", "theme.R"))
 
 # Load libraries
 library(pheatmap)
@@ -46,12 +46,11 @@ for (frac in fractions) {
     if (length(cols) > 0) rowMeans(select(results_wide, all_of(cols))) else NA_real_
 }
 
-'''
-MISEV2023 category keyword matching against protein annotations:
-- Category 1: transmembrane EV markers (should be enriched in EVs)
-- Category 2: cytosolic EV-associated (variably enriched)
-- Category 3: negative/contamination markers (should be depleted in EVs vs WCL)
-'''
+
+# MISEV2023 category keyword matching against protein annotations:
+# - Category 1: transmembrane EV markers (should be enriched in EVs)
+# - Category 2: cytosolic EV-associated (variably enriched)
+# - Category 3: negative/contamination markers (should be depleted in EVs vs WCL)
 MISEV_CATEGORY_1 <- c("tetraspanin", "SNARE", "synaptotagmin")
 MISEV_CATEGORY_2 <- c("ESCRT", "Rab", "exocyst", "flotillin")
 MISEV_CATEGORY_3 <- c("GAPDH", "BiP", "histone", "Rubisco")
@@ -76,9 +75,9 @@ ev_frac  <- fractions[str_detect(tolower(fractions), "ev")][1]
 wcl_frac <- fractions[str_detect(tolower(fractions), "wcl")][1]
 awf_frac <- fractions[str_detect(tolower(fractions), "awf|cr")][1]
 if (!is.na(ev_frac) && !is.na(wcl_frac))
-  marker_table <- mutate(marker_table, log2_EV_vs_WCL=log2((get(paste0("avg_", ev_frac))+1e-10) / (get(paste0("avg_", wcl_frac))+1e-10)))
+  marker_table <- mutate(marker_table, log2_EV_vs_WCL=log2((.data[[paste0("avg_", ev_frac)]]+1e-10) / (.data[[paste0("avg_", wcl_frac)]]+1e-10)))
 if (!is.na(ev_frac) && !is.na(awf_frac))
-  marker_table <- mutate(marker_table, log2_EV_vs_AWF=log2((get(paste0("avg_", ev_frac))+1e-10) / (get(paste0("avg_", awf_frac))+1e-10)))
+  marker_table <- mutate(marker_table, log2_EV_vs_WCL=log2((.data[[paste0("avg_", ev_frac)]]+1e-10) / (.data[[paste0("avg_", awf_frac)]]+1e-10)))
 
 # Generate heatmap of log-dNSAF across fractions for marker proteins
 avg_cols <- intersect(paste0("avg_", fractions), colnames(marker_table))
