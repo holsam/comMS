@@ -14,12 +14,18 @@ lfq_dir <- args[8]
 lfc_threshold <- as.numeric(args[9])
 fdr_threshold <- as.numeric(args[10])
 
+# Get script directory for path traversal
+script_dir <- local({
+  args <- commandArgs(trailingOnly = FALSE)
+  script <- grep("^--file=", args, value = TRUE)
+  dirname(normalizePath(sub("^--file=", "", script)))
+})
+
 # Import utility functions
-script_dir <- dirname(sys.frame(1)$ofile)
-source(file.path(script_dir, "../utils/import.R"))
-source(file.path(script_dir, "../utils/theme.R"))
-source(file.path(script_dir, "../utils/normalise.R"))
-source(file.path(script_dir, "../utils/theme.R"))
+source(file.path(script_dir, "..", "utils", "import.R"))
+source(file.path(script_dir, "..", "utils", "limma_da.R"))
+source(file.path(script_dir, "..", "utils", "normalise.R"))
+source(file.path(script_dir, "..", "utils", "theme.R"))
 
 # Load libraries
 library(ggrepel)

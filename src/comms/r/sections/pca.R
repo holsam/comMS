@@ -11,10 +11,16 @@ cont_csv_path <- args[5]
 organism_prefix <- args[6]
 min_reps <- as.integer(args[7])
 
+# Get script directory for path traversal
+script_dir <- local({
+  args <- commandArgs(trailingOnly = FALSE)
+  script <- grep("^--file=", args, value = TRUE)
+  dirname(normalizePath(sub("^--file=", "", script)))
+})
+
 # Import utility functions
-script_dir <- dirname(sys.frame(1)$ofile)
-source(file.path(script_dir, "../utils/import.R"))
-source(file.path(script_dir, "../utils/theme.R"))
+source(file.path(script_dir, "..", "utils", "import.R"))
+source(file.path(script_dir, "..", "utils", "theme.R"))
 
 # Load libraries
 library(cluster)
