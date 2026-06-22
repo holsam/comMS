@@ -72,7 +72,7 @@ def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
                         stderr_lines.append(line)
                         live.update(Text(line, style='dim'))
         if proc.returncode != 0:
-            logMsg.warn(f'{subcommand} exited {proc.returncode}); last stderr: {stderr_lines[-1] if stderr_lines else "none"}')
+            logMsg.warn(f'{subcommand} exited {proc.returncode}; last stderr: {stderr_lines[-1] if stderr_lines else "none"}')
             return False
         return True
     except Exception as e:
@@ -189,7 +189,7 @@ def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
     if not matched:
         logMsg.warn('No mzML files matched any PSM file, aborting lfq')
         return False
-    logMsg.debug(f'Matched {len(mzml_files)} mzML file(s)')
+    logMsg.debug(f'Matched {len(matched)} mzML file(s)')
     # Concatenate all PSM files for this fraction into a single temp file
     tmp_psm = out_dir / f'{fileroot}.combined.percolator.target.psms.txt'
     logMsg.debug(f'Concatenating {len(psm_files)} PSM file(s) into {tmp_psm.name}')
