@@ -102,7 +102,17 @@ def run_pipeline(
     else:
         current_step += 1
         logMsg.progress(f'Step {current_step}/{num_steps}: generating report')
-        report.run_report(ctx=ctx, sample_sheet=sample_sheet, in_pipeline=True)
+        report.run_report(
+            ctx=ctx, 
+            sample_sheet=sample_sheet, 
+            in_pipeline=True,
+            # ! TODO: make below configurable via CLI or config?
+            min_reps=3,
+            fdr_threshold=0.05,
+            sections=['qc', 'pca', 'da'],
+            overwrite=False,
+            rscript='Rscript',
+        )
 
     END = datetime.datetime.now()
     logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {ctx.root}')
