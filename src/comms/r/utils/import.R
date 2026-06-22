@@ -30,6 +30,7 @@ loadSampleSheet <- function(sampleSheetPath) {
 # loadSpectralCounts: reads a single spectral-counts file, removes contaminant proteins, and joins reference annotations
 loadSpectralCounts <- function(spectralCountsFilePath, refInfo, contInfo) {
   read_tsv(file=spectralCountsFilePath, show_col_types=FALSE) %>%
+    rename(proteinId="protein id") %>%
     filter(!proteinId %in% contInfo$proteinId) %>%
     left_join(refInfo, by="proteinId")
 }
@@ -55,14 +56,15 @@ mergeResults <- function(resultsList) {
     imap(function(x, y) x %>%
       rename_with(~paste(., y, sep='_'), -c(proteinId, proteinAnnotation))) %>%
      reduce(full_join, by=join_by(proteinId, proteinAnnotation))
-  merged[is.na(merged)] <- 0
+  dnsaf_cols <- setdiff(colnames(merged), c("proteinId", "proteinAnnotation"))
+  merged <- merged %>% mutate(across(all_of(dnsaf_cols), ~replace_na(., 0)))
   return(merged)
 }
 
 # buildSampleMetadata: joins sample sheet to dNSAF column stems
 buildSampleMetadata <- function(dnsafColStems, sampleSheet) {
   sampleSheet %>%
-    mutate(stem=tools::file_path_sans_ext(basename(raw_file))) %>%
+    mutate(stem=sample_id) %>%
     filter(stem %in% dnsafColStems) %>%
     mutate(dnsaf_col=paste0("dNSAF_", stem))
 }
