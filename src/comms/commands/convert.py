@@ -57,18 +57,29 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     if samples is not None:
         for file in out_dir.glob('[!.]*'):
             try:
+                # Rename sample files
                 sample_id = raw_to_id.get(f'{file.stem}.raw')
                 if sample_id is not None:
                     suffixes = ''.join(file.suffixes)
                     file.rename(file.with_name(f'{sample_id}{suffixes}'))
+                # Rename metadata files
+                else:
+                    metadata_sample = raw_to_id.get(f'{file.stem.removesuffix('-metadata')}.raw')
+                    if metadata_sample is not None:
+                        suffixes = ''.join('-metadata', file.suffixes)
+                        file.rename(file.with_name(f'{metadata_sample}{suffixes}'))
             except:
                 continue
     # If --gzip was provided, gzip TRFP output
     if gzip:
-        import gzip, shutil
-        for file in out_dir.glob('[!.]*'):
+        import gzip, os, shutil
+        # Loop through each mzML file in directory
+        for file in out_dir.glob('[!.]*.mzML'):
+            # Create gzipped file
             with open(file, 'rb') as f_in:
                 with gzip.open(Path(f'{file}.gz'), 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
+            # Delete mzML file
+            os.remove(file)
     logMsg.info(f'Conversion complete: {n_ok} succeeded, {n_fail} failed')
     logMsg.debug(f'Finished command: convert')
