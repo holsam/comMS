@@ -72,20 +72,20 @@ def _write_index(output_dir: Path, params: dict, results: dict[str, bool]) -> No
 
 # -- run_report: return None, but run report section R scripts and output script
 def run_report(
-        quantify_dir,
-        sample_sheet,
-        ctx: ExperimentContext,
-        lfq_dir,
-        ref_info,
-        cont_csv,
-        organism_prefix,
-        min_reps,
-        lfc_threshold,
-        fdr_threshold,
-        sections,
-        overwrite,
-        rscript,
-        in_pipeline,
+        quantify_dir: Path | None,
+        sample_sheet: Path | None,
+        ctx: ExperimentContext | None,
+        lfq_dir: Path | None,
+        ref_info: Path | None,
+        cont_csv: Path | None,
+        organism_prefix: str | None,
+        min_reps: int,
+        lfc_threshold: float,
+        fdr_threshold: float,
+        sections: list,
+        overwrite: bool,
+        rscript: str,
+        in_pipeline: bool,
     ) -> None:
     if not in_pipeline:
         logMsg('report')
