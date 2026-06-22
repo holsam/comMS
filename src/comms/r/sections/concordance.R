@@ -87,7 +87,12 @@ for (frac in fractions) {
     as.matrix()
   log_mat_lfq[log_mat_lfq == 0] <- NA
   log_mat_lfq <- log2(log_mat_lfq)
-  da_lfq <- runLimmaDA(log_mat_lfq, treatment_vec) %>%
+  lfq_stems <- str_remove(colnames(log_mat_lfq), "^Intensity[_ ]?")
+  lfq_treatment_vec <- sample_meta$treatment[match(lfq_stems, sample_meta$stem)]
+  if (anyNA(lfq_treatment_vec)) {
+    message(sprintf("Concordance %s: %d LFQ column(s) unmatched to sample sheet — skipping", frac, sum(is.na(lfq_treatment_vec)))); next
+  }
+  da_lfq <- runLimmaDA(log_mat_lfq, lfq_treatment_vec) %>%
     classifyDA(lfc_threshold, fdr_threshold) %>%
     select(proteinId, log2FC_LFQ=log2FC, adj_pval_LFQ=adj_pval, Abundance_LFQ=Abundance)
   combined <- inner_join(da_dnsaf, da_lfq, by="proteinId")
