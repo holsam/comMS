@@ -12,7 +12,7 @@ from comms.commands import report as reportFuncs
 from comms.utils.context import ExperimentContext
 
 # -- Define constants (report sections)
-VALID_SECTIONS = {'qc', 'pca', 'da', 'primary-species', 'secondary-species', 'concordance'}
+VALID_SECTIONS = {'qc', 'pca', 'da', 'secondary-species', 'concordance', 'ev-markers'}
 DEFAULT_SECTIONS = ['qc', 'pca', 'da']
 
 # -- Initialise report Typer class
