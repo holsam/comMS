@@ -28,6 +28,7 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     try:
         from comms.utils.samples import loadSampleSheet
         samples = loadSampleSheet(ctx.sample_sheet)
+        raw_to_id = dict(zip(samples['raw_file'], samples['sample_id']))
     except Exception as e:
         logMsg.debug(f'Could not load sample sheet: {e}')
         samples = None
@@ -39,19 +40,12 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     logMsg.debug(f'Output log file: {log_path}')
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
-        # Create output name from sample sheet if present
-        if samples:
-            sample_id = samples['sample_id'][samples['raw_file']==raw_file].values[0]
-            out_file = out_dir / f'{sample_id}'
-        else:
-            out_file = out_dir / f'{raw_file.stem}'
-        logMsg.progress(f'Converting {raw_file.name} to {out_file.name}')
+        logMsg.progress(f'Converting {raw_file.name}')
         ok = trfputil.convertRaw(
             trfp_path=trfp_path,
             raw_file=raw_file,
-            out_file=out_file,
+            out_dir=out_dir,
             output_format=ctx.config['convert']['format'],
-            gzip=gzip,
             metadata=ctx.config['convert']['metadata'],
         )
         if ok:
@@ -59,5 +53,22 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
         else:
             logMsg.warn(f'Conversion failed for {raw_file.name}')
             n_fail += 1
+    # If sample sheet provided, rename files
+    if samples is not None:
+        for file in out_dir.glob('[!.]*'):
+            try:
+                sample_id = raw_to_id.get(f'{file.stem}.raw')
+                if sample_id is not None:
+                    suffixes = ''.join(file.suffixes)
+                    file.rename(file.with_name(f'{sample_id}{suffixes}'))
+            except:
+                continue
+    # If --gzip was provided, gzip TRFP output
+    if gzip:
+        import gzip, shutil
+        for file in out_dir.glob('[!.]*'):
+            with open(file, 'rb') as f_in:
+                with gzip.open(Path(f'{file}.gz'), 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
     logMsg.info(f'Conversion complete: {n_ok} succeeded, {n_fail} failed')
     logMsg.debug(f'Finished command: convert')

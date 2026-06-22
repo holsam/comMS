@@ -29,17 +29,16 @@ def findTRFP(bin_dir: Path) -> Optional[Path]:
 def convertRaw(
     trfp_path: Path,
     raw_file: Path,
-    out_file: Path,
+    out_dir: Path,
     output_format: int = 2,
-    gzip: bool = True,
     metadata: int = 0,
     log_path: Optional[Path] = None,
 ) -> bool:
-    out_file.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     # Construct base command
     cmd = [str(trfp_path),
            '--input', str(raw_file),
-           '--output', str(out_file),
+           '--output_directory', str(out_dir),
            '--format', str(output_format),
            '--metadata', str(metadata)]
     # Check if Mono is required
@@ -52,18 +51,18 @@ def convertRaw(
     log_fh = open(log_path, 'a') if log_path else subprocess.DEVNULL
     try:
         logMsg.debug(f'TFRP converting {" ".join(cmd)}')
-        stderr_lines = []
+        stdout_lines = []
         with subprocess.Popen(
             cmd,
             stderr=subprocess.PIPE,
-            stdout=log_fh,
+            stdout=subprocess.PIPE,
             text=True
         ) as proc:
             with Live('', refresh_per_second=10, transient=True) as live:
-                for line in proc.stderr:
+                for line in proc.stdout:
                     line = line.rstrip()
                     if line:
-                        stderr_lines.append(line)
+                        stdout_lines.append(line)
                         live.update(Text(line, style='dim'))
         if proc.returncode != 0:
             logMsg.warn(f'ThermoRawFileParser exited {proc.returncode} for {raw_file.name}')
@@ -74,14 +73,4 @@ def convertRaw(
     finally:
         if log_path:
             log_fh.close()
-    # If gzip was provided, gzip TRFP output
-    if gzip:
-        import gzip
-        out_match = list(out_file.parent.glob(f'{out_file.stem}.*'))
-        if len(out_match) > 1:
-            logMsg.warn(f'Could not compress ThermoRawFileParser output')
-        trfp_out = out_match[0]
-        with open(trfp_out, 'rb') as f_in:
-            with gzip.open(Path(f'{trfp_out}.gz'), 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
     return True
