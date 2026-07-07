@@ -45,76 +45,79 @@ fractions  <- unique(sample_meta$fraction)
 treatments <- sort(unique(sample_meta$treatment))
 
 # Load LFQ files (one per fraction subdirectory)
-lfq_files <- list.files(lfq_dir, pattern="QuantifiedProteins\\.tsv", full.names=TRUE, recursive=TRUE)
-if (length(lfq_files) == 0) stop("No QuantifiedProteins.tsv files found under: ", lfq_dir)
-lfq_data <- bind_rows(lapply(lfq_files, function(f) {
-  read_tsv(f, show_col_types=FALSE) %>% mutate(Fraction=basename(dirname(f)))
-}))
+lfq_data <- loadLfqFiles(lfq_dir)
 
 # Initialise list for concordance statistics
 concordance_stats <- list()
 
-# Loop through each fraction
-for (frac in fractions) {
-  frac_meta <- filter(sample_meta, fraction==frac)
-  frac_cols <- frac_meta$dnsaf_col
+organisms <- unique(sample_meta$organism)
+concordance_stats <- list()
 
-  # dNSAF DA via limma
-  frac_data <- results_wide %>%
-    select(proteinId, all_of(frac_cols)) %>%
-    filter(startsWith(proteinId, organism_prefix))
-  log_mat_dnsaf <- frac_data %>%
-    column_to_rownames("proteinId") %>%
-    as.matrix() %>%
-    logdNSAF()
-  treatment_vec <- frac_meta %>%
-    arrange(match(dnsaf_col, frac_cols)) %>%
-    pull(treatment)
-  da_dnsaf <- runLimmaDA(log_mat_dnsaf, treatment_vec) %>%
-    classifyDA(lfc_threshold, fdr_threshold) %>%
-    select(proteinId, log2FC_dNSAF=log2FC, adj_pval_dNSAF=adj_pval,
-           Abundance_dNSAF=Abundance)
+for (org in organisms) {
+  org_meta <- filter(sample_meta, organism == org)
+  fractions <- unique(org_meta$fraction)
 
-  # LFQ DA via limma
-  lfq_frac <- filter(lfq_data, Fraction==frac)
-  if (nrow(lfq_frac) == 0) {
-    message(sprintf("Concordance %s: no LFQ data found — skipping", frac)); next
+  for (frac in fractions) {
+    frac_meta <- filter(org_meta, fraction == frac)
+    frac_cols <- frac_meta$dnsaf_col
+
+    frac_data <- results_wide %>%
+      select(proteinId, all_of(frac_cols)) %>%
+      filter(rowSums(select(., -proteinId) > 0) > 0)
+    log_mat_dnsaf <- frac_data %>%
+      column_to_rownames("proteinId") %>%
+      as.matrix() %>%
+      logdNSAF()
+    treatment_vec <- frac_meta %>%
+      arrange(match(dnsaf_col, frac_cols)) %>%
+      pull(treatment)
+    if (length(unique(treatment_vec)) < 2) {
+      message(sprintf("DA %s %s: fewer than 2 treatment levels in this fraction — skipping", org, frac))
+      next
+    }
+    da_dnsaf <- runLimmaDA(log_mat_dnsaf, treatment_vec) %>%
+      classifyDA(lfc_threshold, fdr_threshold) %>%
+      select(proteinId, log2FC_dNSAF=log2FC, adj_pval_dNSAF=adj_pval,
+      Abundance_dNSAF=Abundance)
+    lfq_frac <- filter(lfq_data, Fraction==frac)
+    if (nrow(lfq_frac) == 0) {
+      message(sprintf("Concordance %s %s: no LFQ data found — skipping", org, frac)); next
+    }
+
+    lfq_sample_cols <- setdiff(colnames(lfq_frac), c("proteinId", "Fraction"))
+    lfq_treatment_vec <- tibble(sample_id = lfq_sample_cols) %>%
+      inner_join(samples, by = "sample_id") %>%
+      pull(treatment)
+
+    log_mat_lfq <- lfq_frac %>%
+      select(proteinId, all_of(lfq_sample_cols)) %>%
+      column_to_rownames("proteinId") %>%
+      as.matrix() %>%
+      log2()
+    da_lfq <- runLimmaDA(log_mat_lfq, lfq_treatment_vec) %>%
+      classifyDA(lfc_threshold, fdr_threshold) %>%
+      select(proteinId, log2FC_LFQ=log2FC, adj_pval_LFQ=adj_pval, Abundance_LFQ=Abundance)
+    combined <- inner_join(da_dnsaf, da_lfq, by="proteinId")
+    key <- paste(org, frac, sep = "_")
+    concordance_stats[[key]] <- combined
+    r_val <- cor(combined$log2FC_dNSAF, combined$log2FC_LFQ, use = "complete.obs")
+    scatter <- ggplot(combined, aes(x=log2FC_dNSAF, y=log2FC_LFQ)) +
+      geom_point(aes(colour=Abundance_dNSAF), alpha=0.6) +
+      geom_smooth(method="lm", se=FALSE, colour="black", linewidth=0.5) +
+      scale_colour_manual(values=c("Increased"="#CC6677","Decreased"="#88CCEE","Unchanged"="grey70")) +
+      theme_comms() +
+      labs(title=sprintf("LFQ vs dNSAF concordance — %s %s", org, frac), x=expression(log[2](FC)~dNSAF), y=expression(log[2](FC)~LFQ), colour="DA (dNSAF)") +
+      annotate("text", x=Inf, y=-Inf, hjust=1.1, vjust=-0.5, size=3.5, label=sprintf("r = %.2f (n=%d proteins)", r_val, nrow(combined)))
+    svglite(file.path(output_dir, sprintf("lfq_vs_dnsaf_%s_%s.svg", frac, org)), width=8, height=7)
+    print(scatter); dev.off()
   }
-  intensity_cols <- colnames(lfq_frac)[str_starts(colnames(lfq_frac), "Intensity")]
-  log_mat_lfq <- lfq_frac %>%
-    select(proteinId=ProteinGroups, all_of(intensity_cols)) %>%
-    column_to_rownames("proteinId") %>%
-    as.matrix()
-  log_mat_lfq[log_mat_lfq == 0] <- NA
-  log_mat_lfq <- log2(log_mat_lfq)
-  lfq_stems <- str_remove(colnames(log_mat_lfq), "^Intensity[_ ]?")
-  lfq_treatment_vec <- sample_meta$treatment[match(lfq_stems, sample_meta$stem)]
-  if (anyNA(lfq_treatment_vec)) {
-    message(sprintf("Concordance %s: %d LFQ column(s) unmatched to sample sheet — skipping", frac, sum(is.na(lfq_treatment_vec)))); next
-  }
-  da_lfq <- runLimmaDA(log_mat_lfq, lfq_treatment_vec) %>%
-    classifyDA(lfc_threshold, fdr_threshold) %>%
-    select(proteinId, log2FC_LFQ=log2FC, adj_pval_LFQ=adj_pval, Abundance_LFQ=Abundance)
-  combined <- inner_join(da_dnsaf, da_lfq, by="proteinId")
-  concordance_stats[[frac]] <- combined
-  r_val <- cor(combined$log2FC_dNSAF, combined$log2FC_LFQ, use="complete.obs")
-  # Generate scatter plot
-  scatter <- ggplot(combined, aes(x=log2FC_dNSAF, y=log2FC_LFQ)) +
-    geom_point(aes(colour=Abundance_dNSAF), alpha=0.6) +
-    geom_smooth(method="lm", se=FALSE, colour="black", linewidth=0.5) +
-    scale_colour_manual(values=c("Increased"="#CC6677","Decreased"="#88CCEE","Unchanged"="grey70")) +
-    theme_comms() +
-    labs(title=sprintf("LFQ vs dNSAF concordance — %s", frac), x=expression(log[2](FC)~dNSAF), y=expression(log[2](FC)~LFQ), colour="DA (dNSAF)") +
-    annotate("text", x=Inf, y=-Inf, hjust=1.1, vjust=-0.5, size=3.5, label=sprintf("r = %.2f (n=%d proteins)", r_val, nrow(combined)))
-  svglite(file.path(output_dir, sprintf("lfq_vs_dnsaf_%s.svg", frac)), width=8, height=7)
-  print(scatter); dev.off()
 }
 
 # Export .xlsx spreadsheet
 wb <- wb_workbook()
-for (frac in names(concordance_stats)) {
-  sn <- substr(frac, 1, 31)
-  wb$add_worksheet(sn); wb$add_data(sn, concordance_stats[[frac]])
+for (key in names(concordance_stats)) {
+  sn <- substr(key, 1, 31)
+  wb$add_worksheet(sn); wb$add_data(sn, concordance_stats[[key]])
 }
 wb_save(wb, file.path(output_dir, "concordance_stats.xlsx"))
 message("Concordance section complete")
