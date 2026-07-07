@@ -20,6 +20,7 @@ script_dir <- local({
 
 # Import utility functions
 source(file.path(script_dir, "..", "utils", "import.R"))
+source(file.path(script_dir, "..", "utils", "status.R"))
 source(file.path(script_dir, "..", "utils", "theme.R"))
 
 # Load libraries
@@ -27,6 +28,9 @@ library(cluster)
 library(ggfortify)
 library(ggrepel)
 library(svglite)
+
+# Define variable for minimum samples required to run clustering
+MIN_SAMPLES_FOR_PCA <- max(min_reps, 2)
 
 # Import files
 ref_info <- loadRefInfo(ref_info_path)
@@ -38,36 +42,55 @@ dnsaf_cols <- colnames(results_wide)[startsWith(colnames(results_wide), "dNSAF_"
 sample_meta <- buildSampleMetadata(str_remove(dnsaf_cols, "dNSAF_"), samples)
 
 organisms <- unique(sample_meta$organism)
+status <- new_status_tracker("pca")
+
 for (org in organisms) {
-  org_meta <- filter(sample_meta, organism == org)
-  org_cols <- org_meta$dnsaf_col
-  label_map <- setNames(org_meta$sample_id, org_meta$dnsaf_col)
+  tryCatch({
+    org_meta <- filter(sample_meta, organism == org)
+    org_cols <- org_meta$dnsaf_col
+    label_map <- setNames(org_meta$sample_id, org_meta$dnsaf_col)
+    
+    if (length(org_cols) < MIN_SAMPLES_FOR_PCA) {
+      reason <- sprintf("only %d sample(s) available (need >= %d for clustering)", length(org_cols), MIN_SAMPLES_FOR_PCA)
+      message(sprintf("PCA %s: %s - skipping", org, reason))
+      status <<- record_skip(status, org, reason)
+      next
+    }
 
-  org_data <- results_wide %>%
-    filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
+    org_data <- results_wide %>%
+      filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
 
-  pca_mat <- org_data %>%
-    select(proteinId, all_of(org_cols)) %>%
-    column_to_rownames("proteinId") %>%
-    rename_with(~label_map[.]) %>%
-    t()
+    pca_mat <- org_data %>%
+      select(proteinId, all_of(org_cols)) %>%
+      column_to_rownames("proteinId") %>%
+      rename_with(~label_map[.]) %>%
+      t()
 
-  k <- max(2, min(length(unique(org_meta$fraction)), nrow(pca_mat) - 1))
-  pca_data <- clara(pca_mat, k=k, metric="euclidean", stand=FALSE, samples=500, sampsize=nrow(pca_mat), pamLike=TRUE, correct.d=TRUE)
+    k <- max(2, min(length(unique(org_meta$fraction)), nrow(pca_mat) - 1))
+    pca_data <- clara(pca_mat, k=k, metric="euclidean", stand=FALSE, samples=500, sampsize=nrow(pca_mat), pamLike=TRUE, correct.d=TRUE)
 
-  pca_plot <- autoplot(pca_data, frame=TRUE, frame.type="t", size=5) +
-    theme_comms() +
-    geom_text_repel(label=rownames(pca_mat), size=4, box.padding=0.5, point.padding=0.75, direction="both", force=15, max.overlaps=Inf) +
-    scale_color_manual(values=COMMS_COLOURS) +
-    scale_fill_manual(values=COMMS_COLOURS) +
-    labs(colour="Cluster", fill="Cluster", title=sprintf("PCA — %s", org))
-  svglite(file.path(output_dir, sprintf("pca_%s.svg", org)), width=10, height=8)
-  print(pca_plot); dev.off()
+    pca_plot <- autoplot(pca_data, frame=TRUE, frame.type="t", size=5) +
+      theme_comms() +
+      geom_text_repel(label=rownames(pca_mat), size=4, box.padding=0.5, point.padding=0.75, direction="both", force=15, max.overlaps=Inf) +
+      scale_color_manual(values = COMMS_COLOURS) +
+      scale_fill_manual(values = COMMS_COLOURS) +
+      labs(colour="Cluster", fill="Cluster", title=sprintf("PCA — %s", org))
+    svglite(file.path(output_dir, sprintf("pca_%s.svg", org)), width=10, height=8)
+    print(pca_plot); dev.off()
 
-  dist_mat <- dist(scale(pca_mat), method="euclidean")
-  hc <- hclust(dist_mat, method="average")
-  svglite(file.path(output_dir, sprintf("dendrogram_%s.svg", org)), width=10, height=6)
-  plot(hc, main=sprintf("Sample clustering — %s", org), xlab="", sub="", ylab="Distance", cex=0.9)
-  dev.off()
+    dist_mat <- dist(scale(pca_mat), method="euclidean")
+    hc <- hclust(dist_mat, method="average")
+    svglite(file.path(output_dir, sprintf("dendrogram_%s.svg", org)), width=10, height=6)
+    plot(hc, main=sprintf("Sample clustering — %s", org), xlab="", sub="", ylab="Distance", cex=0.9)
+    dev.off()
+
+    status <<- record_ok(status, org)
+  }, error = function(e) {
+    while (dev.cur() != 1) dev.off()
+    message(sprintf("PCA %s: error — %s", org, conditionMessage(e)))
+    status <<- record_fail(status, org, conditionMessage(e))
+  })
 }
+
+write_status(status, output_dir)
 message("PCA section complete")
