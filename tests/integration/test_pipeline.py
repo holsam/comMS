@@ -653,7 +653,7 @@ class TestRunRescoreSingleSpecies:
 
     @patch('comms.commands.rescore.cruxutil.percolator')
     def test_percolator_called_once_per_file(
-        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path
+        self, mock_perc, crux_bin, single_species_context, mock_search_output, two_organism_fasta, tmp_path
     ):
         '''Single-species mode: only the combined round runs, one call per input file.'''
         rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
@@ -674,7 +674,7 @@ class TestRunRescoreSingleSpecies:
 
     @patch('comms.commands.rescore.cruxutil.percolator')
     def test_no_per_organism_subdirectories_created(
-        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, tmp_path
+        self, mock_perc, crux_bin, single_species_context, mock_search_output, two_organism_fasta, tmp_path
     ):
         def _side_effect(**kwargs):
             kwargs['out_dir'].mkdir(parents=True, exist_ok=True)
@@ -694,7 +694,7 @@ class TestRunRescoreSingleSpecies:
 
     @patch('comms.commands.rescore.cruxutil.percolator')
     def test_ignores_supplied_organism_tags_with_warning(
-        self, mock_perc, single_species_context, mock_search_output, two_organism_fasta, caplog
+        self, mock_perc, crux_bin, single_species_context, mock_search_output, two_organism_fasta, caplog
     ):
         def _side_effect(**kwargs):
             kwargs['out_dir'].mkdir(parents=True, exist_ok=True)
@@ -889,7 +889,7 @@ class TestRunQuantify:
 class TestQuantifyFlatOutput:
     @patch('comms.commands.quantify.cruxutil.spectralCounts')
     def test_quantify_finds_flat_output(
-        self, mock_sc, tmp_path, experiment_ctx, monkeypatch, two_organism_fasta
+        self, mock_sc, crux_bin, tmp_path, experiment_ctx, monkeypatch, two_organism_fasta
     ):
         '''quantify discovers flat Percolator PSM files in the rescore root (single-species layout)'''
         rescore_dir = tmp_path / 'rescore'

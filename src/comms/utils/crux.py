@@ -20,11 +20,11 @@ def _cleanBinaryFasta(dest_dir: Path):
     Context manager that moves any *-binary-fasta files written to CWD
     during a Crux call into dest_dir afterwards.
     '''
-    before = set(Path.cwd().glob('*-binary-fasta'))
+    before = set(Path.cwd().glob('[!.]*-binary-fasta'))
     try:
         yield
     finally:
-        after = set(Path.cwd().glob('*-binary-fasta'))
+        after = set(Path.cwd().glob('[!.]*-binary-fasta'))
         for f in after - before:
             shutil.move(str(f), str(dest_dir / f.name))
 
@@ -72,7 +72,7 @@ def runCrux(crux_bin: Path, subcommand: str, args: list) -> bool:
                         stderr_lines.append(line)
                         live.update(Text(line, style='dim'))
         if proc.returncode != 0:
-            logMsg.warn(f'{subcommand} exited {proc.returncode}); last stderr: {stderr_lines[-1] if stderr_lines else "none"}')
+            logMsg.warn(f'{subcommand} exited {proc.returncode}; last stderr: {stderr_lines[-1] if stderr_lines else "none"}')
             return False
         return True
     except Exception as e:
@@ -155,7 +155,7 @@ def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: P
 # -- spectralCounts: returns True if dNSAF spectral counting completed successfully, False on failure
 def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
     logMsg.debug(f'spectral-counts: {psm_file.name}')
-    args = [
+    measurement_args = [
         '--verbosity', '40',
         '--measure', config['quantify']['measure'],
         '--threshold', str(config['quantify']['qvalue_threshold']),
@@ -163,12 +163,26 @@ def spectralCounts(crux_bin: Path, psm_file: Path, database: Path, out_dir: Path
         '--unique-mapping', _tomlToCrux(config['quantify']['unique_mapping']),
         '--protein-database', str(database),
         '--output-dir', str(out_dir),
-        '--fileroot', fileroot,
+        '--fileroot', f'{fileroot}_{config['quantify']['measure']}',
         '--overwrite', 'T',
         str(psm_file),
     ]
     with _cleanBinaryFasta(out_dir):
-        return runCrux(crux_bin, 'spectral-counts', args)
+        measurement_run = runCrux(crux_bin, 'spectral-counts', measurement_args)
+    if measurement_run:
+        raw_args = [
+            '--verbosity', '40',
+            '--measure', 'RAW',
+            '--threshold-type', 'none',
+            '--output-dir', str(out_dir),
+            '--fileroot', f'{fileroot}_RAW',
+            '--overwrite', 'T',
+            str(psm_file),
+        ]
+        raw_run = runCrux(crux_bin, 'spectral-counts', raw_args)
+        return True if raw_run else False
+    else:
+        return False
 
 # -- lfq: returns True if LFQ quantification completed successfully, False on failure
 def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
@@ -189,7 +203,7 @@ def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
     if not matched:
         logMsg.warn('No mzML files matched any PSM file, aborting lfq')
         return False
-    logMsg.debug(f'Matched {len(mzml_files)} mzML file(s)')
+    logMsg.debug(f'Matched {len(matched)} mzML file(s)')
     # Concatenate all PSM files for this fraction into a single temp file
     tmp_psm = out_dir / f'{fileroot}.combined.percolator.target.psms.txt'
     logMsg.debug(f'Concatenating {len(psm_files)} PSM file(s) into {tmp_psm.name}')

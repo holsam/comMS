@@ -46,7 +46,7 @@ def run_pipeline(
         logMsg.error(f'Could not load sample sheet: {e}')
         raise SystemExit(1)
     logMsg.debug(f"Sample sheet loaded: {len(samples)} sample(s); {samples['treatment'].nunique()} treatment(s)")
-    logMsg.info(f'Running comMS pipeline: {len(samples)} sample(s), {samples['treatment'].nunique()} treatment(s)')
+    logMsg.info(f"Running comMS pipeline: {len(samples)} sample(s), {samples['treatment'].nunique()} treatment(s)")
     # -- Step 1: Convert (optional)
     if not skip_convert:
         current_step += 1
@@ -100,9 +100,26 @@ def run_pipeline(
     if skip_report:
         logMsg.progress(f'Skipped report generation')
     else:
+        from comms.cli.report import VALID_SECTIONS
         current_step += 1
         logMsg.progress(f'Step {current_step}/{num_steps}: generating report')
-        report.run_report(ctx=ctx, sample_sheet=sample_sheet, in_pipeline=True)
+        report.run_report(
+            ctx=ctx, 
+            sample_sheet=sample_sheet, 
+            in_pipeline=True,
+            quantify_dir=None,
+            lfq_dir=None,
+            ref_info=None,
+            cont_csv=None,
+            organism_prefix=None,
+            # ! TODO: make below configurable via CLI or config?
+            min_reps=3,
+            fdr_threshold=0.05,
+            lfc_threshold=1.0,
+            sections=VALID_SECTIONS,
+            overwrite=False,
+            rscript='Rscript',
+        )
 
     END = datetime.datetime.now()
     logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {ctx.root}')

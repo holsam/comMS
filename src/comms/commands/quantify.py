@@ -25,9 +25,12 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
     database = resolve_database(ctx, database)
     # Discover both layouts: per-organism subdirectories and flat
     logMsg.debug(f'Scanning {input_dir} for rescored PSMs')
-    psm_files = sorted(input_dir.glob('[!.]*/*.percolator.target.psms.txt'))  # multi (per-organism)
-    psm_files += sorted(input_dir.glob('[!.]*.percolator.target.psms.txt'))    # single (flat)
-
+    # Discover per-organism rescored results
+    psm_files = sorted(input_dir.glob('[!._]*/[!._]*.percolator.target.psms.txt'))  # multi (per-organism)
+    # If no per-organism files found, search for flat layout
+    if not psm_files:
+        psm_files += sorted(input_dir.glob('[!._]*.percolator.target.psms.txt'))    # single (flat)
+    # Check there are files to analyse
     if not psm_files:
         logMsg.error(f'No rescored PSM files found in {input_dir}')
         raise SystemExit(1)
