@@ -24,6 +24,7 @@ script_dir <- local({
 source(file.path(script_dir, "..", "utils", "import.R"))
 source(file.path(script_dir, "..", "utils", "limma_da.R"))
 source(file.path(script_dir, "..", "utils", "normalise.R"))
+source(file.path(script_dir, "..", "utils", "status.R"))
 source(file.path(script_dir, "..", "utils", "theme.R"))
 
 # Load libraries
@@ -47,76 +48,91 @@ if (length(treatments) != 2) stop("DA section requires exactly two treatment lev
 # Initialise list for differentially abundant results
 da_results_all <- list()
 
+status <- new_status_tracker("da")
+
 for (org in organisms) {
   org_meta <- filter(sample_meta, organism == org)
   fractions <- unique(org_meta$fraction)
 
   for (frac in fractions) {
-    frac_meta <- filter(org_meta, fraction==frac)
-    frac_cols <- frac_meta$dnsaf_col
+    tryCatch({
+      frac_meta <- filter(org_meta, fraction == frac)
+      frac_cols <- frac_meta$dnsaf_col
 
-    frac_data <- results_wide %>%
-      select(proteinId, proteinAnnotation, all_of(frac_cols)) %>%
-      filter(rowSums(select(., all_of(frac_cols)) > 0) > 0)
+      frac_data <- results_wide %>%
+        select(proteinId, proteinAnnotation, all_of(frac_cols)) %>%
+        filter(rowSums(select(., all_of(frac_cols)) > 0) > 0)
 
-    for (trt in treatments) {
-      trt_cols <- filter(frac_meta, treatment==trt)$dnsaf_col
-      frac_data[[paste0("n_", trt)]] <- rowSums(select(frac_data, all_of(trt_cols)) > 0)
-    }
-    frac_data <- filter(frac_data, if_any(starts_with("n_"), ~. >= min_reps))
+      for (trt in treatments) {
+        trt_cols <- filter(frac_meta, treatment == trt)$dnsaf_col
+        frac_data[[paste0("n_", trt)]] <- rowSums(select(frac_data, all_of(trt_cols)) > 0)
+      }
+      frac_data <- filter(frac_data, if_any(starts_with("n_"), ~. >= min_reps))
 
-    if (nrow(frac_data) < 5) {
-      message(sprintf("DA %s %s: too few proteins after replicate filter (%d) — skipping", org, frac, nrow(frac_data))); next
-    }
+      if (nrow(frac_data) < 5) {
+        reason <- sprintf("too few proteins after replicate filter (%d) in fraction %s", nrow(frac_data), frac)
+        message(sprintf("DA %s %s: %s — skipping", org, frac, reason))
+        status <<- record_skip(status, org, reason)
+        next
+      }
 
-    log_mat <- frac_data %>%
-      select(proteinId, all_of(frac_cols)) %>%
-      column_to_rownames("proteinId") %>%
-      as.matrix() %>%
-      logdNSAF()
-    treatment_vec <- frac_meta %>%
-      arrange(match(dnsaf_col, frac_cols)) %>%
-      pull(treatment)
+      log_mat <- frac_data %>%
+        select(proteinId, all_of(frac_cols)) %>%
+        column_to_rownames("proteinId") %>%
+        as.matrix() %>%
+        logdNSAF()
+      treatment_vec <- frac_meta %>%
+        arrange(match(dnsaf_col, frac_cols)) %>%
+        pull(treatment)
 
-    if (length(unique(treatment_vec)) < 2) {
-      message(sprintf("DA %s %s: fewer than 2 treatment levels in this fraction — skipping", org, frac))
-      next
-    }
+      if (length(unique(treatment_vec)) < 2) {
+        reason <- sprintf("fewer than 2 treatment levels in fraction %s", frac)
+        message(sprintf("DA %s %s: %s — skipping", org, frac, reason))
+        status <<- record_skip(status, org, reason)
+        next
+      }
 
-    da_res <- runLimmaDA(log_mat, treatment_vec) %>%
-      classifyDA(lfc_threshold, fdr_threshold) %>%
-      left_join(select(frac_data, proteinId, proteinAnnotation), by="proteinId")
+      da_res <- runLimmaDA(log_mat, treatment_vec) %>%
+        classifyDA(lfc_threshold, fdr_threshold) %>%
+        left_join(select(frac_data, proteinId, proteinAnnotation), by = "proteinId")
 
-    key <- paste(org, frac, sep="_")
-    da_results_all[[key]] <- da_res
+      key <- paste(org, frac, sep = "_")
+      da_results_all[[key]] <- da_res
 
-  # Generate volcano plot
-    top_labels <- filter(da_res, Abundance != "Unchanged") %>% slice_min(adj_pval, n=20)
-    volcano <- ggplot(da_res, aes(x=log2FC, y=-log10(adj_pval), colour=Abundance)) +
-      geom_point(alpha=0.7, size=1.5) +
-      geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", colour="grey50") +
-      geom_vline(xintercept=c(-lfc_threshold, lfc_threshold), linetype="dashed", colour="grey50") +
-      geom_text_repel(data=top_labels, aes(label=proteinAnnotation), size=3, max.overlaps=15) +
-      scale_colour_manual(values=c("Increased"="#CC6677","Decreased"="#88CCEE","Unchanged"="grey70")) +
-      theme_comms() +
-      labs(title=sprintf("DA — %s %s (%s vs %s)", org, frac, treatments[2], treatments[1]), x=expression(log[2](FC)), y=expression(-log[10](adj.p)))
-    svglite(file.path(output_dir, sprintf("volcano_%s_%s.svg", frac, org)), width=10, height=7)
-    print(volcano); dev.off()
+      top_labels <- filter(da_res, Abundance != "Unchanged") %>% 
+        slice_min(adj_pval, n=20)
+      volcano <- ggplot(da_res, aes(x=log2FC, y=-log10(adj_pval), colour=Abundance)) +
+        geom_point(alpha=0.7, size=1.5) +
+        geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", colour="grey50") +
+        geom_vline(xintercept=c(-lfc_threshold, lfc_threshold), linetype="dashed", colour="grey50") +
+        geom_text_repel(data=top_labels, aes(label=proteinAnnotation), size=3, max.overlaps=15) +
+        scale_colour_manual(values=c("Increased"="#CC6677", "Decreased"="#88CCEE", "Unchanged"="grey70")) +
+        theme_comms() +
+        labs(title=sprintf("DA — %s %s (%s vs %s)", org, frac, treatments[2], treatments[1]), x=expression(log[2](FC)), y=expression(-log[10](adj.p)))
+      svglite(file.path(output_dir, sprintf("volcano_%s_%s.svg", frac, org)), width=10, height=7)
+      print(volcano); dev.off()
+
+      status <<- record_ok(status, org)
+    }, error = function(e) {
+      while (dev.cur() != 1) dev.off()
+      message(sprintf("DA %s %s: error — %s", org, frac, conditionMessage(e)))
+      status <<- record_fail(status, org, conditionMessage(e))
+    })
   }
 }
+
+write_status(status, output_dir)
 
 # Venn diagrams per organism
 for (org in organisms) {
   org_results <- da_results_all[str_starts(names(da_results_all), org)]
-  da_up_sets   <- lapply(org_results, function(x) filter(x, Abundance == "Increased")$proteinId)
+  da_up_sets <- lapply(org_results, function(x) filter(x, Abundance == "Increased")$proteinId)
   da_down_sets <- lapply(org_results, function(x) filter(x, Abundance == "Decreased")$proteinId)
   names(da_up_sets) <- names(da_down_sets) <- str_remove(names(org_results), paste0(org, "_"))
   if (length(da_up_sets) >= 2) {
-    venn_up <- venn.diagram(da_up_sets, filename=NULL, disable.logging=TRUE,
-                            category.names=names(da_up_sets))
+    venn_up <- venn.diagram(da_up_sets, filename=NULL, disable.logging=TRUE, category.names=names(da_up_sets))
     ggsave(file.path(output_dir, sprintf("venn_da_up_%s.svg", org)), venn_up)
-    venn_down <- venn.diagram(da_down_sets, filename=NULL, disable.logging=TRUE,
-                              category.names=names(da_down_sets))
+    venn_down <- venn.diagram(da_down_sets, filename=NULL, disable.logging=TRUE, category.names=names(da_down_sets))
     ggsave(file.path(output_dir, sprintf("venn_da_down_%s.svg", org)), venn_down)
   }
 }
