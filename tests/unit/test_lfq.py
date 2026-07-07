@@ -29,7 +29,7 @@ def _make_psm_files(tmp_path: Path, stems: list[str]) -> list[Path]:
 class TestGroupPsmsByFraction:
     def test_returns_dict(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -37,12 +37,12 @@ class TestGroupPsmsByFraction:
 
     def test_groups_three_fractions_correctly(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'mock_wcl.RAW',  'fraction': 'WCL'},
-            {'raw_file': 'treat_wcl.RAW', 'fraction': 'WCL'},
-            {'raw_file': 'mock_ecf.RAW',  'fraction': 'ECF'},
-            {'raw_file': 'treat_ecf.RAW', 'fraction': 'ECF'},
-            {'raw_file': 'mock_pur.RAW',   'fraction': 'PUR'},
-            {'raw_file': 'treat_pur.RAW',  'fraction': 'PUR'},
+            {'raw_file': 'mock_wcl.RAW', 'sample_id': 'mock_wcl',  'fraction': 'WCL'},
+            {'raw_file': 'treat_wcl.RAW', 'sample_id': 'treat_wcl', 'fraction': 'WCL'},
+            {'raw_file': 'mock_ecf.RAW', 'sample_id': 'mock_ecf',  'fraction': 'ECF'},
+            {'raw_file': 'treat_ecf.RAW', 'sample_id': 'treat_ecf', 'fraction': 'ECF'},
+            {'raw_file': 'mock_pur.RAW', 'sample_id': 'mock_pur', 'fraction': 'PUR'},
+            {'raw_file': 'treat_pur.RAW', 'sample_id': 'treat_pur', 'fraction': 'PUR'},
         ])
         psm_files = _make_psm_files(
             tmp_path,
@@ -53,9 +53,9 @@ class TestGroupPsmsByFraction:
 
     def test_each_fraction_contains_correct_files(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'mock_wcl.RAW',  'fraction': 'WCL'},
-            {'raw_file': 'treat_wcl.RAW', 'fraction': 'WCL'},
-            {'raw_file': 'mock_pur.RAW',   'fraction': 'PUR'},
+            {'raw_file': 'mock_wcl.RAW', 'sample_id': 'mock_wcl', 'fraction': 'WCL'},
+            {'raw_file': 'treat_wcl.RAW', 'sample_id': 'treat_wcl', 'fraction': 'WCL'},
+            {'raw_file': 'mock_pur.RAW', 'sample_id': 'mock_pur', 'fraction': 'PUR'},
         ])
         psm_files = _make_psm_files(tmp_path, ['mock_wcl', 'treat_wcl', 'mock_pur'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -64,7 +64,7 @@ class TestGroupPsmsByFraction:
 
     def test_values_are_lists_of_paths(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -75,8 +75,8 @@ class TestGroupPsmsByFraction:
 
     def test_paths_in_result_match_input_paths(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
-            {'raw_file': 'sample_b.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
+            {'raw_file': 'sample_b.RAW', 'sample_id': 'sample_b', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a', 'sample_b'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -84,8 +84,8 @@ class TestGroupPsmsByFraction:
 
     def test_single_fraction_returns_one_key(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
-            {'raw_file': 'sample_b.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
+            {'raw_file': 'sample_b.RAW', 'sample_id': 'sample_b', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a', 'sample_b'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -93,8 +93,8 @@ class TestGroupPsmsByFraction:
 
     def test_single_fraction_contains_all_files(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
-            {'raw_file': 'sample_b.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
+            {'raw_file': 'sample_b.RAW', 'sample_id': 'sample_b', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a', 'sample_b'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -102,7 +102,7 @@ class TestGroupPsmsByFraction:
 
     def test_single_fraction_still_returns_dict(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['sample_a'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -110,7 +110,7 @@ class TestGroupPsmsByFraction:
 
     def test_unmatched_file_is_excluded_from_result(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'known_sample.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'known_sample.RAW', 'sample_id': 'known_sample', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['known_sample', 'unknown_sample'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -122,7 +122,7 @@ class TestGroupPsmsByFraction:
 
     def test_all_files_unmatched_returns_empty_dict(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'different_name.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'different_name.RAW', 'sample_id': 'different_name', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['unknown_a', 'unknown_b'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -130,20 +130,20 @@ class TestGroupPsmsByFraction:
 
     def test_empty_psm_list_returns_empty_dict(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'sample_a.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'sample_a.RAW', 'sample_id': 'sample_a', 'fraction': 'WCL'},
         ])
         result = _groupPsmsByFraction([], samples)
         assert result == {}
 
     def test_empty_sample_sheet_returns_empty_dict(self, tmp_path):
-        samples = pd.DataFrame(columns=['raw_file', 'fraction'])
+        samples = pd.DataFrame(columns=['raw_file', 'sample_id', 'fraction'])
         psm_files = _make_psm_files(tmp_path, ['sample_a'])
         result = _groupPsmsByFraction(psm_files, samples)
         assert result == {}
     
     def test_matches_raw_file_with_raw_extension(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'SAMPLE_A.RAW', 'fraction': 'WCL'},
+            {'raw_file': 'SAMPLE_A.RAW', 'sample_id': 'SAMPLE_A', 'fraction': 'WCL'},
         ])
         psm_files = _make_psm_files(tmp_path, ['SAMPLE_A'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -151,7 +151,7 @@ class TestGroupPsmsByFraction:
 
     def test_matches_raw_file_with_mzML_extension(self, tmp_path):
         samples = _make_samples([
-            {'raw_file': 'SAMPLE_B.mzML', 'fraction': 'ECF'},
+            {'raw_file': 'SAMPLE_B.mzML', 'sample_id': 'SAMPLE_B', 'fraction': 'ECF'},
         ])
         psm_files = _make_psm_files(tmp_path, ['SAMPLE_B'])
         result = _groupPsmsByFraction(psm_files, samples)
@@ -160,7 +160,7 @@ class TestGroupPsmsByFraction:
     def test_matches_raw_file_without_extension(self, tmp_path):
         '''raw_file column without extension should match PSM stem directly.'''
         samples = _make_samples([
-            {'raw_file': 'SAMPLE_C', 'fraction': 'PUR'},
+            {'raw_file': 'SAMPLE_C', 'sample_id': 'SAMPLE_C', 'fraction': 'PUR'},
         ])
         psm_files = _make_psm_files(tmp_path, ['SAMPLE_C'])
         result = _groupPsmsByFraction(psm_files, samples)
