@@ -3,7 +3,7 @@ comMS report functions
 '''
 
 # -- Import external dependencies
-import shutil, subprocess, sys
+import json, shutil, subprocess, sys
 from datetime import datetime
 from importlib.resources import files as pkg_files
 from pathlib import Path
@@ -18,24 +18,64 @@ from comms.utils.context import ExperimentContext, resolve_organism_prefix, reso
 # -- Initialise Rich console
 console = Console()
 
-# -- Define helper dictionary matching sections to R scripts and whether they require LFQ data
-_SECTIONS: dict[str, tuple[str, bool]] = {
-    # Core sections
-    'qc': ('qc.R', False),
-    'pca': ('pca.R', False),
-    'da': ('da.R', False),
-    'secondary-species': ('secondary-species.R', False),
-    'concordance': ('concordance.R', True),
+# -- Define helper dictionary matching sections to R scripts, LFQ requirement, and whether the section reports per-organism status
+_SECTIONS: dict[str, tuple[str, bool, bool]] = {
+    # Core sections: (script, needs_lfq, per_organism)
+    'qc': ('qc.R', False, True),
+    'pca': ('pca.R', False, True),
+    'da': ('da.R', False, True),
+    'secondary-species': ('secondary-species.R', False, False),
+    'concordance': ('concordance.R', True, True),
     # Auxiliary sections
-    'ev-markers': ('aux/ev-markers.R', False),
+    'ev-markers': ('aux/ev-markers.R', False, True),
 }
+
+# -- Define helper dictionary for potential per-organism section statuses
+_ORGANISM_STATUSES = {'ok', 'skipped', 'failed'}
 
 # -- _resolve_r_script: returns Path to R script
 def _resolve_r_script(script_name: str) -> Path:
     '''Locate R script based on provided script name'''
     return pkg_files('comms').joinpath(f'r/sections/{script_name}')
 
-# -- _run_r_script: returns boolean indicating if command was run successfully
+# -- _read_status: returns tuple of dicts (containing organisms, reasons) parsed from a section's _status.json
+def _read_status(output_subdir: Path) -> tuple[dict[str, str], dict[str, str]]:
+    status_path = output_subdir / '_status.json'
+    if not status_path.exists():
+        return {}, {}
+    try:
+        payload = json.loads(status_path.read_text())
+    except Exception as e:
+        logMsg.debug(f'Could not parse {status_path}: {e}')
+        return {}, {}
+    organisms = {k: v for k, v in payload.get('organisms', {}).items() if v in _ORGANISM_STATUSES}
+    reasons = dict(payload.get('reasons', {}))
+    return organisms, reasons
+
+# -- _section_status: returns string (either 'succeeded', 'partial', 'failed' or 'skipped')
+def _section_status(proc_ok: bool, organisms: dict[str, str]) -> str:
+    if not organisms:
+        # No structured status available (legacy/non-organism script, or crash before writing status)
+        return 'failed' if not proc_ok else 'skipped'
+    ok = sum(1 for s in organisms.values() if s == 'ok')
+    failed = sum(1 for s in organisms.values() if s == 'failed')
+    if failed == 0:
+        return 'succeeded' if ok > 0 else 'skipped'
+    return 'partial' if ok > 0 else 'failed'
+
+# -- _log_organism_outcomes: returns None but outputs logging messages
+def _log_organism_outcomes(section: str, organisms: dict[str, str], reasons: dict[str, str]) -> None:
+    for org, status in organisms.items():
+        reason = reasons.get(org)
+        suffix = f' ({reason})' if reason else ''
+        if status == 'ok':
+            logMsg.progress(f'{section} — {org}: succeeded')
+        elif status == 'skipped':
+            logMsg.progress(f'{section} — {org}: skipped{suffix}')
+        else:
+            logMsg.progress(f'{section} — {org}: failed{suffix}')
+
+# -- _run_r_section: returns boolean indicating if the R process itself exited cleanly
 def _run_r_section(
         section: str,
         script_name: str,
@@ -56,7 +96,12 @@ def _run_r_section(
     return True
 
 # -- _write_index: return none, but write index
-def _write_index(output_dir: Path, params: dict, results: dict[str, bool]) -> None:
+def _write_index(
+        output_dir: Path,
+        params: dict,
+        section_status: dict[str, str],
+        organism_results: dict[str, dict[str, str]],
+) -> None:
     lines = [
         '# comms report',
         f'\nGenerated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
@@ -65,9 +110,16 @@ def _write_index(output_dir: Path, params: dict, results: dict[str, bool]) -> No
     for k,v in params.items():
         lines.append(f'- **{k}**: `{v}`')
     lines.append(f'\n## Sections\n')
-    for sec, ok in results.items():
-        status = '✓ SUCCEEDED' if ok else '✗ FAILED'
-        lines.append(f'- {sec}: {status}')
+    status_glyphs = {
+        'succeeded': '✓ SUCCEEDED',
+        'partial': '◐ PARTIAL',
+        'failed': '✗ FAILED',
+        'skipped': '- SKIPPED',
+    }
+    for sec, status in section_status.items():
+        lines.append(f'- {sec}: {status_glyphs[status]}')
+        for org, org_status in organism_results.get(sec, {}).items():
+            lines.append(f'  - {org}: {org_status}')
     (output_dir / 'index.md').write_text('\n'.join(lines))
 
 # -- run_report: return None, but run report section R scripts and output script
@@ -147,22 +199,30 @@ def run_report(
         organism_prefix,
         str(min_reps),
     ]
-    results: dict[str, bool] = {}
+    section_status: dict[str, str] = {}
+    organism_results: dict[str, dict[str, str]] = {}
     for sec in sections:
         logMsg.progress(f'Running section: {sec}')
-        script, needs_lfq = _SECTIONS[sec]
+        script, needs_lfq, per_organism = _SECTIONS[sec]
         extra: list[str] = []
         if sec == 'da':
             extra = [str(lfc_threshold), str(fdr_threshold)]
         elif sec == 'concordance':
             extra = [str(lfq_dir), str(lfc_threshold), str(fdr_threshold)]
-        results[sec] = _run_r_section(
+        output_subdir = output_dir / sec.replace('-', '_')
+        proc_ok = _run_r_section(
             section = sec,
             script_name=script,
-            output_subdir=output_dir / sec.replace('-', '_'),
+            output_subdir=output_subdir,
             positional_args=common_args+extra,
             rscript=rscript,
         )
+        organisms, reasons = _read_status(output_subdir) if per_organism else ({}, {})
+        section_status[sec] = _section_status(proc_ok, organisms)
+        organism_results[sec] = organisms
+        if organisms:
+            _log_organism_outcomes(sec, organisms, reasons)
+
     _write_index(
         output_dir,
         {
@@ -174,8 +234,20 @@ def run_report(
             'lfc_threshold': lfc_threshold,
             'fdr_threshold': fdr_threshold,
         },
-        results)
-    n_ok = sum(results.values())
-    n_fail = len(results) - n_ok
-    logMsg.info(f'Report complete: {n_ok} succeeded, {n_fail} failed')
+        section_status,
+        organism_results,
+    )
+
+    n_succeeded = sum(1 for s in section_status.values() if s == 'succeeded')
+    n_partial = sum(1 for s in section_status.values() if s == 'partial')
+    n_failed = sum(1 for s in section_status.values() if s == 'failed')
+    n_skipped = sum(1 for s in section_status.values() if s == 'skipped')
+    parts = [f'{n_succeeded} succeeded']
+    if n_partial:
+        parts.append(f'{n_partial} partial (at least one organism failed)')
+    if n_failed:
+        parts.append(f'{n_failed} failed')
+    if n_skipped:
+        parts.append(f'{n_skipped} skipped (no organism had sufficient data)')
+    logMsg.info(f'Report complete: {", ".join(parts)}')
     logMsg.debug(f'Finished command: report')

@@ -28,25 +28,25 @@ class TestResolveRScript:
 # -- Define tests for writing index
 class TestWriteIndex:
     def test_creates_index_file(self, tmp_path):
-        _write_index(tmp_path, {'quantify_dir': '/tmp/q'}, {'qc': True, 'da': False})
+        _write_index(tmp_path, {'quantify_dir': '/tmp/q'}, {'qc': 'succeeded', 'da': 'failed'}, {'qc': {'org1': 'succeeded', 'org2': 'failed'}})
         assert (tmp_path / 'index.md').exists()
 
     def test_index_contains_section_names(self, tmp_path):
-        _write_index(tmp_path, {}, {'qc': True, 'da': False})
+        _write_index(tmp_path, {}, {'qc': 'succeeded', 'da': 'failed'}, {'qc': {'org1': 'succeeded', 'org2': 'failed'}})
         content = (tmp_path / 'index.md').read_text()
         assert 'qc' in content
         assert 'da' in content
 
     def test_failed_section_marked_with_failed(self, tmp_path):
-        _write_index(tmp_path, {}, {'qc': False})
+        _write_index(tmp_path, {}, {'qc': 'failed'}, {'qc': {'org1': 'failed', 'org2': 'failed'}})
         assert 'FAILED' in (tmp_path / 'index.md').read_text()
 
     def test_passed_section_marked_with_checkmark(self, tmp_path):
-        _write_index(tmp_path, {}, {'qc': True})
+        _write_index(tmp_path, {}, {'qc': 'succeeded'}, {'qc': {'org1': 'succeeded', 'org2': 'succeeded'}})
         assert '✓' in (tmp_path / 'index.md').read_text()
 
     def test_parameters_included_in_index(self, tmp_path):
-        _write_index(tmp_path, {'organism_prefix': 'Mtrun'}, {})
+        _write_index(tmp_path, {'organism_prefix': 'Mtrun'}, {}, {})
         assert 'organism_prefix' in (tmp_path / 'index.md').read_text()
 
 # -- Define shared fixtures
