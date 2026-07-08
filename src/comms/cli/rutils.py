@@ -29,4 +29,4 @@ def check():
 @commsRUtils.command(rich_help_panel='R Utilities')
 def install():
     '''Install any missing R dependencies'''
-    rUtils.install_r_dependencies()
+    rUtils.install_r_dependencies_terminal()
