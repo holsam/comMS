@@ -33,3 +33,25 @@ def render_sample_sheet(rows) -> str:
             [r.sample_id, r.raw_file, r.treatment, r.fraction, replicate, r.batch]
         ))
     return '\n'.join(lines) + '\n'
+
+# -- parse_sample_sheet: parse a TSV text into a list of SampleRow
+def parse_sample_sheet(text: str) -> list['SampleRow']:
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return []
+    header = [h.strip() for h in lines[0].split('\t')]
+    rows: list[SampleRow] = []
+    for line in lines[1:]:
+        values = line.split('\t')
+        record = dict(zip(header, values))
+        replicate_text = record.get('replicate', '').strip()
+        rows.append(SampleRow(
+            sample_id=record.get('sample_id', '').strip(),
+            raw_file=record.get('raw_file', '').strip(),
+            treatment=record.get('treatment', '').strip(),
+            fraction=record.get('fraction', '').strip(),
+            replicate=int(replicate_text) if replicate_text else None,
+            batch=record.get('batch', '').strip(),
+            replicate_overridden=bool(replicate_text),
+        ))
+    return rows
