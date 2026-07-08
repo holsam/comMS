@@ -34,7 +34,7 @@ def _existing_experiment(experiment_dir: Path):
     return root, comms_dir, metadata, config, rows
 
 # -- launch_experiment_gui: opens the PySide6 experiment setup window
-def launch_experiment_gui() -> None:
+def launch_experiment_gui(experiment_dir: Path | None = None) -> None:
     logMsg('experiment')
     try:
         from comms.gui.app import run_app
@@ -42,7 +42,7 @@ def launch_experiment_gui() -> None:
         logMsg.error(f'Could not import GUI components: {e}')
         raise SystemExit(1)
     logMsg.info(f'Launching experiment setup GUI')
-    raise SystemExit(run_app())
+    raise SystemExit(run_app(experiment_dir))
 
 # -- _prompt_list: return a list of strings by repeated prompting, prepopulated with any existing items
 def _prompt_list(label: str, existing: list[str] | None = None) -> list[str]:
@@ -61,7 +61,7 @@ def _prompt_list(label: str, existing: list[str] | None = None) -> list[str]:
 # -- _choose: prompt until the user picks one of the allowed options, prepopulated with any existing values
 def _choose(label: str, options: list[str], default: str | None = None) -> str:
     formatted_options = [f'{opt} (default)' if opt==default else opt for opt in options]
-    label = f'{label} [dim]\[{", ".join(formatted_options)}][/dim]'
+    label = f'{label} [dim]\\[{", ".join(formatted_options)}][/dim]'
     return logMsg.input(label, choices=options, default=default, show_default=False, show_choices=False)
 
 # -- _confirm: yes/no prompt via logMsg.input, returned as a bool
