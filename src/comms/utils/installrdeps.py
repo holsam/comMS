@@ -85,7 +85,7 @@ def install_r_dependencies_terminal(rscript: str = 'Rscript') -> None:
             while True:
                 user_confirmation = input('Install these packages? (y/N)').lower()
                 if user_confirmation in ['', 'n']:
-                    logMsg.info(f'Cancelled dependency installation.')
+                    logMsg.info(f'Cancelled dependency installation')
                     break
                 if user_confirmation == 'y':
                     install_r_dependencies()
