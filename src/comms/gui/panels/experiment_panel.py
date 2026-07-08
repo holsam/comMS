@@ -148,5 +148,17 @@ class ExperimentPanel(QWidget):
             tomli_w.dump(meta, f)
         return path
 
+    # -- load_from_metadata: populate fields from a loaded experiment.toml + resolved base_dir
+    def load_from_metadata(self, base_dir: Path, metadata: dict) -> None:
+        self._name.setText(metadata.get('experiment', {}).get('name', ''))
+        self._dir.setText(str(base_dir))
+        database = metadata.get('files', {}).get('database', '')
+        if database:
+            self._database.setText(str(database))
+        bin_dir = metadata.get('experiment', {}).get('bin_dir', '')
+        if bin_dir:
+            self._bin.setText(str(bin_dir))
+        self.changed.emit()
+
     def is_valid(self) -> bool:
         return bool(self.experiment_name()) and self.base_dir() is not None and self.database_path() is not None

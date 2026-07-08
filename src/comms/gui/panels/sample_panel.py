@@ -59,3 +59,11 @@ class SamplePanel(QWidget):
         path = out_dir / 'sample_sheet.tsv'
         path.write_text(self.sample_sheet_text(), encoding='utf-8')
         return path
+
+    # -- load: populate the sample table and treatment/fraction groups from a loaded sample sheet
+    def load(self, rows: list, treatments: list[str], fractions: list[str]) -> None:
+        for t in treatments:
+            self._state.add_treatment(t)
+        for f in fractions:
+            self._state.add_fraction(f)
+        self._state.sample_model.set_rows(rows)
