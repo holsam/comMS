@@ -16,8 +16,7 @@ commsRUtils = typer.Typer(add_completion=False, invoke_without_command=True)
 # -- Define rUtils callback
 @commsRUtils.callback(invoke_without_command=False)
 def rutils_callback(ctx: typer.Context) -> None:
-    logMsg('R Utilities')
-    logMsg.debug(f'Starting R utility: {ctx.invoked_subcommand}')
+    logMsg('r-utils')
 
 # -- Define R utility command: check
 @commsRUtils.command(rich_help_panel='R Utilities')
