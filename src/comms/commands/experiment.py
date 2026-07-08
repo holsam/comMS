@@ -3,17 +3,35 @@ comMS experiment functions
 '''
 
 # -- Import external dependencies
-import tomli_w, typer
+import tomli_w, tomllib, typer
 from datetime import datetime, timezone
 from pathlib import Path
 from rich import print
 from typing import Literal
 
 # -- Import internal functions
-from comms.utils.log import logMsg
-from comms.utils.sheet import SampleRow, render_sample_sheet
 from comms.commands.config import _apply_protocol_flags, _apply_organism, _writeConfigTo
+from comms.utils.context import _normalise_dirs
+from comms.utils.log import logMsg
 from comms.utils.settings import loadDefaultConfig
+from comms.utils.sheet import SampleRow, render_sample_sheet, parse_sample_sheet
+
+# -- _existing_experiment: returns (root, comms_dir, metadata, config, sample_rows) if experiment_dir already holds a saved experiment else None
+def _existing_experiment(experiment_dir: Path):
+    root, comms_dir = _normalise_dirs(experiment_dir)
+    meta_path = comms_dir / 'experiment.toml'
+    config_path = comms_dir / 'config.toml'
+    if not (meta_path.exists() and config_path.exists()):
+        return None
+    with meta_path.open('rb') as f:
+        metadata = tomllib.load(f)
+    with config_path.open('rb') as f:
+        config = tomllib.load(f)
+    sheet_path = comms_dir / 'sample_sheet.tsv'
+    rows: list[SampleRow] = []
+    if sheet_path.exists():
+        rows = parse_sample_sheet(sheet_path.read_text(encoding='utf-8'))
+    return root, comms_dir, metadata, config, rows
 
 # -- launch_experiment_gui: opens the PySide6 experiment setup window
 def launch_experiment_gui() -> None:
