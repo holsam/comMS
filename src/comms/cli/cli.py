@@ -59,16 +59,20 @@ comms.add_typer(commsVersion)
 # -- Register experiment command
 @comms.command(rich_help_panel='comMS Configuration')
 def experiment(
+    experiment_dir: Annotated[
+        Optional[Path],
+        typer.Argument(help='Existing experiment directory to edit (leave blank to create a new experiment)')
+    ] = None,
     headless: Annotated[
         bool,
         typer.Option('--headless', help='Run setup in terminal instead of GUI')
     ] = False,
 ):
-    '''Set up a comMS experiment (sample sheet + config + metadata)'''
+    '''Set up a comMS experiment (sample sheet + config + metadata), or edit an existing one'''
     if headless:
-        experimentFuncs.run_experiment_headless()
+        experimentFuncs.run_experiment_headless(experiment_dir)
     else:
-        experimentFuncs.launch_experiment_gui()
+        experimentFuncs.launch_experiment_gui(experiment_dir)
 
 # ====================
 # Top-level callback: --verbose / --debug flags
