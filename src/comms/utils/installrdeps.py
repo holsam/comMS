@@ -20,14 +20,10 @@ def _print_dependency_table(deps_dict: dict[str, list[str]]) -> None:
     installed_deps = deps_dict['installed']
     missing_deps = deps_dict['missing']
     if len(installed_deps) > 0:
-        print(f'[bold]Installed packages ({len(installed_deps)})[/bold]')
-        for d in installed_deps:
-            print(f'\t[bold green]✓[/bold green] {d}')
+        logMsg.info(f'[bold green]✓ Installed packages ({len(installed_deps)})[/bold green]: {", ".join(installed_deps)}')
     if len(missing_deps) > 0:
-        print(f'[bold]Missing packages ({len(missing_deps)})[/bold]')
-        for d in missing_deps:
-            print(f'\t[bold red]✗[/bold red] {d}')
-        print('\nTo install missing packages, run [bold]comms r-utils install[/bold]')
+        logMsg.info(f'[bold red]✗ Missing packages ({len(missing_deps)})[/bold red]: {", ".join(missing_deps)}')
+        logMsg.info('To install missing packages, run [bold]comms r-utils install[/bold]')
 
 # -- check_r_dependencies: returns {'installed': [...], 'missing': [...]}, or None if Rscript itself isn't callable / the check failed
 def check_r_dependencies(rscript: str = 'Rscript') -> dict[str, list[str]] | None:
@@ -85,7 +81,7 @@ def install_r_dependencies_terminal(rscript: str = 'Rscript') -> None:
         parsed = json.loads(result.stdout.strip())
         missing = parsed['missing']
         if len(missing) > 0:
-            logMsg.info(f'{len(missing)} {'dependencies need' if len(missing) > 1 else 'dependency needs'} to be installed: {', '.join(d for d in missing)}')
+            logMsg.info(f'{len(missing)} {"dependencies need" if len(missing) > 1 else "dependency needs"} to be installed: {", ".join(d for d in missing)}')
             while True:
                 user_confirmation = input('Install these packages? (y/N)').lower()
                 if user_confirmation in ['', 'n']:
