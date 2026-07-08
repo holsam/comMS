@@ -21,6 +21,7 @@ from comms.cli.report import commsReport
 from comms.cli.pipeline import commsPipeline
 from comms.cli.config import commsConfig
 from comms.cli.license import commsLicense
+from comms.cli.rutils import commsRUtils
 from comms.cli.uninstall import commsUninstall
 from comms.cli.version import commsVersion
 
@@ -51,6 +52,7 @@ comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
 comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='comMS Configuration')
 comms.add_typer(commsLicense)
+comms.add_typer(commsRUtils, name='r-utils', help='Check or install required R dependencies', rich_help_panel='Utilities')
 comms.add_typer(commsUninstall)
 comms.add_typer(commsVersion)
 
