@@ -4,7 +4,8 @@ comMS ENTRYPOINT
 
 # -- Import external dependencies
 import logging, typer
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Optional
 
 # -- Import internal utility functions
 from comms.utils.settings import initComms
