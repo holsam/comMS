@@ -60,7 +60,7 @@ def install_r_dependencies(rscript: str = 'Rscript') -> bool:
     for line in process.stdout:
         line = line.rstrip()
         if line:
-            logMsg.info(line)
+            logMsg.progress(line)
     process.wait()
     if process.returncode != 0:
         logMsg.error('R dependency installation failed; see above output')
@@ -83,7 +83,7 @@ def install_r_dependencies_terminal(rscript: str = 'Rscript') -> None:
         if len(missing) > 0:
             logMsg.info(f'{len(missing)} {"dependencies need" if len(missing) > 1 else "dependency needs"} to be installed: {", ".join(d for d in missing)}')
             while True:
-                user_confirmation = input('Install these packages? (y/N)').lower()
+                user_confirmation = logMsg.input('Install these packages? [dim](y/N)[/dim]', choices=['y','n'], default='n', case_sensitive=False, show_default=False, show_choices=False).lower()
                 if user_confirmation in ['', 'n']:
                     logMsg.info(f'Cancelled dependency installation')
                     break
