@@ -99,6 +99,7 @@ class logMsg:
                 show_default=prompt_kwargs.get('show_default', True),
                 show_choices=prompt_kwargs.get('show_choices', True),
             )
+            prompt_obj.case_sensitive = prompt_kwargs.get('case_sensitive', True)
             default = prompt_kwargs.get('default', ...)
             answer = prompt_obj(default=default, stream=prompt_kwargs.get('stream'))
             # Work out how many terminal rows the prompt (and the typed answer, if echoed) actually occupied, so wrapped prompts get fully erased rather than leaving fragments behind
