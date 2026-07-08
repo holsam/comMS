@@ -3,15 +3,15 @@ comMS experiment functions
 '''
 
 # -- Import external dependencies
-import re, tomli_w, tomllib, typer
+import re, tomli_w, tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 from rich import print
-from typing import Literal
 
 # -- Import internal functions
 from comms.commands.config import _apply_protocol_flags, _apply_organism, _writeConfigTo
 from comms.utils.context import _normalise_dirs
+from comms.utils.installrdeps import check_r_dependencies, install_r_dependencies
 from comms.utils.log import logMsg
 from comms.utils.settings import loadDefaultConfig
 from comms.utils.sheet import SampleRow, render_sample_sheet, parse_sample_sheet
@@ -50,7 +50,7 @@ def _prompt_list(label: str, existing: list[str] | None = None) -> list[str]:
     if items:
         print(f'Current {label}(s): {", ".join(items)}')
     while True:
-        value = typer.prompt(f'Add a {label} (blank to finish)', default='', show_default=False)
+        value = logMsg.input(f'Add a {label} (blank to finish)', default='', show_default=False)
         value = value.strip()
         if not value:
             break
@@ -60,10 +60,15 @@ def _prompt_list(label: str, existing: list[str] | None = None) -> list[str]:
 
 # -- _choose: prompt until the user picks one of the allowed options, prepopulated with any existing values
 def _choose(label: str, options: list[str], default: str | None = None) -> str:
-    while True:
-        choice = typer.prompt(f'{label} {options}', default=default, show_default=default is not None)
-        if choice in options:
-            return choice
+    formatted_options = [f'{opt} (default)' if opt==default else opt for opt in options]
+    label = f'{label} [dim]\[{", ".join(formatted_options)}][/dim]'
+    return logMsg.input(label, choices=options, default=default, show_default=False, show_choices=False)
+
+# -- _confirm: yes/no prompt via logMsg.input, returned as a bool
+def _confirm(msg: str, default: bool) -> bool:
+    msg = f'{msg} [dim]({"Y/n" if default else "y/N"})[/dim]'
+    answer = logMsg.input(msg, choices=['y', 'n'], default='y' if default else 'n', case_sensitive=False, show_choices=False, show_default=False)
+    return str(answer).strip().lower() == 'y'
 
 # -- run_experiment_headless: build a sample sheet, config and metadata via prompts, or edit an existing experiment
 def run_experiment_headless(experiment_dir: Path | None = None) -> None:
@@ -78,16 +83,13 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
         metadata, config, existing_rows = {}, {}, []
     logMsg.info('Starting headless experiment edit' if edit_mode else 'Starting headless experiment setup')
 
-    name = typer.prompt(
-        'Experiment name',
-        default=metadata.get('experiment', {}).get('name', ''), show_default=edit_mode,
-    )
+    name = logMsg.input('Experiment name', default=metadata.get('experiment', {}).get('name', ''), show_default=edit_mode)
     if edit_mode:
         base_dir = root
     else:
-        base_dir = Path(typer.prompt('Save experiment to (directory)', default=str(experiment_dir) if experiment_dir else None, show_default=experiment_dir is not None)).expanduser()
-    bin_dir = typer.prompt('Bin directory (blank to auto-resolve)', default=metadata.get('experiment', {}).get('bin_dir', ''), show_default=edit_mode).strip()
-    database = typer.prompt('Combined database FASTA', default=metadata.get('files', {}).get('database', ''), show_default=edit_mode).strip()
+        base_dir = Path(logMsg.input('Save experiment to (directory)', default=str(experiment_dir) if experiment_dir else None, show_default=experiment_dir is not None)).expanduser()
+    bin_dir = logMsg.input('Bin directory (blank to auto-resolve)', default=metadata.get('experiment', {}).get('bin_dir', ''), show_default=edit_mode).strip()
+    database = logMsg.input('Combined database FASTA', default=metadata.get('files', {}).get('database', ''), show_default=edit_mode).strip()
     existing_treatments = sorted({r.treatment for r in existing_rows if r.treatment})
     existing_fractions = sorted({r.fraction for r in existing_rows if r.fraction})
     treatments = _prompt_list('treatment', existing=existing_treatments)
@@ -96,7 +98,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
         logMsg.error('At least one treatment and one fraction are required')
         raise SystemExit(1)
 
-    input_dir = Path(typer.prompt('Directory of .RAW / .mzML files')).expanduser()
+    input_dir = Path(logMsg.input('Directory of .RAW / .mzML files')).expanduser()
     input_files = _prompt_list('data file')
     files = []
     for f in input_files:
@@ -132,42 +134,42 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
     cfg = loadDefaultConfig()
     cfg = _apply_protocol_flags(
         cfg,
-        iodo=typer.confirm('Cysteine carbamidomethylation (static)?', default='C+0' not in index_cfg.get('fixed_mods', '')),
-        ox=typer.confirm('Methionine oxidation (variable)?', default=bool(re.search(r'M\+15\.9949', index_cfg.get('mods_spec', ''))) if edit_mode else True),
-        phos=typer.confirm('STY phosphorylation (variable)?', default=bool(re.search(r'STY\+79\.966331', index_cfg.get('mods_spec', ''))) if edit_mode else False),
-        n_cyc=typer.confirm('N-terminal Gln cyclisation?', default=bool(index_cfg.get('nterm_peptide_mods_spec', '')) if edit_mode else True),
-        n_ace=typer.confirm('Protein N-terminal acetylation?', default=bool(index_cfg.get('nterm_protein_mods_spec', '')) if edit_mode else True),
-        clip_met=typer.confirm('Clip N-terminal methionine?', default=index_cfg.get('clip_n_met', True) if edit_mode else True),
-        low_res=typer.confirm('Low-resolution instrument (ion trap)?', default=(search_cfg.get('score_function') == 'combined-p-value') if edit_mode else False),
+        iodo=_confirm('Cysteine carbamidomethylation (static)?', default='C+0' not in index_cfg.get('fixed_mods', '')),
+        ox=_confirm('Methionine oxidation (variable)?', default=bool(re.search(r'M\+15\.9949', index_cfg.get('mods_spec', ''))) if edit_mode else True),
+        phos=_confirm('STY phosphorylation (variable)?', default=bool(re.search(r'STY\+79\.966331', index_cfg.get('mods_spec', ''))) if edit_mode else False),
+        n_cyc=_confirm('N-terminal Gln cyclisation?', default=bool(index_cfg.get('nterm_peptide_mods_spec', '')) if edit_mode else True),
+        n_ace=_confirm('Protein N-terminal acetylation?', default=bool(index_cfg.get('nterm_protein_mods_spec', '')) if edit_mode else True),
+        clip_met=_confirm('Clip N-terminal methionine?', default=index_cfg.get('clip_n_met', True) if edit_mode else True),
+        low_res=_confirm('Low-resolution instrument (ion trap)?', default=(search_cfg.get('score_function') == 'combined-p-value') if edit_mode else False),
     )
     cfg.setdefault('index', {})['custom_mods'] = index_cfg.get('custom_mods', '')
     organisms: dict[str, str] = dict(config.get('organism', {})) if edit_mode else {}
-    multispecies = typer.confirm('Multispecies analysis (per-organism FDR)?', default=bool(organisms))
+    multispecies = _confirm('Multispecies analysis (per-organism FDR)?', default=bool(organisms))
     if multispecies:
         while True:
-            label = typer.prompt('Organism label (blank to finish)', default='', show_default=False).strip()
+            label = logMsg.input('Organism label (blank to finish)', default='', show_default=False).strip()
             if not label:
                 break
-            pattern = typer.prompt(f'Header pattern for {label}').strip()
+            pattern = logMsg.input(f'Header pattern for {label}').strip()
             if pattern:
                 organisms[label] = pattern
     else:
         organisms = {}
     cfg = _apply_organism(cfg, organisms)
     if multispecies:
-        cfg['percolator']['shared_psm'] = typer.prompt('Shared PSM handling policy', default=config.get('percolator', {}).get('shared_psm', 'drop'), type=Literal['drop', 'include'], show_choices=True, show_default=True).strip()
+        cfg['percolator']['shared_psm'] = logMsg.input('Shared PSM handling policy', choices=['drop', 'include'], default=config.get('percolator', {}).get('shared_psm', 'drop'), show_choices=True, show_default=True).strip()
     report_meta = metadata.get('report', {})
     organism_prefix = ''
-    include_report = typer.confirm('Create report?', default=report_meta.get('enabled', True))
+    include_report = _confirm('Create report?', default=report_meta.get('enabled', True))
     if include_report:
-        reference = typer.prompt('Reference protein annotation file (blank to skip)', default=report_meta.get('ref_info', ''), show_default=edit_mode).strip()
-        contaminants = typer.prompt('Contaminants list CSV path (blank to skip)', default=report_meta.get('cont_csv', ''), show_default=edit_mode).strip()
+        reference = logMsg.input('Reference protein annotation file (blank to skip)', default=report_meta.get('ref_info', ''), show_default=edit_mode).strip()
+        contaminants = logMsg.input('Contaminants list CSV path (blank to skip)', default=report_meta.get('cont_csv', ''), show_default=edit_mode).strip()
         if multispecies:
-            organism_prefix = typer.prompt('Primary organism ID prefix', default=report_meta.get('organism_prefix', ''), show_default=edit_mode).strip()
-        status = rdepsFuncs.check_r_dependencies()
+            organism_prefix = logMsg.input('Primary organism ID prefix', default=report_meta.get('organism_prefix', ''), show_default=edit_mode).strip()
+        status = check_r_dependencies()
         if status is not None and status['missing']:
-            if typer.confirm(f"Install missing R report dependencies now? ({', '.join(status['missing'])})", default=True):
-                rdepsFuncs.install_r_dependencies()
+            if _confirm(f"Install missing R report dependencies now? ({', '.join(status['missing'])})", default=True):
+                install_r_dependencies()
 
     # Write all three files
     out_dir = base_dir / 'comms'
