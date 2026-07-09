@@ -71,8 +71,8 @@ class CommandReadinessPanel(QWidget):
         buttons_row.addWidget(self._locate_crux_btn)
         deps_layout.addLayout(buttons_row)
 
-        layout.addWidget(box)
         layout.addWidget(deps_box)
+        layout.addWidget(box)
         layout.addStretch(1)
         self._refresh_dependencies()
         self.refresh()
