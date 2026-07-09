@@ -323,7 +323,7 @@ def _apply_protocol_flags(
         logMsg.debug(f'{'--low-res' if low_res else '--high-res'} applied: mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
     if clip_met is not None:
         cfg.setdefault('index', {})
-        cfg['index']['clip_n_met'] = 'true' if clip_met else 'false'
+        cfg['index']['clip_n_met'] = bool(clip_met)
         logMsg.debug(f'{'--clip-met' if clip_met else '--no-clip-met'} applied: {cfg['index']['clip_n_met']}')
     return cfg
 

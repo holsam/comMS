@@ -332,7 +332,10 @@ class ConfigPanel(QWidget):
         self._phos.setChecked(bool(re.search(r'STY\+79\.966331', index_cfg.get('mods_spec', ''))))
         self._n_cyc.setChecked(bool(index_cfg.get('nterm_peptide_mods_spec', '')))
         self._n_ace.setChecked(bool(index_cfg.get('nterm_protein_mods_spec', '')))
-        self._clip_met.setChecked(index_cfg.get('clip_n_met', True))
+        clip_met_value = index_cfg.get('clip_n_met', True)
+        if isinstance(clip_met_value, str):
+            clip_met_value = clip_met_value.strip().lower() == 'true'
+        self._clip_met.setChecked(bool(clip_met_value))
         self._custom.setText(index_cfg.get('custom_mods', ''))
         self._res.setCurrentIndex(1 if search_cfg.get('mz_bin_width') == MZ_BIN_WIDTH_LOW_RES else 0)
 

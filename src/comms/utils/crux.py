@@ -230,8 +230,7 @@ def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
     return ok
 
 # -- _tomlToCrux: helper function returning 'T' if True and 'F' if False
-def _tomlToCrux(val: bool):
-    if val:
-        return 'T' 
-    else:
-        return 'F'
+def _tomlToCrux(val) -> str:
+    if isinstance(val, str):
+        val = val.strip().lower() == 'true'
+    return 'T' if val else 'F'

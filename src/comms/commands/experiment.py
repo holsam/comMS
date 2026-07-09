@@ -141,7 +141,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
         phos=_confirm('STY phosphorylation (variable)?', default=bool(re.search(r'STY\+79\.966331', index_cfg.get('mods_spec', ''))) if edit_mode else False),
         n_cyc=_confirm('N-terminal Gln cyclisation?', default=bool(index_cfg.get('nterm_peptide_mods_spec', '')) if edit_mode else True),
         n_ace=_confirm('Protein N-terminal acetylation?', default=bool(index_cfg.get('nterm_protein_mods_spec', '')) if edit_mode else True),
-        clip_met=_confirm('Clip N-terminal methionine?', default=index_cfg.get('clip_n_met', True) if edit_mode else True),
+        clip_met=_confirm('Clip N-terminal methionine?', default=(str(index_cfg.get('clip_n_met', True)).strip().lower() == 'true') if edit_mode else True),
         low_res=_confirm('Low-resolution instrument (ion trap)?', default=(search_cfg.get('score_function') == 'combined-p-value') if edit_mode else False),
     )
     cfg.setdefault('index', {})['custom_mods'] = index_cfg.get('custom_mods', '')
