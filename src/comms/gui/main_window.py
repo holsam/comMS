@@ -91,7 +91,8 @@ class MainWindow(QMainWindow):
         self.config.load_from_config(config, report_meta)
         treatments = sorted({r.treatment for r in rows if r.treatment})
         fractions = sorted({r.fraction for r in rows if r.fraction})
-        self.sample.load(rows, treatments, fractions)
+        data_files = metadata.get('files', {}).get('data', [])
+        self.sample.load(rows, treatments, fractions, data_files=data_files)
         self._log.info(f'Loaded existing experiment from {comms_dir}')
 
     def closeEvent(self, event) -> None:

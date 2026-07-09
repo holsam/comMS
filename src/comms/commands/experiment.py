@@ -88,7 +88,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
     if edit_mode:
         base_dir = root
     else:
-        base_dir = Path(logMsg.input('Save experiment to (directory)', default=str(experiment_dir) if experiment_dir else None, show_default=experiment_dir is not None)).expanduser()
+        base_dir = Path(logMsg.input('Save experiment to directory (default: ".")', default=str(experiment_dir) if experiment_dir else '.', show_default=experiment_dir is not None)).expanduser()
     bin_dir = logMsg.input('Bin directory (blank to auto-resolve)', default=metadata.get('experiment', {}).get('bin_dir', ''), show_default=edit_mode).strip()
     database = logMsg.input('Combined database FASTA', default=metadata.get('files', {}).get('database', ''), show_default=edit_mode).strip()
     existing_treatments = sorted({r.treatment for r in existing_rows if r.treatment})
@@ -100,7 +100,8 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
         raise SystemExit(1)
 
     input_dir = Path(logMsg.input('Directory of .RAW / .mzML files')).expanduser()
-    input_files = _prompt_list('data file')
+    existing_data_files = metadata.get('files', {}).get('data', []) if edit_mode else None
+    input_files = _prompt_list('data file', existing=existing_data_files)
     files = []
     for f in input_files:
         f = Path(Path(f).expanduser())
