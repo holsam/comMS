@@ -19,6 +19,7 @@ from comms.utils.sheet import SampleRow, render_sample_sheet, parse_sample_sheet
 # -- _existing_experiment: returns (root, comms_dir, metadata, config, sample_rows) if experiment_dir already holds a saved experiment else None
 def _existing_experiment(experiment_dir: Path):
     root, comms_dir = _normalise_dirs(experiment_dir)
+    root = Path(root).resolve()
     meta_path = comms_dir / 'experiment.toml'
     config_path = comms_dir / 'config.toml'
     if not (meta_path.exists() and config_path.exists()):
