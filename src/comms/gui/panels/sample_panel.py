@@ -61,9 +61,16 @@ class SamplePanel(QWidget):
         return path
 
     # -- load: populate the sample table and treatment/fraction groups from a loaded sample sheet
-    def load(self, rows: list, treatments: list[str], fractions: list[str]) -> None:
+    def load(self, rows: list, treatments: list[str], fractions: list[str], data_files: list[str] | None = None) -> None:
         for t in treatments:
             self._state.add_treatment(t)
         for f in fractions:
             self._state.add_fraction(f)
+        if data_files:
+            by_name = {Path(p).name: str(p) for p in data_files}
+            for row in rows:
+                if not row.source_path:
+                    match = by_name.get(row.raw_file)
+                    if match:
+                        row.source_path = match
         self._state.sample_model.set_rows(rows)
