@@ -17,6 +17,7 @@ from comms.gui.status import PanelStateTracker
 # -- Define class ExperimentPanel to collect experiment name and base output directory
 class ExperimentPanel(QWidget):
     changed = Signal()
+    binDirChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -59,6 +60,7 @@ class ExperimentPanel(QWidget):
         self._bin.setMinimumWidth(360)
         self._bin.setPlaceholderText('optional: directory containing Crux / ThermoRawFileParser')
         self._bin.textChanged.connect(self.changed)
+        self._bin.editingFinished.connect(self.binDirChanged)
         bin_browse = QPushButton('Select directory')
         bin_browse.clicked.connect(self._browse_bin)
         bin_row = QWidget()
@@ -121,6 +123,7 @@ class ExperimentPanel(QWidget):
     def set_bin_dir(self, path: Path) -> None:
         self._bin.setText(str(path))
         self.changed.emit()
+        self.binDirChanged.emit()
 
     def database_path(self) -> Path | None:
         text = self._database.text().strip()
@@ -164,6 +167,8 @@ class ExperimentPanel(QWidget):
         if bin_dir:
             self._bin.setText(str(bin_dir))
         self.changed.emit()
+        if bin_dir:
+            self.binDirChanged.emit()
 
     def is_valid(self) -> bool:
         return bool(self.experiment_name()) and self.base_dir() is not None and self.database_path() is not None

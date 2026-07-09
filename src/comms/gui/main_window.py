@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self.sample.contentChanged.connect(self.readiness.refresh)
         self.config.changed.connect(self.readiness.refresh)
         self.experiment.changed.connect(self.readiness.refresh)
+        self.experiment.binDirChanged.connect(self.readiness.refresh_dependencies)
 
         # paint the initial (unedited) icons
         self.tabs.setTabIcon(self._sample_index, status_icon(self.sample.tracker.status))

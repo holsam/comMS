@@ -156,7 +156,6 @@ class CommandReadinessPanel(QWidget):
         if not chosen:
             return
         self._experiment.set_bin_dir(Path(chosen))
-        self.refresh_dependencies()
 
     def _install_deps(self) -> None:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
