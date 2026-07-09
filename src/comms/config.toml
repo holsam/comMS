@@ -1,9 +1,5 @@
 # comMS default configuration
 
-[global]
-verbose = false
-debug = false
-
 [organism]
 
 
@@ -22,19 +18,16 @@ nterm_protein_mods_spec = "1X+42.011"
 custom_mods = ""
 
 [search]
-score_function = "xcorr"    # xcorr for high-res MS (default); combined-p-value for low-res (run: comms config set --low-res)
-mz_bin_width = 0.02    # 0.02 for high-res MS (default); 1.0005079 for low-res (run: comms config set --low-res)
+score_function = "xcorr"    # xcorr for high-res MS (default); combined-p-value for low-res (run: comms config --low-res)
+mz_bin_width = 0.02    # 0.02 for high-res MS (default); 1.0005079 for low-res (run: comms config --low-res)
 min_peaks = 10
 precursor_tolerance_ppm = 10.0
 threads = 2
 
 [percolator]
 protein_enzyme = "trypsin"
-picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015)
+picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015, doi:10.1074/mcp.M114.046995)
 shared_psm = "drop"
-
-[lfq]
-match_between_runs = true
 
 [quantify]
 measure = "dNSAF"
@@ -42,10 +35,7 @@ qvalue_threshold = 0.01
 unique_mapping = true
 
 [report]
-top_n_proteins = 50
-fdr_threshold = 0.01
-colour_palette = "Set2"
-include_organism_panel = true
-include_pca = true
-include_volcano = true
-include_heatmap = true
+min_reps = 3
+lfc_threshold = 1.0
+fdr_threshold = 0.05
+top_n_proteins = 20
