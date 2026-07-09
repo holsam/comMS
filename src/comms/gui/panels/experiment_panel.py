@@ -117,6 +117,11 @@ class ExperimentPanel(QWidget):
         text = self._bin.text().strip()
         return Path(text) if text else None
 
+    # -- set_bin_dir: write a chosen bin directory into the field and mark the panel changed
+    def set_bin_dir(self, path: Path) -> None:
+        self._bin.setText(str(path))
+        self.changed.emit()
+
     def database_path(self) -> Path | None:
         text = self._database.text().strip()
         return Path(text) if text else None
