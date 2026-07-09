@@ -67,8 +67,8 @@ class TestRunExperimentHeadless:
             'MOCK',                          # treatment for sample_mock.mzML
             'WCL',                           # fraction for sample_mock.mzML
         ])
-        with patch('typer.prompt', side_effect=lambda *a, **k: next(prompts)), \
-             patch('typer.confirm', return_value=False):
+        with patch('comms.utils.log.logMsg.input', side_effect=lambda *a, **k: next(prompts)), \
+             patch('comms.commands.experiment._confirm', return_value=False):
             run_experiment_headless()
         out = base / 'comms'
         assert (out / 'sample_sheet.tsv').exists()
