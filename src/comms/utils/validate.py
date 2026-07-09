@@ -184,3 +184,13 @@ def _get_trfp_version(trfp_path) -> Optional[tuple[int, ...]]:
     if output is None:
         return None
     return _parse_version(output)
+
+# -- probe_crux: returns Path to Crux binary if found under bin_dir, else None (non-raising version for experiment GUI)
+def probe_crux(bin_dir: Path) -> Optional[Path]:
+    result = _select_best(_find_all_crux(bin_dir), _get_crux_version)
+    return result[0] if result else None
+
+# -- probe_trfp: returns Path to ThermoRawFileParser binary if found under bin_dir, else None (non-raising version for experiment GUI)
+def probe_trfp(bin_dir: Path) -> Optional[Path]:
+    result = _select_best(_find_all_trfp(bin_dir), _get_trfp_version)
+    return result[0] if result else None

@@ -3,18 +3,19 @@ comMS experiment GUI: comMS configuration panel
 '''
 
 # -- Import external dependencies
+import re
 from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QFormLayout, QGroupBox, QCheckBox,
-    QComboBox, QLineEdit, QPushButton, QTableWidget,
+    QComboBox, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
 )
 
 # -- Import internal functions
 from comms.gui.status import PanelStateTracker
 from comms.utils.settings import loadDefaultConfig
 from comms.commands.config import (
-    _apply_protocol_flags, _apply_organism, _apply_custom_mod, _writeConfigTo,
+    _apply_protocol_flags, _apply_organism, _apply_custom_mod, _writeConfigTo, MZ_BIN_WIDTH_LOW_RES,
 )
 
 # -- Define class ConfigPanel to define a structured form mirroring `comms config set` with an additional analysis type activating the organism table
@@ -321,3 +322,37 @@ class ConfigPanel(QWidget):
         path = out_dir / 'config.toml'
         _writeConfigTo(self._build_config(), path)
         return path
+
+    # -- load_from_config: populate fields from a loaded config.toml + experiment.toml [report] section
+    def load_from_config(self, cfg: dict, report_meta: dict) -> None:
+        index_cfg = cfg.get('index', {})
+        search_cfg = cfg.get('search', {})
+        self._iodo.setChecked('C+0' not in index_cfg.get('fixed_mods', ''))
+        self._ox.setChecked(bool(re.search(r'M\+15\.9949', index_cfg.get('mods_spec', ''))))
+        self._phos.setChecked(bool(re.search(r'STY\+79\.966331', index_cfg.get('mods_spec', ''))))
+        self._n_cyc.setChecked(bool(index_cfg.get('nterm_peptide_mods_spec', '')))
+        self._n_ace.setChecked(bool(index_cfg.get('nterm_protein_mods_spec', '')))
+        clip_met_value = index_cfg.get('clip_n_met', True)
+        if isinstance(clip_met_value, str):
+            clip_met_value = clip_met_value.strip().lower() == 'true'
+        self._clip_met.setChecked(bool(clip_met_value))
+        self._custom.setText(index_cfg.get('custom_mods', ''))
+        self._res.setCurrentIndex(1 if search_cfg.get('mz_bin_width') == MZ_BIN_WIDTH_LOW_RES else 0)
+
+        organisms = cfg.get('organism', {})
+        self._analysis.setCurrentIndex(1 if organisms else 0)
+        self._sharedpsm.setCurrentIndex(1 if cfg.get('percolator', {}).get('shared_psm') == 'include' else 0)
+        self._org_table.setRowCount(0)
+        for label, pattern in organisms.items():
+            row = self._org_table.rowCount()
+            self._org_table.insertRow(row)
+            self._org_table.setItem(row, 0, QTableWidgetItem(label))
+            self._org_table.setItem(row, 1, QTableWidgetItem(pattern))
+
+        self._report_enabled.setChecked(bool(report_meta.get('enabled', True)))
+        self._reference.setText(str(report_meta.get('ref_info', '')))
+        self._contaminant.setText(str(report_meta.get('cont_csv', '')))
+        self._organism_prefix.setText(str(report_meta.get('organism_prefix', '')))
+        self._update_organism_enabled()
+        self._update_report_fields_enabled()
+        self._on_changed()

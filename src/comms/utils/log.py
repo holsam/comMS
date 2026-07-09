@@ -2,10 +2,11 @@
 Shared utility functions: logging
 '''
 # -- Import external dependencies
-import atexit, logging, shutil, sys, tempfile
+import atexit, logging, shutil, sys, tempfile, time
 from pathlib import Path
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
+from rich.prompt import Prompt
 from rich.text import Text
 
 # -- Define level colours for RichHandler
@@ -13,6 +14,7 @@ _LEVEL_COLOURS: dict[str, str] = {
     'DEBUG':    'color(67)',
     'PROGRESS': 'color(75)',
     'INFO':     'color(33)',
+    'INPUT':    'color(28)',
     'WARNING':  'color(178)',
     'ERROR':    'color(160)',
     'CRITICAL': 'color(124)',
@@ -28,10 +30,23 @@ def _progress(self, message, *args, **kwargs):
 
 logging.Logger.progress = _progress
 
+# -- Register custom INPUT logging level
+INPUT = 45
+logging.addLevelName(INPUT, 'INPUT')
+
+def _input(self, message, *args, **kwargs):
+    if self.isEnabledFor(INPUT):
+        self._log(INPUT, message, args, **kwargs)
+
+logging.Logger.input = _input
+
+
 # -- Define custom RichHandler subclass (CommsRichHandler) to allow custom formatting
 class CommsRichHandler(RichHandler):
     def emit(self, record: logging.LogRecord) -> None:
         log_state._emitted = True
+        if getattr(record, '_suppress_console', False):
+            return
         super().emit(record)
     def render_message(self, record: logging.LogRecord, message: str) -> 'ConsoleRenderable':
         level_colour = _LEVEL_COLOURS.get(record.levelname, 'white')
@@ -60,6 +75,46 @@ class logMsg:
     def info(cls, msg: str):
         if cls._instance:
             cls._instance.logger.info(msg)
+    @classmethod
+    def input(cls, msg: str, **prompt_kwargs) -> str | None:
+        if not cls._instance:
+            return None
+        logger = cls._instance.logger
+        if not logger.isEnabledFor(INPUT):
+            return None
+        interactive = sys.stdin.isatty()
+        if interactive:
+            level_colour = _LEVEL_COLOURS.get('INPUT', 'white')
+            console = Console(stderr=True)
+            timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+            styled_prompt = (
+                f"[dim]{timestamp}[/dim] | "
+                f"[bold]{logger.name}[/bold] | "
+                f"[bold {level_colour}]INPUT[/] | [white]{msg}[/]"
+            )
+            prompt_obj = Prompt(
+                styled_prompt,
+                console=console,
+                choices=prompt_kwargs.get('choices'),
+                show_default=prompt_kwargs.get('show_default', True),
+                show_choices=prompt_kwargs.get('show_choices', True),
+            )
+            prompt_obj.case_sensitive = prompt_kwargs.get('case_sensitive', True)
+            default = prompt_kwargs.get('default', ...)
+            answer = prompt_obj(default=default, stream=prompt_kwargs.get('stream'))
+            # Work out how many terminal rows the prompt (and the typed answer, if echoed) actually occupied, so wrapped prompts get fully erased rather than leaving fragments behind
+            rendered = prompt_obj.make_prompt(default)
+            total_len = len(rendered.plain) + len(str(answer))
+            width = console.width or 80
+            rows = max(1, -(-total_len // width))  # ceil division
+            for _ in range(rows):
+                console.file.write("\x1b[1A\x1b[2K")
+            console.file.write("\r")
+            console.file.flush()
+        else:
+            answer = prompt_kwargs.get('default')
+        logger.input(f"{msg}: {answer}")
+        return answer
     @classmethod
     def warn(cls, msg: str):
         if cls._instance:

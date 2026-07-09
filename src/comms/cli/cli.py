@@ -4,7 +4,8 @@ comMS ENTRYPOINT
 
 # -- Import external dependencies
 import logging, typer
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Optional
 
 # -- Import internal utility functions
 from comms.utils.settings import initComms
@@ -21,6 +22,7 @@ from comms.cli.report import commsReport
 from comms.cli.pipeline import commsPipeline
 from comms.cli.config import commsConfig
 from comms.cli.license import commsLicense
+from comms.cli.rutils import commsRUtils
 from comms.cli.uninstall import commsUninstall
 from comms.cli.version import commsVersion
 
@@ -51,22 +53,27 @@ comms.add_typer(commsQuantify)
 comms.add_typer(commsReport)
 comms.add_typer(commsConfig, name='config', help='Manage comMS configuration', rich_help_panel='comMS Configuration')
 comms.add_typer(commsLicense)
+comms.add_typer(commsRUtils, name='r-utils', help='Check or install required R dependencies', rich_help_panel='Utilities')
 comms.add_typer(commsUninstall)
 comms.add_typer(commsVersion)
 
 # -- Register experiment command
 @comms.command(rich_help_panel='comMS Configuration')
 def experiment(
+    experiment_dir: Annotated[
+        Optional[Path],
+        typer.Argument(help='Existing experiment directory to edit (leave blank to create a new experiment)')
+    ] = None,
     headless: Annotated[
         bool,
         typer.Option('--headless', help='Run setup in terminal instead of GUI')
     ] = False,
 ):
-    '''Set up a comMS experiment (sample sheet + config + metadata)'''
+    '''Set up a comMS experiment (sample sheet + config + metadata), or edit an existing one'''
     if headless:
-        experimentFuncs.run_experiment_headless()
+        experimentFuncs.run_experiment_headless(experiment_dir)
     else:
-        experimentFuncs.launch_experiment_gui()
+        experimentFuncs.launch_experiment_gui(experiment_dir)
 
 # ====================
 # Top-level callback: --verbose / --debug flags
