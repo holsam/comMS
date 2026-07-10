@@ -3,15 +3,18 @@ comMS application settings and start up
 '''
 
 # -- Import external dependencies
-import tomllib
+import tomllib, tomli_w
 from importlib.resources import files as pkg_files
 from pathlib import Path
 from platformdirs import user_config_dir
 from rich import print
-from typing import Optional
+from typing import Optional, TypeVar
 
 # Import internal classes/functions
 from comms.utils.log import logMsg
+
+# -- Define TypeVar T
+T = TypeVar('T')
 
 # -- globalConfigPath: returns Path to OS-appropriate config file
 def globalConfigPath() -> Path:
@@ -51,6 +54,12 @@ def _loadTomlFile(path: Path) -> dict:
     with path.open('rb') as f:
         return tomllib.load(f)
 
+# -- _writeConfigTo: writes a config dict to a given path
+def _writeConfigTo(config: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('wb') as f:
+        tomli_w.dump(config, f)
+
 # -- resolveConfig: returns (config, source)
 def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
     '''
@@ -67,6 +76,18 @@ def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
         return _loadTomlFile(global_path), f'global ({global_path})'
     logMsg.debug('Using bundled default config')
     return loadDefaultConfig(), 'bundled defaults'
+
+# -- resolve_config_value: returns override if given, else the config.toml value at [section].key
+def resolve_config_value(cfg: dict, section: str, key: str, override: Optional[T]) -> T:
+    '''
+    Return override if given (not None), else cfg[section][key
+    '''
+    if override is not None:
+        return override
+    try:
+        return cfg[section][key]
+    except KeyError:
+        raise KeyError(f'No value for [{section}].{key} in config, and no override given') from None
 
 # -- initComms: returns None, but prints start-up message to terminal
 def initComms() -> None:

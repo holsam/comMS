@@ -23,15 +23,15 @@ commsReport = typer.Typer(add_completion=False)
 def report(
     organism_prefix: Annotated[
         Optional[str],
-        typer.Option('-o', '--organism-prefix', help='ID prefix for the primary organism [dim][default: experiment organism prefix][/dim]')
+        typer.Option('-o', '--organism-prefix', help='ID prefix for the primary organism [dim]\\[default: experiment organism prefix][/dim]')
     ] = None,
     quantify_dir: Annotated[
         Optional[Path],
-        typer.Option('-q', '--quantify-dir', help='Path to quantification results [dim][default: quantify output][/dim]')
+        typer.Option('-q', '--quantify-dir', help='Path to quantification results [dim]\\[default: quantify output][/dim]')
     ] = None,
     sample_sheet: Annotated[
         Optional[Path],
-        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim][default: experiment sample sheet][/dim]')
+        typer.Option('-s', '--sample-sheet', help='Path to sample sheet [dim]\\[default: experiment sample sheet][/dim]')
     ] = None,
     experiment_dir: Annotated[
         Optional[Path],
@@ -39,28 +39,32 @@ def report(
     ] = Path('.'),
     lfq_dir: Annotated[
         Optional[Path],
-        typer.Option('-l', '--lfq-dir', help='Path to LFQ results [dim][default: lfq output][/dim]')
+        typer.Option('-l', '--lfq-dir', help='Path to LFQ results [dim]\\[default: lfq output][/dim]')
     ] = None,
     ref_info: Annotated[
         Optional[Path],
-        typer.Option('-r', '--ref-info', help='Protein metadata TSV [dim][default: experiment ref_info][/dim]')
+        typer.Option('-r', '--ref-info', help='Protein metadata TSV [dim]\\[default: experiment ref_info][/dim]')
     ] = None,
     cont_csv: Annotated[
         Optional[Path],
-        typer.Option('-c', '--cont-csv', help='Contaminant annotations CSV [dim][default: experiment cont_csv][/dim]')
+        typer.Option('-c', '--cont-csv', help='Contaminant annotations CSV [dim]\\[default: experiment cont_csv][/dim]')
     ] = None,
     min_reps: Annotated[
-        int,
-        typer.Option('--min-reps', help='Minimum replicates per fraction-treatment group', min=1)
-    ] = 3,
+        Optional[int],
+        typer.Option('--min-reps', help='Minimum replicates per fraction-treatment group [dim]\\[default: config report.min_reps][/dim]', min=1)
+    ] = None,
     lfc_threshold: Annotated[
-        float,
-        typer.Option('--lfc-threshold', help='|log2FC| threshold for DA', min=0.0)
-    ] = 1.0,
+        Optional[float],
+        typer.Option('--lfc-threshold', help='|log2FC| threshold for DA [dim]\\[default: config report.lfc_threshold][/dim]', min=0.0)
+    ] = None,
     fdr_threshold: Annotated[
-        float,
-        typer.Option('--fdr-threshold', help='BH-FDR threshold for DA', min=0.0, max=1.0)
-    ] = 0.05,
+        Optional[float],
+        typer.Option('--fdr-threshold', help='BH-FDR threshold for DA [dim]\\[default: config report.fdr_threshold][/dim]', min=0.0, max=1.0)
+    ] = None,
+    top_n: Annotated[
+        Optional[int],
+        typer.Option('--top-n', help='Number of top DA proteins labelled per volcano plot [dim]\\[default: config report.top_n_proteins][/dim]', min=1)
+    ] = None,
     section: Annotated[
         Optional[list[str]],
         typer.Option('--section', help='Section(s) to run (repeatable)')
@@ -91,6 +95,7 @@ def report(
         min_reps=min_reps,
         lfc_threshold=lfc_threshold,
         fdr_threshold=fdr_threshold,
+        top_n=top_n,
         sections=sections,
         overwrite=overwrite,
         rscript=rscript,

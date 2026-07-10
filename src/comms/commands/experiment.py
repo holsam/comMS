@@ -9,10 +9,11 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.commands.config import _apply_protocol_flags, _apply_organism, _writeConfigTo
+from comms.commands.config import _writeConfigTo
 from comms.utils.context import _normalise_dirs
 from comms.utils.installrdeps import check_r_dependencies, install_r_dependencies
 from comms.utils.log import logMsg
+from comms.utils.modspec import apply_protocol_flags, apply_organism
 from comms.utils.settings import loadDefaultConfig
 from comms.utils.sheet import SampleRow, render_sample_sheet, parse_sample_sheet
 
@@ -134,7 +135,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
     index_cfg = config.get('index', {})
     search_cfg = config.get('search', {})
     cfg = loadDefaultConfig()
-    cfg = _apply_protocol_flags(
+    cfg = apply_protocol_flags(
         cfg,
         iodo=_confirm('Cysteine carbamidomethylation (static)?', default='C+0' not in index_cfg.get('fixed_mods', '')),
         ox=_confirm('Methionine oxidation (variable)?', default=bool(re.search(r'M\+15\.9949', index_cfg.get('mods_spec', ''))) if edit_mode else True),
@@ -157,7 +158,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
                 organisms[label] = pattern
     else:
         organisms = {}
-    cfg = _apply_organism(cfg, organisms)
+    cfg = apply_organism(cfg, organisms)
     if multispecies:
         cfg['percolator']['shared_psm'] = logMsg.input('Shared PSM handling policy', choices=['drop', 'include'], default=config.get('percolator', {}).get('shared_psm', 'drop'), show_choices=True, show_default=True).strip()
     report_meta = metadata.get('report', {})

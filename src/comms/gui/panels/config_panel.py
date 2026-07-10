@@ -12,10 +12,11 @@ from PySide6.QtWidgets import (
 )
 
 # -- Import internal functions
+from comms.commands.config import _writeConfigTo 
 from comms.gui.status import PanelStateTracker
 from comms.utils.settings import loadDefaultConfig
-from comms.commands.config import (
-    _apply_protocol_flags, _apply_organism, _apply_custom_mod, _writeConfigTo, MZ_BIN_WIDTH_LOW_RES,
+from comms.utils.modspec import (
+    apply_protocol_flags, apply_organism, apply_custom_mod, MZ_BIN_WIDTH_LOW_RES,
 )
 
 # -- Define class ConfigPanel to define a structured form mirroring `comms config set` with an additional analysis type activating the organism table
@@ -288,7 +289,7 @@ class ConfigPanel(QWidget):
     # -- build config file and save --
     def _build_config(self) -> dict:
         cfg = loadDefaultConfig()
-        cfg = _apply_protocol_flags(
+        cfg = apply_protocol_flags(
             cfg,
             iodo=self._iodo.isChecked(),
             ox=self._ox.isChecked(),
@@ -304,13 +305,13 @@ class ConfigPanel(QWidget):
                 label: pattern for label, pattern in self._organism_rows() if label and pattern
             }
             cfg['percolator']['shared_psm'] = self.shared_policy()
-        cfg = _apply_organism(cfg, organisms)
+        cfg = apply_organism(cfg, organisms)
         cfg.setdefault('index', {})
         cfg['index']['custom_mods'] = ''
         custom = self._custom.text().strip()
         if custom:
             for entry in [e.strip() for e in custom.split(',') if e.strip()]:
-                cfg['index']['custom_mods'] = _apply_custom_mod(
+                cfg['index']['custom_mods'] = apply_custom_mod(
                     cfg['index']['custom_mods'], entry)
         return cfg
     

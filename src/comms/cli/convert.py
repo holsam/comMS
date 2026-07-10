@@ -27,8 +27,16 @@ def convert(
     ] = Path('.'),
     gzip: Annotated[
         Optional[bool],
-        typer.Option('--gzip/--no-gzip', help='Gzip-compress mzML output file(s)')
+        typer.Option('--gzip/--no-gzip', help='Gzip-compress mzML output file(s) [dim][default: config convert.gzip][/dim]')
+    ] = None,
+    format: Annotated[
+        Optional[int],
+        typer.Option('--format', help='ThermoRawFileParser output format code [dim][default: config convert.format][/dim]', min=0, max=4)
+    ] = None,
+    metadata: Annotated[
+        Optional[int],
+        typer.Option('--metadata', help='ThermoRawFileParser metadata capture code [dim][default: config convert.metadata][/dim]', min=0, max=2)
     ] = None,
 ):
     ctx = ExperimentContext.resolve(experiment_dir)
-    convertFuncs.run_convert(data, ctx, gzip)
+    convertFuncs.run_convert(data, ctx, gzip, format, metadata)

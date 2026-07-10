@@ -13,6 +13,7 @@ from rich.console import Console
 # -- Import internal functions
 from comms.utils.log import logMsg
 from comms.utils.samples import loadSampleSheet
+from comms.utils.settings import resolve_config_value, _writeConfigTo
 from comms.utils.context import ExperimentContext, resolve_organism_prefix, resolve_sample_sheet, resolve_results_input, results_dir
 
 # -- Initialise Rich console
@@ -131,9 +132,10 @@ def run_report(
         ref_info: Path | None,
         cont_csv: Path | None,
         organism_prefix: str | None,
-        min_reps: int,
-        lfc_threshold: float,
-        fdr_threshold: float,
+        min_reps: int | None,
+        lfc_threshold: float | None,
+        fdr_threshold: float | None,
+        top_n: int | None,
         sections: list,
         overwrite: bool,
         rscript: str,
@@ -188,6 +190,22 @@ def run_report(
     if shutil.which(rscript) is None:
         logMsg.error(f'Rscript not callable: {rscript}')
         raise SystemExit(1)
+
+    # Build config for this run only if any override was given
+    overrides_given = any(v is not None for v in (min_reps, lfc_threshold, fdr_threshold, top_n))
+    if overrides_given:
+        logMsg.debug('Using run-specific configuration parameters')
+        run_config = {**ctx.config, 'report': dict(ctx.config.get('report', {}))}
+        run_config['report']['min_reps'] = resolve_config_value(ctx.config, 'report', 'min_reps', min_reps)
+        run_config['report']['lfc_threshold'] = resolve_config_value(ctx.config, 'report', 'lfc_threshold', lfc_threshold)
+        run_config['report']['fdr_threshold'] = resolve_config_value(ctx.config, 'report', 'fdr_threshold', fdr_threshold)
+        run_config['report']['top_n_proteins'] = resolve_config_value(ctx.config, 'report', 'top_n_proteins', top_n)
+        logMsg.info('Command-line overrides detected - run configuration file will be saved to output folder as "report.config.toml"')
+        _writeConfigTo(run_config, path=Path(output_dir, 'report.config.toml'))
+    else:
+        logMsg.debug('Using contextual configuration parameters')
+        run_config = ctx.config
+
     # Run command
     logMsg.info(f'Generating report: {len(sections)} section(s)')
     # Define arguments passed to every R script
@@ -197,7 +215,7 @@ def run_report(
         str(ref_info) if ref_info else '',
         str(cont_csv) if cont_csv else '',
         organism_prefix,
-        str(min_reps),
+        str(run_config['report']['min_reps']),
     ]
     section_status: dict[str, str] = {}
     organism_results: dict[str, dict[str, str]] = {}
@@ -206,9 +224,9 @@ def run_report(
         script, needs_lfq, per_organism = _SECTIONS[sec]
         extra: list[str] = []
         if sec == 'da':
-            extra = [str(lfc_threshold), str(fdr_threshold)]
+            extra = [str(run_config['report']['lfc_threshold']), str(run_config['report']['fdr_threshold']), str(run_config['report']['top_n_proteins'])]
         elif sec == 'concordance':
-            extra = [str(lfq_dir), str(lfc_threshold), str(fdr_threshold)]
+            extra = [str(lfq_dir), str(run_config['report']['lfc_threshold']), str(run_config['report']['fdr_threshold'])]
         output_subdir = output_dir / sec.replace('-', '_')
         proc_ok = _run_r_section(
             section = sec,
@@ -230,9 +248,10 @@ def run_report(
             'sample_sheet': sample_sheet,
             'lqf_dir': lfq_dir or 'not provided',
             'organism_prefix': organism_prefix,
-            'min_reps': min_reps,
-            'lfc_threshold': lfc_threshold,
-            'fdr_threshold': fdr_threshold,
+            'min_reps': run_config['report']['min_reps'],
+            'lfc_threshold': run_config['report']['lfc_threshold'],
+            'fdr_threshold': run_config['report']['fdr_threshold'],
+            'top_n_proteins': run_config['report']['top_n_proteins'],
         },
         section_status,
         organism_results,

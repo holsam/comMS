@@ -12,6 +12,7 @@ organism_prefix <- args[6]
 min_reps <- as.integer(args[7])
 lfc_threshold <- as.numeric(args[8])
 fdr_threshold <- as.numeric(args[9])
+top_n <- as.integer(args[10])
 
 # Get script directory for path traversal
 script_dir <- local({
@@ -100,7 +101,7 @@ for (org in organisms) {
       da_results_all[[key]] <- da_res
 
       top_labels <- filter(da_res, Abundance != "Unchanged") %>% 
-        slice_min(adj_pval, n=20)
+        slice_min(adj_pval, n=top_n)
       volcano <- ggplot(da_res, aes(x=log2FC, y=-log10(adj_pval), colour=Abundance)) +
         geom_point(alpha=0.7, size=1.5) +
         geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", colour="grey50") +
