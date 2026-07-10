@@ -114,10 +114,12 @@ def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
     return runCrux(crux_bin, 'param-medic', args)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, threads, precursor_tol=None, mz_bin_width=None) -> bool:
+def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, threads, precursor_tol=None, mz_bin_width=None, score_function=None, min_peaks=None) -> bool:
     logMsg.debug(f'tide-search: {mzml_file.name}')
-    prec = precursor_tol or config['search']['precursor_tolerance_ppm']
-    bin_width = mz_bin_width  or config['search']['mz_bin_width']
+    prec = precursor_tol if precursor_tol is not None else config['search']['precursor_tolerance_ppm']
+    bin_width = mz_bin_width if mz_bin_width is not None else config['search']['mz_bin_width']
+    score_fn = score_function or config['search']['score_function']
+    peaks = min_peaks or config['search']['min_peaks']
     logMsg.debug(f'Precursor tolerance {prec} ppm, m/z bin width {bin_width}')
     args = [
         '--verbosity', '40',
@@ -126,8 +128,8 @@ def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, 
         '--precursor-window', str(prec),
         '--precursor-window-type', 'ppm',
         '--mz-bin-width', str(bin_width),
-        '--score-function', config['search']['score_function'],
-        '--min-peaks', str(config['search']['min_peaks']),
+        '--score-function', score_fn,
+        '--min-peaks', str(peaks),
         '--missed-cleavages', str(config['index']['missed_cleavages']),
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
