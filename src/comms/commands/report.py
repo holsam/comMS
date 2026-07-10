@@ -201,7 +201,7 @@ def run_report(
         run_config['report']['fdr_threshold'] = resolve_config_value(ctx.config, 'report', 'fdr_threshold', fdr_threshold)
         run_config['report']['top_n_proteins'] = resolve_config_value(ctx.config, 'report', 'top_n_proteins', top_n)
         logMsg.info('Command-line overrides detected - run configuration file will be saved to output folder as "report.config.toml"')
-        _writeConfigTo(run_config, path=Path(out_dir, 'report.config.toml'))
+        _writeConfigTo(run_config, path=Path(output_dir, 'report.config.toml'))
     else:
         logMsg.debug('Using contextual configuration parameters')
         run_config = ctx.config
