@@ -47,19 +47,27 @@ def run_pipeline(
         raise SystemExit(1)
     logMsg.debug(f"Sample sheet loaded: {len(samples)} sample(s); {samples['treatment'].nunique()} treatment(s)")
     logMsg.info(f"Running comMS pipeline: {len(samples)} sample(s), {samples['treatment'].nunique()} treatment(s)")
+
     # -- Step 1: Convert (optional)
     if not skip_convert:
         current_step += 1
         logMsg.progress(f'Step {current_step}/{num_steps}: converting .RAW files')
-        convert.run_convert(data_files, ctx=ctx, gzip=True, in_pipeline=True)
+        convert.run_convert(
+            data_files,
+            ctx=ctx,
+            gzip=None,
+            in_pipeline=True
+        )
         mzml_override = None # search/lfq glob the convert results
     else:
         logMsg.progress(f'Skipped .RAW -> .mzML conversion')
         mzml_override = [f for f in data_files if f.suffix.lower() == '.mzml' or f.name.endswith('.mzML.gz')]
+
     # -- Step 2: Build index
     current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: building peptide index')
     index.run_index(database=database, ctx=ctx, in_pipeline=True)
+
     # -- Step 3: Search
     current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: searching spectra')
@@ -71,6 +79,7 @@ def run_pipeline(
         threads=threads,
         in_pipeline=True
     )
+
     # -- Step 4: Rescore
     current_step += 1
     logMsg.progress(f'Step {current_step}/{num_steps}: rescoring PSMs')
@@ -80,7 +89,8 @@ def run_pipeline(
         ctx=ctx,
         organism_tags=org_tags,
         in_pipeline=True
-)
+    )
+
     # -- Steps 5 & 6: Quantify
     if skip_lfq and skip_quantify:
         logMsg.progress(f'Skipped LFQ and dNSAF quantification')
@@ -113,9 +123,10 @@ def run_pipeline(
             cont_csv=None,
             organism_prefix=None,
             # ! TODO: make below configurable via CLI or config?
-            min_reps=3,
-            fdr_threshold=0.05,
-            lfc_threshold=1.0,
+            min_reps=None,
+            fdr_threshold=None,
+            lfc_threshold=None,
+            top_n=None,
             sections=VALID_SECTIONS,
             overwrite=False,
             rscript='Rscript',
