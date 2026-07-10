@@ -12,10 +12,9 @@ from pathlib import Path
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 from typing import Optional
 
-# -- Define root directories external dependencies
-TESTS_DIR = Path(__file__).parent
-REPO_ROOT = TESTS_DIR.parent
-BIN_DIR = REPO_ROOT / 'bin'
+
+# -- Define bin directory for tests requiring Crux/ThermoRawFileParser
+BIN_DIR = Path(__file__).parent / 'bin'
 
 # -- Import internal dependencies
 from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
