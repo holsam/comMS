@@ -122,7 +122,6 @@ def run_pipeline(
             ref_info=None,
             cont_csv=None,
             organism_prefix=None,
-            # ! TODO: make below configurable via CLI or config?
             min_reps=None,
             fdr_threshold=None,
             lfc_threshold=None,
