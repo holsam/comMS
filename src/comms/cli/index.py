@@ -25,6 +25,25 @@ def index(
         Optional[Path],
         typer.Option('-e', '--experiment-dir', help='Experiment directory', exists=True, file_okay=False, dir_okay=True, writable=True)
     ] = Path('.'),
+    iodo: Annotated[Optional[bool], typer.Option('--iodo/--no-iodo', help='Override carbamidomethylation of cysteine for this run only [dim][default: config][/dim]')] = None,
+    ox: Annotated[Optional[bool], typer.Option('--ox/--no-ox', help='Override oxidation of methionine for this run only [dim][default: config][/dim]')] = None,
+    phos: Annotated[Optional[bool], typer.Option('--phos/--no-phos', help='Override phosphorylation of S/T/Y for this run only [dim][default: config][/dim]')] = None,
+    n_cyc: Annotated[Optional[bool], typer.Option('--n-cyc/--no-n-cyc', help='Override N-terminal Gln cyclisation for this run only [dim][default: config][/dim]')] = None,
+    n_ace: Annotated[Optional[bool], typer.Option('--n-ace/--no-n-ace', help='Override N-terminal protein acetylation for this run only [dim][default: config][/dim]')] = None,
+    custom: Annotated[Optional[str], typer.Option('--custom', help='Add a custom variable modification for this run only [dim][default: config][/dim]')] = None,
+    clip_met: Annotated[Optional[bool], typer.Option('--clip-met/--no-clip-met', help='Override clipped N-terminal methionine handling for this run only [dim][default: config][/dim]')] = None,
+    missed_cleavages: Annotated[Optional[int], typer.Option('--missed-cleavages', help='Missed cleavages for this run only [dim][default: config index.missed_cleavages][/dim]', min=0)] = None,
 ):
     ctx = ExperimentContext.resolve(experiment_dir)
-    indexFuncs.run_index(database, ctx)
+    indexFuncs.run_index(
+        database,
+        ctx,
+        iodo=iodo,
+        ox=ox,
+        phos=phos,
+        n_cyc=n_cyc,
+        n_ace=n_ace,
+        custom=custom,
+        clip_met=clip_met,
+        missed_cleavages=missed_cleavages,
+    )
