@@ -74,8 +74,8 @@ def _print_diff_summary(before: dict, after: dict) -> None:
         print(f'[bold green]✓[/bold green] [dim]{key}[/dim]: [dim]{old}[/dim] → [cyan]{new}[/cyan]')
     print()
 
-# -- resolve_or_create: returns the Path to edit, creating it from defaults first if needed
-def resolve_or_create(path: Path | None, use_global: bool) -> Path:
+# -- _resolve_or_create: returns the Path to edit, creating it from defaults first if needed
+def _resolve_or_create(path: Path | None, use_global: bool) -> Path:
     '''
     Resolve the config.toml target and make sure it exists, creating it from bundled defaults if not
     '''
@@ -95,7 +95,7 @@ def resolve_or_create(path: Path | None, use_global: bool) -> Path:
             target = nested
         else:
             logMsg.warn(f'No local config found in the current directory. Did you mean to use [bold]--global[/bold]?')
-            create_answer = _confirm(msg=f'Create default config at {config}', default=True)
+            create_answer = _confirm(msg=f'Create default config at {nested}', default=True)
             if not create_answer:
                 raise SystemExit(0)
             target = nested
@@ -105,8 +105,10 @@ def resolve_or_create(path: Path | None, use_global: bool) -> Path:
     return target
 
 # -- config_list: prints current config values, highlighting differences from bundled defaults
-def config_list(config_path: Path) -> None:
+def config_list(path, global_) -> None:
     logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
     logMsg.debug(f'Listing config values')
     default_config = _flatten(loadDefaultConfig())
     print(f'\n[bold blue]Current config:[/bold blue] [cyan]{config_path}[/cyan]\n')
@@ -115,8 +117,10 @@ def config_list(config_path: Path) -> None:
     print()
 
 # -- config_verify: checks that all expected keys are present in the config file
-def config_verify(config_path: Path) -> None:
+def config_verify(path, global_) -> None:
     logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
     logMsg.debug(f'Verifying config keys at {config_path}')
     user_config = _flatten(_loadConfigFile(config_path))
     default_config = _flatten(loadDefaultConfig())
@@ -138,8 +142,10 @@ def config_verify(config_path: Path) -> None:
     raise SystemExit(1)
 
 # -- config_reset: overwrites the config file with comMS built-in defaults
-def config_reset(config_path: Path, force: bool = False) -> None:
+def config_reset(path, global_, force: bool = False) -> None:
     logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
     if not force:
         logMsg.warn(f'This will overwrite {config_path} with comMS defaults.')
         if not _confirm('Continue with reset'):
@@ -153,8 +159,10 @@ def config_reset(config_path: Path, force: bool = False) -> None:
         raise SystemExit(1)
 
 # -- config_set: apply any given flags to the config file; returns True if anything changed
-def config_set(config_path: Path, **flags) -> bool:
+def config_set(path, global_, **flags) -> bool:
     logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
     logMsg.debug(f'Applying flags: {flags}')
     if all(v is None for v in flags.values()):
         return False
