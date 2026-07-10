@@ -79,11 +79,6 @@ def run_search(
                 out_dir=out_dir,
                 fileroot=fileroot,
                 config=run_config,
-                threads=run_config['search']['threads'],
-                score_function=run_config['search']['score_function'],
-                min_peaks=run_config['search']['min_peaks'],
-                precursor_tol=run_config['search']['precursor_tolerance_ppm'],
-                mz_bin_width=run_config['search']['mz_bin_width'],
             )
             if ok:
                 n_ok += 1
