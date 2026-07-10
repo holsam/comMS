@@ -13,6 +13,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 from comms.utils.fasta import splitFastaByOrganism
 from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.context import ExperimentContext, resolve_database, resolve_results_input
+from comms.utils.settings import resolve_config_value, _writeConfigTo
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
@@ -25,6 +26,9 @@ def run_rescore(
     database,
     ctx: ExperimentContext,
     organism_tags: Optional[str] = None,
+    protein_enzyme: Optional[str] = None,
+    picked_protein: Optional[bool] = None,
+    shared_psm: Optional[str] = None,
     in_pipeline: bool = False,
 ):
     if not in_pipeline:
@@ -51,20 +55,36 @@ def run_rescore(
     log_path = out_dir / 'rescore.log'
     configureFileLogging(log_path)
     logMsg.debug(f'Output log file: {log_path}')
+
+    # Build config for this run only if any override was given
+    overrides_given = any(v is not None for v in (protein_enzyme, picked_protein, shared_psm))
+    if overrides_given:
+        logMsg.debug('Using run-specific configuration parameters')
+        run_config = {**ctx.config, 'rescore': dict(ctx.config.get('rescore', {}))}
+        run_config['rescore']['protein_enzyme'] = resolve_config_value(ctx.config, 'rescore', 'protein_enzyme', protein_enzyme)
+        run_config['rescore']['picked_protein'] = resolve_config_value(ctx.config, 'rescore', 'picked_protein', picked_protein)
+        run_config['rescore']['shared_psm'] = resolve_config_value(ctx.config, 'rescore', 'shared_psm', shared_psm)
+        logMsg.info('Command-line overrides detected - run configuration file will be saved to output folder as "rescore.config.toml"')
+        _writeConfigTo(run_config, path=Path(out_dir, 'rescore.config.toml'))
+    else:
+        logMsg.debug('Using contextual configuration parameters')
+        run_config = ctx.config
+
     # Round 1: run Percolator on the full combined database, with one call per sample file
-    combined_target_files = _run_combined_percolator_round(
-        crux_bin, target_files, database, out_dir, ctx,
+    _run_combined_percolator_round(
+        crux_bin,
+        target_files,
+        database,
+        out_dir,
+        run_config,
     )
     if not combined_target_files:
         logMsg.error('No combined Percolator output found, cannot continue')
         raise SystemExit(1)
+
     # Round 2: run Percolator on each organism sub-FASTA if multispecies analysis
     if multispecies:
-        organism_tags = (
-            _parseOrganismTags(organism_tags)
-            if organism_tags
-            else ctx.config.get('organism')
-        )
+        organism_tags = (_parseOrganismTags(organism_tags) if organism_tags else ctx.config.get('organism'))
         if not organism_tags:
             logMsg.error('No organism tags supplied or configured for multi-species analysis')
             raise SystemExit(1)
@@ -72,13 +92,18 @@ def run_rescore(
         sub_fastas = splitFastaByOrganism(database, out_dir, organism_tags)
         logMsg.debug(f'Built {len(sub_fastas)} per-organism sub-FASTA(s)')
         _run_per_organism_percolator_round(
-            crux_bin, target_files, sub_fastas, organism_tags, out_dir, ctx
+            crux_bin,
+            target_files,
+            sub_fastas,
+            organism_tags,
+            out_dir,
+            run_config,
         )
     # Log command as complete
     logMsg.debug('Finished command: rescore')
 
 # -- _run_percolator_round: returns list of PSM files after runn Percolator (via Crux) on database, with one call per sample file
-def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, ctx) -> list:
+def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, run_config) -> list:
     logMsg.progress(f'Rescoring {len(target_files)} file(s) using combined database')
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
@@ -91,7 +116,7 @@ def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, ct
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=ctx.config,
+                config=run_config,
             )
             if ok:
                 n_ok += 1
@@ -103,10 +128,10 @@ def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, ct
     return sorted(out_dir.glob('[!.]*.percolator.target.psms.txt'))
 
 # -- _run_per_organism_percolator_round: returns None but splits combined Tide search outputs by organism and runs Percolator (via Crux)
-def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir, ctx):
+def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir, run_config):
     logMsg.progress(f'Rescoring {len(combined_target_files)} file(s) using per-organism sub-FASTAs')
     n_ok, n_fail = 0, 0
-    shared_policy = ctx.config['percolator']['shared_psm']
+    shared_policy = run_config['percolator']['shared_psm']
     with logging_redirect_tqdm():
         for combined_file in tqdm(combined_target_files, desc='Files rescored'):
             logMsg.progress(f'Rescoring {combined_file.name}')
@@ -140,7 +165,7 @@ def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fast
                     database=sub_fastas[label],
                     out_dir=org_out_dir,
                     fileroot=org_fileroot,
-                    config=ctx.config,
+                    config=run_config,
                 )
                 if ok:
                     n_ok += 1
