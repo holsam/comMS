@@ -3,7 +3,7 @@ comMS application settings and start up
 '''
 
 # -- Import external dependencies
-import tomllib
+import tomllib, tomli_w
 from importlib.resources import files as pkg_files
 from pathlib import Path
 from platformdirs import user_config_dir
