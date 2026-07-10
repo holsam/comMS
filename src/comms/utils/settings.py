@@ -54,6 +54,12 @@ def _loadTomlFile(path: Path) -> dict:
     with path.open('rb') as f:
         return tomllib.load(f)
 
+# -- _writeConfigTo: writes a config dict to a given path
+def _writeConfigTo(config: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('wb') as f:
+        tomli_w.dump(config, f)
+
 # -- resolveConfig: returns (config, source)
 def resolveConfig(comms_dir: Optional[Path] = None) -> tuple[dict, str]:
     '''

@@ -16,7 +16,7 @@ from rich.table import Table
 from comms.utils.context import _normalise_dirs
 from comms.utils.log import logMsg
 from comms.utils.modspec import apply_custom_mod, apply_organism, apply_protocol_flags, parse_organism_arg
-from comms.utils.settings import loadDefaultConfig, globalConfigPath
+from comms.utils.settings import loadDefaultConfig, globalConfigPath, _writeConfigTo
 
 # -- _confirm: yes/no prompt via logMsg.input, returned as a bool
 def _confirm(msg: str, default: bool) -> bool:
@@ -28,12 +28,6 @@ def _confirm(msg: str, default: bool) -> bool:
 def _loadConfigFile(config_path: Path) -> dict:
     with config_path.open('rb') as f:
         return tomllib.load(f)
-
-# -- _writeConfigTo: writes a config dict to a given path
-def _writeConfigTo(config: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('wb') as f:
-        tomli_w.dump(config, f)
 
 # -- _flatten: returns a flat dict from a nested dict, with dot-separated keys
 def _flatten(d: dict, prefix: str = '') -> dict:
