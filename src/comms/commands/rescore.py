@@ -71,7 +71,7 @@ def run_rescore(
         run_config = ctx.config
 
     # Round 1: run Percolator on the full combined database, with one call per sample file
-    _run_combined_percolator_round(
+    combined_target_files = _run_combined_percolator_round(
         crux_bin,
         target_files,
         database,
