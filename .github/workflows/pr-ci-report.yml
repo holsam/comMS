@@ -111,73 +111,82 @@ jobs:
         run: exit 1
 
   r-tests:
-      name: R ${{ matrix.r-version }} (${{ matrix.os }})
-      runs-on: ${{ matrix.os }}
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      strategy:
-        fail-fast: false
-        matrix:
-          os: [ubuntu-latest, macos-latest]
-          r-version: ["4.3.0", "4.4.3", "4.5.3", "4.6.1"]
-      steps:
-        - uses: actions/checkout@v7
+    name: R ${{ matrix.r-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        r-version: ["4.3.0", "4.4.3", "4.5.3", "4.6.1"]
+    steps:
+      - uses: actions/checkout@v7
 
-        - name: OS version (Linux)
-          if: runner.os == 'Linux'
-          shell: bash
-          run: |
-            . /etc/os-release
-            echo "OS_NAME=$NAME" >> "$GITHUB_ENV"
-            echo "OS_VER=$VERSION_ID" >> "$GITHUB_ENV"
-            echo "USE_BUNDLED_LIBUV=1" >> "$GITHUB_ENV"
+      - name: OS version (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          . /etc/os-release
+          echo "OS_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "OS_VER=$VERSION_ID" >> "$GITHUB_ENV"
+          echo "USE_BUNDLED_LIBUV=1" >> "$GITHUB_ENV"
 
-        - name: OS version (macOS)
-          if: runner.os == 'macOS'
-          shell: bash
-          run: |
-            echo "OS_NAME=macOS" >> "$GITHUB_ENV"
-            echo "OS_VER=$(sw_vers -productVersion)" >> "$GITHUB_ENV"
+      - name: OS version (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "OS_NAME=macOS" >> "$GITHUB_ENV"
+          echo "OS_VER=$(sw_vers -productVersion)" >> "$GITHUB_ENV"
 
-        - name: Set up R
-          uses: r-lib/actions/setup-r@v2
-          with:
-            r-version: ${{ matrix.r-version }}
-            use-public-rspm: true
+      - name: Install Linux runtime dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcurl4-openssl-dev \
+            libfontconfig1-dev
 
-        - name: Install R dependencies
-          run: |
-            Rscript -e 'install.packages("testthat", repos = "https://cloud.r-project.org")'
-            Rscript src/comms/r/deps/install_deps.R
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r-version }}
+          use-public-rspm: true
 
-        - name: Run R tests
-          id: rtests
-          continue-on-error: true
-          run: Rscript -e 'testthat::test_dir("tests/r")'
+      - name: Install R dependencies
+        run: |
+          Rscript -e 'install.packages("testthat", repos = "https://cloud.r-project.org")'
+          Rscript src/comms/r/deps/install_deps.R
 
-        - name: Write result file
-          if: always()
-          shell: bash
-          run: |
-            mkdir -p result
-            cat > result/result.json <<EOF
-            {
-              "os_name": "${{ env.OS_NAME }}",
-              "os_ver": "${{ env.OS_VER }}",
-              "r_version": "${{ matrix.r-version }}",
-              "tests": "${{ steps.rtests.outcome == 'success' && 'pass' || 'fail' }}"
-            }
-            EOF
+      - name: Run R tests
+        id: rtests
+        continue-on-error: true
+        run: Rscript -e 'testthat::test_dir("tests/r")'
 
-        - name: Upload result artifact
-          if: always()
-          uses: actions/upload-artifact@v7
-          with:
-            name: r-result-${{ matrix.os }}-${{ matrix.r-version }}
-            path: result/result.json
+      - name: Write result file
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p result
+          cat > result/result.json <<EOF
+          {
+            "os_name": "${{ env.OS_NAME }}",
+            "os_ver": "${{ env.OS_VER }}",
+            "r_version": "${{ matrix.r-version }}",
+            "tests": "${{ steps.rtests.outcome == 'success' && 'pass' || 'fail' }}"
+          }
+          EOF
 
-        - name: Fail if R tests failed
-          if: always() && steps.rtests.outcome == 'failure'
-          run: exit 1
+      - name: Upload result artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: r-result-${{ matrix.os }}-${{ matrix.r-version }}
+          path: result/result.json
+
+      - name: Fail if R tests failed
+        if: always() && steps.rtests.outcome == 'failure'
+        run: exit 1
 
   all-checks-passed:
     name: All checks passed
