@@ -186,7 +186,7 @@ class TestConfigSet:
     @pytest.mark.parametrize('section, key, flag, value', [
         ('convert', 'gzip', 'gzip', True),
         ('search', 'threads', 'threads', 16),
-        ('percolator', 'picked_protein', 'picked_protein', False),
+        ('rescore', 'picked_protein', 'picked_protein', False),
         ('quantify', 'measure', 'measure', 'dNSAF'),
         ('report', 'lfc_threshold', 'lfc_threshold', 2.0),
     ])
@@ -204,7 +204,7 @@ class TestConfigSet:
         config_set(tmp_path, False, iodo=True)
         with target.open('rb') as f:
             after = tomllib.load(f)
-        for section in ('search', 'percolator', 'quantify', 'convert'):
+        for section in ('search', 'rescore', 'quantify', 'convert'):
             assert after.get(section) == before.get(section)
 
     def test_prints_diff_summary(self, tmp_path, capsys):

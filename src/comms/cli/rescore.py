@@ -35,15 +35,15 @@ def rescore(
     ] = Path('.'),
     protein_enzyme: Annotated[
         Optional[str],
-        typer.Option('--protein-enzyme', help='Enzyme used for protein-level picked-FDR grouping [dim][default: config percolator.protein_enzyme][/dim]')
+        typer.Option('--protein-enzyme', help='Enzyme used for protein-level picked-FDR grouping [dim][default: config rescore.protein_enzyme][/dim]')
     ] = None,
     picked_protein: Annotated[
         Optional[bool],
-        typer.Option('--picked-protein/--no-picked-protein', help='Use picked-protein FDR [dim][default: config percolator.picked_protein][/dim]')
+        typer.Option('--picked-protein/--no-picked-protein', help='Use picked-protein FDR [dim][default: config rescore.picked_protein][/dim]')
     ] = None,
     shared_psm: Annotated[
         Optional[Literal['drop', 'include']],
-        typer.Option('--shared-psm', help='Policy for PSMs shared between organisms [dim][default: config percolator.shared_psm][/dim]')
+        typer.Option('--shared-psm', help='Policy for PSMs shared between organisms [dim][default: config rescore.shared_psm][/dim]')
     ] = None,
 ):
     ctx = ExperimentContext.resolve(experiment_dir)

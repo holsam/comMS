@@ -130,7 +130,7 @@ def _run_combined_percolator_round(crux_bin, target_files, database, out_dir, ru
 def _run_per_organism_percolator_round(crux_bin, combined_target_files, sub_fastas, organism_tags, out_dir, run_config):
     logMsg.progress(f'Rescoring {len(combined_target_files)} file(s) using per-organism sub-FASTAs')
     n_ok, n_fail = 0, 0
-    shared_policy = run_config['percolator']['shared_psm']
+    shared_policy = run_config['rescore']['shared_psm']
     with logging_redirect_tqdm():
         for combined_file in tqdm(combined_target_files, desc='Files rescored'):
             logMsg.progress(f'Rescoring {combined_file.name}')

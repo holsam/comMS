@@ -304,7 +304,7 @@ class ConfigPanel(QWidget):
             organisms = {
                 label: pattern for label, pattern in self._organism_rows() if label and pattern
             }
-            cfg['percolator']['shared_psm'] = self.shared_policy()
+            cfg['rescore']['shared_psm'] = self.shared_policy()
         cfg = apply_organism(cfg, organisms)
         cfg.setdefault('index', {})
         cfg['index']['custom_mods'] = ''
@@ -342,7 +342,7 @@ class ConfigPanel(QWidget):
 
         organisms = cfg.get('organism', {})
         self._analysis.setCurrentIndex(1 if organisms else 0)
-        self._sharedpsm.setCurrentIndex(1 if cfg.get('percolator', {}).get('shared_psm') == 'include' else 0)
+        self._sharedpsm.setCurrentIndex(1 if cfg.get('rescore', {}).get('shared_psm') == 'include' else 0)
         self._org_table.setRowCount(0)
         for label, pattern in organisms.items():
             row = self._org_table.rowCount()

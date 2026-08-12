@@ -257,7 +257,7 @@ Class | Test description
 `TestConfigList` | prints the config path and a table (`config_list`)
 `TestConfigVerify` | a config created from defaults passes; missing a required key exits non-zero; an unexpected/extra key exits non-zero
 `TestConfigReset` | `--force` resets to bundled defaults without prompting; without force, prompts via `_confirm` and exits with code 0 only when declined
-`TestConfigSet` | all-`None` flags returns `False` and writes nothing; a protocol flag (`iodo`) round-trips into `index.fixed_mods`; `organism` round-trips into the `organism` section; `custom` round-trips into `index.custom_mods`; direct flags (`gzip`, `threads`, `picked_protein`, `measure`, `lfc_threshold`) round-trip into their respective sections (parametrised); unrelated sections (`search`, `percolator`, `quantify`, `convert`) are untouched by an unrelated flag; a diff summary (✓) is printed after a successful set
+`TestConfigSet` | all-`None` flags returns `False` and writes nothing; a protocol flag (`iodo`) round-trips into `index.fixed_mods`; `organism` round-trips into the `organism` section; `custom` round-trips into `index.custom_mods`; direct flags (`gzip`, `threads`, `picked_protein`, `measure`, `lfc_threshold`) round-trip into their respective sections (parametrised); unrelated sections (`search`, `rescore`, `quantify`, `convert`) are untouched by an unrelated flag; a diff summary (✓) is printed after a successful set
 `TestConfigSetLocalTarget` | writes to the local `<root>/comms/config.toml`, not the global user config, which remains untouched
 
 ---

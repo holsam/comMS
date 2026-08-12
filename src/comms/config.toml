@@ -24,7 +24,7 @@ min_peaks = 10
 precursor_tolerance_ppm = 10.0
 threads = 2
 
-[percolator]
+[rescore]
 protein_enzyme = "trypsin"
 picked_protein = true    # use picked-protein FDR (c.f. Savitski et al. 2015, doi:10.1074/mcp.M114.046995)
 shared_psm = "drop"

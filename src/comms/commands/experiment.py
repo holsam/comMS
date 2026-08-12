@@ -160,7 +160,7 @@ def run_experiment_headless(experiment_dir: Path | None = None) -> None:
         organisms = {}
     cfg = apply_organism(cfg, organisms)
     if multispecies:
-        cfg['percolator']['shared_psm'] = logMsg.input('Shared PSM handling policy', choices=['drop', 'include'], default=config.get('percolator', {}).get('shared_psm', 'drop'), show_choices=True, show_default=True).strip()
+        cfg['rescore']['shared_psm'] = logMsg.input('Shared PSM handling policy', choices=['drop', 'include'], default=config.get('rescore', {}).get('shared_psm', 'drop'), show_choices=True, show_default=True).strip()
     report_meta = metadata.get('report', {})
     organism_prefix = ''
     include_report = _confirm('Create report?', default=report_meta.get('enabled', True))

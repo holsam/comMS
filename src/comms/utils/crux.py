@@ -139,13 +139,13 @@ def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: P
     logMsg.debug(f'percolator: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
-        '--protein-enzyme', config['percolator']['protein_enzyme'],
+        '--protein-enzyme', config['rescore']['protein_enzyme'],
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
         '--overwrite', 'T',
         str(target_psm_file),
     ]
-    if config['percolator']['picked_protein']:
+    if config['rescore']['picked_protein']:
         args = ['--picked-protein', str(database)] + args
     return runCrux(crux_bin, 'percolator', args)
 
