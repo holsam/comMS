@@ -43,9 +43,14 @@ Tool | Minimum version | Purpose | Platform notes
 [ThermoRawFileParser][trfp-url] | 1.4.5 | `.RAW` → `.mzML` conversion | Versions < 2.0.0 require [Mono](https://mono-project.com) on Linux/macOS
 
 ### `comms report` dependencies
-The `report` command requires R (≥ 4.3.0) and a set of R packages (listed in the [report command documentation](./docs/commands.md#the-report-command)). Required R packages can be installed by running:
+The `report` command requires R (≥ 4.3.0) and a set of R packages (listed in the [report command documentation](./docs/commands.md#the-report-command)). Check or install the required R packages with:
 ```bash
-Rscript src/comms/r/install_deps.R
+comms r-utils check
+comms r-utils install
+```
+Alternatively, run the underlying script directly:
+```bash
+Rscript src/comms/r/deps/install_deps.R
 ```
 
 ## Installation
@@ -93,7 +98,7 @@ comms experiment --headless         # via terminal
 # 2. Run comMS analysis pipeline
 comms pipeline -e /path/to/experiment/dir
 ```
-Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step.
+Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step. `--skip-lfq` and `--skip-quant` omit the two quantification stages individually, `--param-medic` estimates search tolerances before searching, and `--organism-tags`/`-o` supplies per-organism FDR patterns at runtime (see [Per-organism FDR][docs-commands]). Run `comms pipeline --help` for the full option list.
 
 You need two inputs to run the pipeline: a sample sheet (TSV or CSV) and a combined FASTA database containing your proteome(s) and contaminants. Both are described in [Input files](./docs/commands.md#input-files). The `--experiment-dir` option sets where comMS reads its configuration and writes its results, explained in [Configuration][docs-config].
 

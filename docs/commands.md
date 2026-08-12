@@ -49,12 +49,12 @@ Command | Description
 `experiment` | Build a sample sheet, configuration, and metadata (see [Configuration](./configuration.md#creating-an-experiment-the-experiment-command))
 `config` | Manage a configuration file (see [Configuration][docs-config])
 
-### Pipeline
+### Pipelines
 Command | Description
 ---|---
 `pipeline` | Run the full analysis pipeline end-to-end from a sample sheet
 
-### Analysis commands
+### Protein Identification
 Command | Description
 ---|---
 `convert` | Convert `.RAW` files to indexed `.mzML` using ThermoRawFileParser
@@ -63,17 +63,23 @@ Command | Description
 `rescore` | Rescore PSMs using Crux `percolator` on the combined database, then split by organism and run `percolator` per organism for calibrated per-organism FDR
 `lfq` | Run MS1 label-free quantification using grouped fractions
 `quantify` | Compute dNSAF spectral counts using Crux `spectral-counts`
+
+### Downstream Analysis
+Command | Description
+---|---
 `report` | Generate a static analysis report from `quantify` and, optionally, `lfq` output
 
 ### Utilities
 Command | Description
 ---|---
 `license` | Print the comMS license
+`r-utils check` | Check whether the R packages required by `report` are installed
+`r-utils install` | Install any missing R packages required by `report`
 `uninstall` | Remove comMS-generated files and print the uninstall command where possible
 `version` | Print the installed comMS version
 
 ## Per-organism FDR
-When a combined multi-species FASTA is searched, comMS can apply picked-protein FDR separately per organism. The patterns that split the database can be set once in configuration (`comms config set --organism`, see the [configuration reference](./config-reference.md#protocol-flags)), or supplied at runtime to `rescore` and `pipeline` with `--organism-tags` which takes a comma-separated list of alternating label and pattern pairs:
+When a combined multi-species FASTA is searched, comMS can apply picked-protein FDR separately per organism. The patterns that split the database can be set once in configuration (`comms config --organism`, see the [configuration reference](./config-reference.md#protocol-flags)), or supplied at runtime to `rescore` and `pipeline` with `--organism-tags` which takes a comma-separated list of alternating label and pattern pairs:
 ```bash
 comms rescore search_dir/ \
     --database combined_proteome.fasta \
@@ -87,10 +93,10 @@ comMS then splits the combined FASTA into one sub-FASTA per organism (appending 
 The `report` command runs a set of R-based analysis sections over the quantification output, writing figures and spreadsheets. It requires R (≥ 4.3.0) and the packages listed below.
 
 ### Enabling the report command
-The report command can be run manually via `comms report` or as part of a `comms pipeline` run. Creating an experiment via `comms experiment` allows selection of reference protein annotation and contaminant files, which are recorded in experiment.toml under [report] and picked up automatically by the `report` command. They can also be supplied at runtime via the `-r`/`--ref-info` and `-c`/`--cont-csv` option flags.
+The report command can be run manually via `comms report` or as part of a `comms pipeline` run. Creating an experiment via `comms experiment` allows selection of reference protein annotation and contaminant files, which are recorded in experiment.toml under [report] and picked up automatically by the `report` command. They can also be supplied at runtime via the `-r`/`--ref-info` and `-c`/`--cont-csv` option flags, alongside `-o`/`--organism-prefix`, `-q`/`--quantify-dir`, `-s`/`--sample-sheet`, and `-l`/`--lfq-dir` to override the other resolved inputs. `--min-reps`, `--lfc-threshold`, `--fdr-threshold`, and `--top-n` override the corresponding `[report]` config values for a single run (and are recorded to `report.config.toml` in the output directory when used); `--overwrite` allows writing into an existing report output directory; `--rscript` points to a non-default `Rscript` binary.
 
 ### Sections
-By default the `qc`, `pca`, and `da` sections run. Use `--section` (repeatable) to choose specific sections, or `--all` to run every section.
+By default the `qc`, `pca`, and `da` sections run. Use `--section` (repeatable) to choose specific sections, or `--all` to run every section, including the auxiliary `ev-markers` section.
 
 Section | Content
 ---|---
@@ -99,19 +105,27 @@ Section | Content
 `da` | limma-based differential abundance per fraction, with volcano plots and DA Venn diagrams
 `secondary-species` | Secondary-organism proteins per fraction, with a Venn diagram and candidate table
 `concordance` | LFQ vs dNSAF log₂FC concordance scatter and Venn diagrams (skipped automatically if no `--lfq-dir` is provided)
+`ev-markers` | MISEV2023-informed marker-category heatmaps per organism (auxiliary; not run by default)
 
 ### Analysis notes
 **Normalisation.** Normalisation is deliberately not applied across fractions, because the fractions are expected to differ genuinely in protein composition.
 
 **Differential abundance.** limma with empirical Bayes shrinkage supports analysis at *n* = 3 ([Ritchie et al., 2015](https://doi.org/10.1093/nar/gkv007), doi:10.1093/nar/gkv007). A Benjamini-Hochberg false-discovery rate is applied within each fraction independently, since across-fraction comparisons are likely confounded by run order.
 
-**EV markers (auxiliary).** A script for analysis of extracellular vesicle marker proteins is provided at `r/sections/aux/ev-markers.R`, informed by the MISEV 2023 guidelines ([Welsh et al., 2024](https://doi.org/10.1002/jev2.12404), doi:10.1002/jev2.12404). It is run manually rather than through `--section`.
+**EV markers (auxiliary).** A script for analysis of extracellular vesicle marker proteins is provided at `r/sections/aux/ev-markers.R`, informed by the MISEV 2023 guidelines ([Welsh et al., 2024](https://doi.org/10.1002/jev2.12404), doi:10.1002/jev2.12404). It is not a default section, but `--section ev-markers` can be used to run it on its own, or `--all` to include it alongside every other section.
 
 ### R packages
-Install the required R packages by running:
+Check or install the required R packages via:
 
 ```bash
-Rscript src/comms/r/install_deps.R
+comms r-utils check
+comms r-utils install
+```
+
+or by running the underlying script directly:
+
+```bash
+Rscript src/comms/r/deps/install_deps.R
 ```
 
 If R is not available, `report` exits with an informative error.
@@ -127,6 +141,8 @@ Package | Source
 `UpSetR` | CRAN
 `pheatmap` | CRAN
 `VennDiagram` | CRAN
+`iq` | CRAN
+`jsonlite` | CRAN
 `limma` | Bioconductor
 
 ---
