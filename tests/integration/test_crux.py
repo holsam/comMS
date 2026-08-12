@@ -84,7 +84,6 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
-            threads=cfg['search']['threads']
         )
         assert ok, 'tideSearch returned False — check search.log'
         target_file = out_dir / 'synthetic.tide-search.target.txt'
@@ -100,7 +99,6 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
-            threads=cfg['search']['threads']
         )
         target_file = out_dir / 'synthetic.tide-search.target.txt'
         lines = target_file.read_text().splitlines()
@@ -116,7 +114,6 @@ class TestTideSearch:
             out_dir=out_dir,
             fileroot='synthetic',
             config=cfg,
-            threads=cfg['search']['threads']
         )
         log = out_dir / 'synthetic.tide-search.log.txt'
         assert log.exists()
@@ -138,7 +135,6 @@ def search_results(crux_bin, built_index, tmp_path_factory):
         out_dir=out_dir,
         fileroot='synthetic',
         config=cfg,
-        threads=cfg['search']['threads']
     )
     if not ok:
         pytest.skip('tideSearch failed — cannot run percolator tests')
@@ -218,7 +214,7 @@ class TestSpectralCounts:
             config=cfg,
         )
         assert ok, 'spectralCounts returned False — check quantify.log'
-        assert (out_dir / 'synthetic.spectral-counts.target.txt').exists()
+        assert (out_dir / 'synthetic_dNSAF.spectral-counts.target.txt').exists()
 
     def test_counts_file_has_content(self, crux_bin, synthetic_percolator_results, synthetic_fasta, tmp_path):
         psm_file = synthetic_percolator_results / 'EUK' / 'synthetic.EUK.percolator.target.psms.txt'
@@ -232,4 +228,4 @@ class TestSpectralCounts:
             fileroot='synthetic',
             config=cfg,
         )
-        assert (out_dir / 'synthetic.spectral-counts.target.txt').stat().st_size > 0
+        assert (out_dir / 'synthetic_dNSAF.spectral-counts.target.txt').stat().st_size > 0
