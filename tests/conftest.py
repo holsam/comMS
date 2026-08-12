@@ -12,10 +12,17 @@ from pathlib import Path
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 from typing import Optional
 
-# -- Define root directories external dependencies
-TESTS_DIR = Path(__file__).parent
-REPO_ROOT = TESTS_DIR.parent
-BIN_DIR = REPO_ROOT / 'bin'
+
+# -- Define bin directory for tests requiring Crux/ThermoRawFileParser
+BIN_DIR = Path(__file__).parent / 'bin'
+
+# -- Point comMS at the test bin/ directory for the whole session
+@pytest.fixture(scope='session', autouse=True)
+def _comms_bin_dir_env():
+    mp = pytest.MonkeyPatch()
+    mp.setenv('COMMS_BIN_DIR', str(BIN_DIR))
+    yield
+    mp.undo()
 
 # -- Import internal dependencies
 from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
@@ -87,51 +94,29 @@ def synthetic_fixtures(tmp_path: Path) -> tuple[Path, Path]:
 
 # -- Create sample sheet fixtures
 @pytest.fixture()
-def valid_sample_sheet(tmp_path: Path) -> Path:
+def sample_sheet_factory(tmp_path: Path):
     '''
-    Write a minimal valid comMS sample sheet (TSV) and return its path
+    Returns a function that writes a minimal comMS sample sheet (TSV) with the
+    given fractions (two treatments, one replicate each, optional batch column)
+    and returns its path.
     '''
-    content = (
-        'sample_id\traw_file\ttreatment\tfraction\treplicate\tbatch\n'
-        'S1\tsynthetic.mzML\tCONTROL\tWCL\t1\tA\n'
-        'S2\tsynthetic.mzML\tTREATMENT\tWCL\t1\tA\n'
-    )
-    p = tmp_path / 'sample_sheet.tsv'
-    p.write_text(content)
-    return p
-
-@pytest.fixture()
-def valid_sample_sheet_single_fraction(tmp_path: Path) -> Path:
-    '''
-    Write a minimal sample sheet with a single fraction (WCL) and return its path
-    '''
-    content = (
-        'sample_id\traw_file\ttreatment\tfraction\treplicate\n'
-        'S1\tsample_mock_wcl_1.RAW\tMOCK\tWCL\t1\n'
-        'S2\tsample_treat_wcl_1.RAW\tTREAT\tWCL\t1\n'
-    )
-    p = tmp_path / 'sample_sheet_single_fraction.tsv'
-    p.write_text(content)
-    return p
-
-@pytest.fixture()
-def valid_sample_sheet_multiple_fractions(tmp_path: Path) -> Path:
-    '''
-    Write a minimal sample sheet with three fractions (WCL, ECF, PUR), two treatments, and one
-    replicate each and return its path
-    '''
-    content = (
-        'sample_id\traw_file\ttreatment\tfraction\treplicate\tbatch\n'
-        'S1\tsample_mock_wcl_1.RAW\tMOCK\tWCL\t1\tA\n'
-        'S2\tsample_treat_wcl_1.RAW\tTREAT\tWCL\t1\tA\n'
-        'S3\tsample_mock_ecf_1.RAW\tMOCK\tECF\t1\tA\n'
-        'S4\tsample_treat_ecf_1.RAW\tTREAT\tECF\t1\tA\n'
-        'S5\tsample_mock_pur_1.RAW\tMOCK\tPUR\t1\tA\n'
-        'S6\tsample_treat_pur_1.RAW\tTREAT\tPUR\t1\tA\n'
-    )
-    p = tmp_path / 'sample_sheet_multiple_fractions.tsv'
-    p.write_text(content)
-    return p
+    def _make(fractions: list[str] = ('WCL',), batch: bool = True) -> Path:
+        columns = ['sample_id', 'raw_file', 'treatment', 'fraction', 'replicate']
+        if batch:
+            columns.append('batch')
+        lines = ['\t'.join(columns)]
+        for i, fraction in enumerate(fractions):
+            for j, treatment in enumerate(('MOCK', 'TREAT')):
+                sample_id = f'S{i * 2 + j + 1}'
+                raw_file = f'sample_{treatment.lower()}_{fraction.lower()}_1.RAW'
+                row = [sample_id, raw_file, treatment, fraction, '1']
+                if batch:
+                    row.append('A')
+                lines.append('\t'.join(row))
+        p = tmp_path / f'sample_sheet_{"_".join(fractions).lower()}.tsv'
+        p.write_text('\n'.join(lines) + '\n')
+        return p
+    return _make
 
 @pytest.fixture()
 def sample_sheet_missing_col(tmp_path: Path) -> Path:
@@ -193,40 +178,21 @@ def synthetic_percolator_results(tmp_path):
     return rescore_dir
 
 @pytest.fixture()
-def multi_fraction_psm_dir(tmp_path: Path) -> Path:
+def psm_dir_factory(tmp_path: Path):
     '''
-    Write synthetic Percolator PSM files for three fractions (WCL, AWF, EV), two samples per fraction, matching the filenames in valid_multi_fraction_sample_sheet. and return the directory path
+    Returns a function that writes one synthetic Percolator PSM file per given
+    stem under comms/results/rescore/, and returns that directory.
     '''
-    rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
-    rescore_dir.mkdir(parents=True)
     psm_header = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
     psm_row = 'synthetic_1\t1.5\t0.01\t0.001\tK.ACDEFGHIK.L\tSP|PROT1|GENE1\n'
-    stems = [
-        'sample_mock_wcl_1',
-        'sample_treat_wcl_1',
-        'sample_mock_ecf_1',
-        'sample_treat_ecf_1',
-        'sample_mock_pur_1',
-        'sample_treat_pur_1',
-    ]
-    for stem in stems:
-        psm_file = rescore_dir / f'{stem}.percolator.target.psms.txt'
-        psm_file.write_text(psm_header + psm_row)
-    return rescore_dir
 
-@pytest.fixture()
-def single_fraction_psm_dir(tmp_path: Path) -> Path:
-    '''
-    Write synthetic Percolator PSM files for a single fraction (WCL), matching the filenames in valid_sample_sheet_single_fraction
-    '''
-    rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
-    rescore_dir.mkdir(parents=True)
-    psm_header = 'PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n'
-    psm_row = 'synthetic_1\t1.5\t0.01\t0.001\tK.ACDEFGHIK.L\tSP|PROT1|GENE1\n'
-    for stem in ('sample_mock_wcl_1', 'sample_treat_wcl_1'):
-        psm_file = rescore_dir / f'{stem}.percolator.target.psms.txt'
-        psm_file.write_text(psm_header + psm_row)
-    return rescore_dir
+    def _make(stems: list[str]) -> Path:
+        rescore_dir = tmp_path / 'comms' / 'results' / 'rescore'
+        rescore_dir.mkdir(parents=True, exist_ok=True)
+        for stem in stems:
+            (rescore_dir / f'{stem}.percolator.target.psms.txt').write_text(psm_header + psm_row)
+        return rescore_dir
+    return _make
 
 # -- Define session-scoped QApplication for GUI tests
 @pytest.fixture(scope='session')
@@ -256,11 +222,52 @@ qInstallMessageHandler(_qt_message_handler)
 
 # -- Add a function-scoped experiment context for most tests
 @pytest.fixture()
-def experiment_ctx(tmp_path, monkeypatch):
+def experiment_ctx(tmp_path, isolated_config_dir):
     '''A bare ExperimentContext rooted at tmp_path (no experiment.toml)'''
-    monkeypatch.setattr(
-        'comms.utils.settings.globalConfigPath',
-        lambda: tmp_path / '_no_global_config.toml',
-    )
     from comms.utils.context import ExperimentContext
     return ExperimentContext.resolve(tmp_path)
+
+# -- Add a fixture for integration-layer tests
+@pytest.fixture()
+def experiment_builder(tmp_path: Path, isolated_config_dir, sample_sheet_factory, psm_dir_factory):
+    '''
+    Compose a comms/ directory from only the pieces a test asks for.
+    Usage: root, ctx = experiment_builder.with_sample_sheet().with_stage_output('rescore').build()
+    '''
+    import tomli_w
+    from comms.utils.context import ExperimentContext
+
+    class _Builder:
+        def __init__(self):
+            self._metadata: dict = {'experiment': {'name': 'exp', 'updated': '2026-01-01T00:00:00+00:00'}}
+            self._sample_sheet_path: Path | None = None
+
+        def with_sample_sheet(self, fractions=('WCL',), batch=True):
+            self._sample_sheet_path = sample_sheet_factory(list(fractions), batch=batch)
+            self._metadata.setdefault('files', {})['sample_sheet'] = str(self._sample_sheet_path)
+            return self
+
+        def with_stage_output(self, stage: str, files: list[str] | None = None):
+            if stage in ('rescore',):
+                psm_dir_factory(files or ['sample_mock_wcl_1', 'sample_treat_wcl_1'])
+            else:
+                out_dir = tmp_path / 'comms' / 'results' / stage
+                out_dir.mkdir(parents=True, exist_ok=True)
+                for name in (files or [f'placeholder.{stage}.txt']):
+                    (out_dir / name).write_text('')
+            return self
+
+        def with_metadata(self, **kwargs):
+            for section, values in kwargs.items():
+                self._metadata.setdefault(section, {}).update(values)
+            return self
+
+        def build(self):
+            comms_dir = tmp_path / 'comms'
+            comms_dir.mkdir(parents=True, exist_ok=True)
+            with (comms_dir / 'experiment.toml').open('wb') as f:
+                tomli_w.dump(self._metadata, f)
+            ctx = ExperimentContext.resolve(tmp_path)
+            return tmp_path, ctx
+
+    return _Builder()

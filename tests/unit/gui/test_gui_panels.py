@@ -10,7 +10,6 @@ from PySide6.QtWidgets import QTableWidgetItem
 from unittest.mock import patch
 
 # -- Import functions under test
-from comms.commands.config import MET_OX_MOD
 from comms.gui.status import PanelStatus
 from comms.gui.models.experiment_state import ExperimentState
 from comms.gui.models.sample_table import COL_TREATMENT, COL_FRACTION
@@ -18,6 +17,7 @@ from comms.gui.panels.config_panel import ConfigPanel
 from comms.gui.panels.experiment_panel import ExperimentPanel
 from comms.gui.panels.sample_panel import SamplePanel
 from comms.gui.panels.save_panel import SavePanel
+from comms.utils.modspec import MET_OX_MOD
 
 # -- Helper: bring a sample panel's state to completeness
 def _complete_sample(state):
@@ -106,6 +106,27 @@ class TestConfigPanel:
 
     def test_summary_reports_single_species(self):
         assert 'single species' in ConfigPanel().summary()
+
+    def test_loads_string_clip_n_met_as_checked(self, qapp):
+        panel = ConfigPanel()
+        panel.load_from_config({'index': {'clip_n_met': 'true'}}, {})
+        assert panel._clip_met.isChecked() is True
+
+    def test_loads_string_clip_n_met_false_as_unchecked(self, qapp):
+        panel = ConfigPanel()
+        panel.load_from_config({'index': {'clip_n_met': 'false'}}, {})
+        assert panel._clip_met.isChecked() is False
+
+    def test_loads_bool_clip_n_met(self, qapp):
+        panel = ConfigPanel()
+        panel.load_from_config({'index': {'clip_n_met': True}}, {})
+        assert panel._clip_met.isChecked() is True
+
+    def test_build_config_always_writes_bool(self, qapp):
+        panel = ConfigPanel()
+        panel.load_from_config({'index': {'clip_n_met': 'true'}}, {})
+        cfg = panel._build_config()
+        assert isinstance(cfg['index']['clip_n_met'], bool)
 
 # -- Define tests for experiment_panel
 class TestExperimentPanel:
@@ -243,6 +264,48 @@ class TestSamplePanel:
         result = panel.data_files()
         assert path in result
         assert '' not in result
+
+    def test_load_populates_treatments_and_fractions(self, qapp):
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        panel.load(rows=[], treatments=['MOCK', 'MYC'], fractions=['WCL', 'AWF'])
+        assert 'MOCK' in state.treatments and 'MYC' in state.treatments
+        assert 'WCL' in state.fractions and 'AWF' in state.fractions
+
+    def test_load_matches_source_path_by_filename(self, tmp_path, qapp):
+        from comms.utils.sheet import SampleRow
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        row = SampleRow(sample_id='S1', raw_file='s1.RAW', source_path='')
+        data_file = tmp_path / 's1.RAW'
+        panel.load(rows=[row], treatments=[], fractions=[], data_files=[str(data_file)])
+        assert state.sample_model.rows()[0].source_path == str(data_file)
+
+    def test_load_does_not_overwrite_existing_source_path(self, tmp_path, qapp):
+        from comms.utils.sheet import SampleRow
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        existing = str(tmp_path / 'already_set.RAW')
+        row = SampleRow(sample_id='S1', raw_file='s1.RAW', source_path=existing)
+        new_match = tmp_path / 's1.RAW'
+        panel.load(rows=[row], treatments=[], fractions=[], data_files=[str(new_match)])
+        assert state.sample_model.rows()[0].source_path == existing
+
+    def test_load_leaves_unmatched_row_source_path_empty(self, tmp_path, qapp):
+        from comms.utils.sheet import SampleRow
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        row = SampleRow(sample_id='S1', raw_file='no_match.RAW', source_path='')
+        panel.load(rows=[row], treatments=[], fractions=[], data_files=[str(tmp_path / 'other.RAW')])
+        assert state.sample_model.rows()[0].source_path == ''
+
+    def test_load_with_no_data_files_still_sets_rows(self, qapp):
+        from comms.utils.sheet import SampleRow
+        state = ExperimentState()
+        panel = SamplePanel(state)
+        row = SampleRow(sample_id='S1', raw_file='s1.RAW')
+        panel.load(rows=[row], treatments=[], fractions=[], data_files=None)
+        assert len(state.sample_model.rows()) == 1
 
 class TestSavePanel:
     def _build(self, tmp_path):

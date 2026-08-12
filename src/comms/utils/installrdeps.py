@@ -60,7 +60,7 @@ def install_r_dependencies(rscript: str = 'Rscript') -> bool:
     for line in process.stdout:
         line = line.rstrip()
         if line:
-            logMsg.progress(line)
+            logMsg.info(line)
     process.wait()
     if process.returncode != 0:
         logMsg.error('R dependency installation failed; see above output')

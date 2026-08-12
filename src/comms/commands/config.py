@@ -79,7 +79,7 @@ def _resolve_or_create(path: Path | None, use_global: bool) -> Path:
         _, comms_dir = _normalise_dirs(path)
         target = comms_dir / 'config.toml'
     else:
-        bare, nested = Path('config.toml'), Path('comms') / 'config.toml'
+        bare, nested = Path.cwd() / 'config.toml', Path.cwd() / 'comms' / 'config.toml'
         if bare.exists() and nested.exists():
             logMsg.error(f'Both {bare} and {nested} exist in the current directory. Remove one before running comms config here.')
             raise SystemExit(1)
