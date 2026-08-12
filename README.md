@@ -43,9 +43,14 @@ Tool | Minimum version | Purpose | Platform notes
 [ThermoRawFileParser][trfp-url] | 1.4.5 | `.RAW` → `.mzML` conversion | Versions < 2.0.0 require [Mono](https://mono-project.com) on Linux/macOS
 
 ### `comms report` dependencies
-The `report` command requires R (≥ 4.3.0) and a set of R packages (listed in the [report command documentation](./docs/commands.md#the-report-command)). Required R packages can be installed by running:
+The `report` command requires R (≥ 4.3.0) and a set of R packages (listed in the [report command documentation](./docs/commands.md#the-report-command)). Check or install the required R packages with:
 ```bash
-Rscript src/comms/r/install_deps.R
+comms r-utils check
+comms r-utils install
+```
+Alternatively, run the underlying script directly:
+```bash
+Rscript src/comms/r/deps/install_deps.R
 ```
 
 ## Installation
