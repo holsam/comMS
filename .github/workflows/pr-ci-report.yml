@@ -46,7 +46,7 @@ jobs:
       - name: Run pytest
         id: pytest
         continue-on-error: true
-        run: uv run pytest
+        run: uv run --with opencv-python-headless pytest
 
       - name: Build package
         id: build
@@ -124,7 +124,7 @@ jobs:
             use-public-rspm: true
 
         - name: Install R dependencies
-          run: Rscript src/comms/r/install_deps.R
+          run: Rscript src/comms/r/deps/install_deps.R
 
         - name: Run R tests
           id: rtests
