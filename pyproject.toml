@@ -1,7 +1,7 @@
 [project]
 name = "comms"
 version = "2.0.2"
-description = "Add your description here"
+description = "A command line tool for comparative analysis of proteomic data"
 readme = "README.md"
 authors = [
     { name = "Sam Holland", email = "hol_sam@icloud.com" }
