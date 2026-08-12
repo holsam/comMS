@@ -31,21 +31,27 @@ See [Installing external tools](./README.md#installing-external-tools) in [`READ
 comMS follows the below structure:
 ```
 comMS/
-  bin/              # External binaries
+  bin/                       # External binaries
   src/
     comms/
-      cli/          # Typer command definitions (argument parsing, help text)
-      commands/     # Logic for each individual command
-      utils/        # Shared utilities (e.g I/O, paths, config, Crux/TRFP wrappers)
-      config.toml   # Bundled default configuration
+      cli/                   # Typer command definitions (argument parsing, help text)
+      commands/              # Logic for each individual command
+      gui/                   # PySide6 GUI for the `experiment` command
+      r/                     # R scripts used by the `report` command
+        deps/                # Dependency checking/installation (also exposed via `comms r-utils`)
+        sections/            # One script per report section (qc, pca, da, secondary-species, concordance, aux/ev-markers)
+        utils/               # Shared R helpers (import, normalisation, status tracking, theming)
+      utils/                 # Shared Python utilities (e.g I/O, paths, config, Crux/TRFP wrappers)
+      config.toml            # Bundled default configuration
+      main.py                # Typer app assembly, imported by the `comms` console-script entry point
   tests/
-    conftest.py     # Shared fixtures and binary-availability guards
+    conftest.py              # Shared fixtures and binary-availability guards
     fixtures/
       generate_fixtures.py   # Synthetic FASTA and mzML generator
-    unit/           # Pure logic tests, no external binaries required
-    integration/    # End-to-end tests, may require Crux and/or TRFP
-  pyproject.toml    # Project configuration
-  uv.lock           # UV lockfile
+    unit/                    # Pure logic tests, no external binaries required
+    integration/             # End-to-end tests, may require Crux and/or TRFP
+  pyproject.toml             # Project configuration
+  uv.lock                    # UV lockfile
 ```
 
 ### CLI vs commands separation
