@@ -16,6 +16,11 @@ from typing import Optional
 # -- Define bin directory for tests requiring Crux/ThermoRawFileParser
 BIN_DIR = Path(__file__).parent / 'bin'
 
+# -- Point comMS at the test bin/ directory for the whole session
+@pytest.fixture(autouse=True)
+def _comms_bin_dir_env(monkeypatch):
+    monkeypatch.setenv('COMMS_BIN_DIR', str(BIN_DIR))
+
 # -- Import internal dependencies
 from tests.fixtures.generate_fixtures import generate_all, write_fasta, write_mzml
 
