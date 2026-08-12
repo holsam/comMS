@@ -22,10 +22,10 @@ def missing_requirements(
         'convert': [('data files', has_data), ('ThermoRawFileParser', has_trfp)],
         'index': [('database', has_database), ('Crux', has_crux)],
         'search': [('data files', has_data), ('database', has_database), ('Crux', has_crux)],
-        'rescore': [('database', has_database)] + [('organism patterns', has_organism_tags)] + [('Crux', has_crux)],
+        'rescore': ([('database', has_database), ('Crux', has_crux)] + ([('organism patterns', has_organism_tags)] if multispecies else [])),
         'lfq': [('sample sheet', has_sample_sheet), ('data files', has_data), ('Crux', has_crux)],
         'quantify': [('database', has_database), ('Crux', has_crux)],
         'report': [('sample sheet', has_sample_sheet), ('organism prefix', has_organism_prefix), ('R dependencies', has_r_deps)],
     }
-    base['pipeline'] = [item for items in base.values() for item in items]
+    base['pipeline'] = [item for cmd, items in base.items() if cmd != 'convert' for item in items]
     return {cmd: [name for name, ok in items if not ok] for cmd, items in base.items()}
