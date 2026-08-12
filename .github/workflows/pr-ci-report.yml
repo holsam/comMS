@@ -214,6 +214,9 @@ jobs:
           pattern: r-result-*
           path: results/r
 
+      - name: Checkout branch for workflow script
+        uses: actions/checkout@v7
+
       - name: Build summary
         id: build
         shell: bash
