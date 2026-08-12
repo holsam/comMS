@@ -28,8 +28,7 @@ def run_index(
     clip_met=None,
     missed_cleavages=None,
 ):
-    if not in_pipeline:
-        logMsg('index')
+    logMsg('index')
     logMsg.debug('Started command: index')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     database = resolve_database(ctx, database)

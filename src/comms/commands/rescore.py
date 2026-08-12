@@ -31,8 +31,7 @@ def run_rescore(
     shared_psm: Optional[str] = None,
     in_pipeline: bool = False,
 ):
-    if not in_pipeline:
-        logMsg('rescore')
+    logMsg('rescore')
     logMsg.debug('Started command: rescore')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     input_dir = resolve_results_input(ctx, 'search', input_dir)

@@ -23,8 +23,7 @@ def run_convert(
         metadata: int | None = None,
         in_pipeline: bool = False,
 ):
-    if not in_pipeline:
-        logMsg('convert')
+    logMsg('convert')
     logMsg.debug('Started command: convert')
     _, trfp_path = validate(check_trfp=True, bin_dir=ctx.bin_dir)
     data_files = resolve_data_files(ctx, data_files)
