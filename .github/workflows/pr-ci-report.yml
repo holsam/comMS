@@ -35,6 +35,27 @@ jobs:
           echo "OS_NAME=macOS" >> "$GITHUB_ENV"
           echo "OS_VER=$(sw_vers -productVersion)" >> "$GITHUB_ENV"
 
+      - name: Install Linux Qt runtime dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libdbus-1-3 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-xinerama0 \
+            libxcb-xfixes0 \
+            xvfb
+
       - name: Install uv
         uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d
         with:
@@ -46,7 +67,7 @@ jobs:
       - name: Run pytest
         id: pytest
         continue-on-error: true
-        run: uv run --with opencv-python-headless pytest
+        run: uv run pytest
 
       - name: Build package
         id: build
@@ -124,7 +145,9 @@ jobs:
             use-public-rspm: true
 
         - name: Install R dependencies
-          run: Rscript src/comms/r/deps/install_deps.R
+          run: |
+            Rscript -e 'install.packages("testthat", repos = "https://cloud.r-project.org")'
+            Rscript src/comms/r/deps/install_deps.R
 
         - name: Run R tests
           id: rtests
