@@ -98,7 +98,7 @@ comms experiment --headless         # via terminal
 # 2. Run comMS analysis pipeline
 comms pipeline -e /path/to/experiment/dir
 ```
-Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step.
+Use `--skip-convert` if `.mzML` files are already available, and `--skip-report` to omit the report step. `--skip-lfq` and `--skip-quant` omit the two quantification stages individually, `--param-medic` estimates search tolerances before searching, and `--organism-tags`/`-o` supplies per-organism FDR patterns at runtime (see [Per-organism FDR][docs-commands]). Run `comms pipeline --help` for the full option list.
 
 You need two inputs to run the pipeline: a sample sheet (TSV or CSV) and a combined FASTA database containing your proteome(s) and contaminants. Both are described in [Input files](./docs/commands.md#input-files). The `--experiment-dir` option sets where comMS reads its configuration and writes its results, explained in [Configuration][docs-config].
 
