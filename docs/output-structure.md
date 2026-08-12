@@ -32,7 +32,8 @@ All outputs are written under the experiment root, inside `comms/results/`. Each
            ├─ pca/                 # PCA and dendrogram plots
            ├─ da/                  # differential abundance plots and spreadsheet
            ├─ secondary_species/   # secondary-species plots and spreadsheet
-           └─ concordance/         # LFQ vs dNSAF concordance (only if --lfq-dir is provided)
+           ├─ concordance/         # LFQ vs dNSAF concordance (only if --lfq-dir is provided)
+           └─ ev_markers/          # MISEV2023 marker-category heatmaps (only if run via --section/--all)
 ```
 
 If a command's output directory already exists, comMS does not overwrite it. Instead it adds an incremental suffix, for example `search-1/`, then `search-2/`, so earlier results are preserved. 
@@ -50,10 +51,11 @@ Level | Enabled with | Used for
 `debug` | `-vv` | Detailed program state for debugging: the command invoked, paths scanned, resolved parameters, and per-item detail
 `progress` | `-v` | Step-wise progress: per-file and per-stage markers
 `info` | always on | High-level overview: processing counts and final results
+`input` | always on (interactive sessions only) | Confirmation prompts and their answers, for example when `config` or `experiment` need to create a file or confirm a destructive action
 `warn` | always on | A part of a command did not succeed but comMS continued, for example a single item failed, an optional input was missing, or a fallback value was used
 `error` | always on | A part of a command did not succeed and comMS could not continue
 
-`-vv` implies `-v`.
+`-vv` implies `-v`. The `input` level only prompts interactively when running in a terminal (`stdin` is a TTY); otherwise it falls back to the flag's default silently.
 
 ### Log files
 comMS logs to standard output (the terminal you ran the command from) and to a file named after the command (`comms convert`, for example, writes to `convert.log`). The log file is saved alongside that command's other output, so running the same command again does not overwrite an earlier log.
