@@ -132,6 +132,7 @@ class LogState:
     _file_handler: logging.FileHandler | None = None
     _emitted: bool = False
     _atexit_registered: bool = False
+    _pipeline_log_paths: list[Path] | None = None
 
 # -- Define custom logging.Formatter subclas (PlainFormatter) to strip Rich markup before writing to file
 class PlainFormatter(logging.Formatter):
@@ -202,6 +203,31 @@ def configureFileLogging(out_dir: Path):
     logger.addHandler(handler)
     log_state._file_handler = handler
     _removeTempLog()
+    # Track this log file if pipeline is aggregating logs
+    if log_state._pipeline_log_paths is not None:
+        log_state._pipeline_log_paths.append(final_path)
+
+# -- startPipelineLogging: begin tracking per-command log files for later aggregation into pipeline.log
+def startPipelineLogging():
+    log_state._pipeline_log_paths = []
+
+# -- concatenatePipelineLog: concatenate per-command log files into pipeline.log
+def concatenatePipelineLog(out_path: Path) -> Path | None:
+    paths = log_state._pipeline_log_paths or []
+    log_state._pipeline_log_paths = None  # stop tracking regardless of outcome
+    if not paths:
+        return None
+    final_path = checkUniqueLogFile(out_path)
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(final_path, 'w') as pipeline_log:
+        for path in paths:
+            section = path.parent.name  # e.g. 'convert', 'index', 'search'
+            pipeline_log.write(f"\n{'=' * 80}\n# {section}  ({path})\n{'=' * 80}\n\n")
+            if path.exists():
+                pipeline_log.write(path.read_text())
+            else:
+                pipeline_log.write(f'[log file missing: {path}]\n')
+    return final_path
 
 # -- _plainFormatter: internal helper to format log messages 
 def _plainFormatter() -> PlainFormatter:
