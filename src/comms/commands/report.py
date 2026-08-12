@@ -70,11 +70,11 @@ def _log_organism_outcomes(section: str, organisms: dict[str, str], reasons: dic
         reason = reasons.get(org)
         suffix = f' ({reason})' if reason else ''
         if status == 'ok':
-            logMsg.progress(f'{section} — {org}: succeeded')
+            logMsg.info(f'{section} — {org}: succeeded')
         elif status == 'skipped':
-            logMsg.progress(f'{section} — {org}: skipped{suffix}')
+            logMsg.info(f'{section} — {org}: skipped{suffix}')
         else:
-            logMsg.progress(f'{section} — {org}: failed{suffix}')
+            logMsg.warn(f'{section} — {org}: failed{suffix}')
 
 # -- _run_r_section: returns boolean indicating if the R process itself exited cleanly
 def _run_r_section(
