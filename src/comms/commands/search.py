@@ -29,8 +29,7 @@ def run_search(
         mz_bin_width: float | None = None,
         in_pipeline: bool = False,
 ):
-    if not in_pipeline:
-        logMsg('search')
+    logMsg('search')
     logMsg.debug('Started command: search')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     index_dir = resolve_results_input(ctx, 'index', index_dir)

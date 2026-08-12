@@ -11,7 +11,7 @@ from rich import print
 from rich.console import Console
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.samples import loadSampleSheet
 from comms.utils.settings import resolve_config_value, _writeConfigTo
 from comms.utils.context import ExperimentContext, resolve_organism_prefix, resolve_sample_sheet, resolve_results_input, results_dir
@@ -141,11 +141,13 @@ def run_report(
         rscript: str,
         in_pipeline: bool,
     ) -> None:
-    if not in_pipeline:
-        logMsg('report')
+    logMsg('report')
     logMsg.debug('Started command: report')
     # Create path to output_dir
     output_dir = ctx.root / 'comms/results/report'
+    log_path = output_dir / 'report.log'
+    configureFileLogging(log_path)
+    logMsg.debug(f'Output log file: {log_path}')
 
     # Required inputs resolved from the experiment context
     quantify_dir = resolve_results_input(ctx, 'quantify', quantify_dir)

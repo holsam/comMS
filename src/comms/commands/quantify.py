@@ -26,8 +26,7 @@ def run_quantify(
     unique_mapping=None,
     in_pipeline: bool = False,
 ):
-    if not in_pipeline:
-        logMsg('quantify')
+    logMsg('quantify')
     logMsg.debug('Started command: quantify')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     input_dir = resolve_results_input(ctx, 'rescore', input_dir)

@@ -7,7 +7,7 @@ from pathlib import Path
 from rich import print
 
 # -- Import internal functions
-from comms.utils.log import logMsg
+from comms.utils.log import logMsg, concatenatePipelineLog, startPipelineLogging
 from comms.utils.samples import loadSampleSheet
 from comms.utils.context import ExperimentContext, resolve_database, resolve_data_files, resolve_report, resolve_sample_sheet
 from comms.commands import convert, index, search, rescore, lfq, quantify, report
@@ -28,6 +28,7 @@ def run_pipeline(
 ):
     logMsg('pipeline')
     logMsg.debug(f'Started command: pipeline')
+    startPipelineLogging()
 
     # Resolve external inputs once
     data_files = resolve_data_files(ctx, data)
@@ -132,7 +133,11 @@ def run_pipeline(
         )
 
     END = datetime.datetime.now()
+    logMsg('pipeline')  # logger needs to be re-tagged
     logMsg.info(f'Pipeline complete, runtime {END - START}, results written to {ctx.root}')
+    pipeline_log_path = concatenatePipelineLog(ctx.root / 'comms/results/pipeline.log')
+    if pipeline_log_path is not None:
+        logMsg.debug(f'Aggregated pipeline log written to: {pipeline_log_path}')
     logMsg.debug(f'Finished command: pipeline')
 
 # -- _calculate_n_steps: returns int corresponding to number of steps in pipeline

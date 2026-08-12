@@ -23,8 +23,7 @@ def run_lfq(
         ctx: ExperimentContext,
         in_pipeline: bool = False
     ):
-    if not in_pipeline:
-        logMsg('lfq')
+    logMsg('lfq')
     logMsg.debug('Started command: lfq')
     crux_bin, _ = validate(check_crux=True, allow_lfq=True, bin_dir=ctx.bin_dir)
     rescore_dir = resolve_results_input(ctx, 'rescore', rescore_dir)
