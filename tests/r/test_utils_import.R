@@ -25,11 +25,11 @@ make_cont_csv <- function(tmp_dir) {
   path <- file.path(tmp_dir, "cont.csv")
   write_csv(tibble(protein.id="CONT001", protein.annotation="Keratin", protein.reason="skin"), path); path
 }
-make_sc_file <- function(tmp_dir, filename="s1.spectral-counts.target.txt") {
+make_sc_file <- function(tmp_dir, filename="s1_dNSAF.spectral-counts.target.txt") {
   path <- file.path(tmp_dir, filename)
   write_tsv(tibble(
-    proteinId = c("Mtrun001", "Mtrun002", "CONT001"),
-    dNSAF = c(0.6, 0.4, 0.1)
+    "protein id" = c("Mtrun001", "Mtrun002", "CONT001"),
+    "dNSAF" = c(0.6, 0.4, 0.1)
   ), path)
   path
 }
@@ -92,8 +92,8 @@ test_that("loadSpectralCounts retains dNSAF column", {
 test_that("mergeResults produces a wide tibble with one dNSAF column per sample", {
   ref  <- loadRefInfo(make_ref_info(tmp))
   cont <- loadContInfo(make_cont_csv(tmp))
-  s1 <- make_sc_file(tmp, "s1.spectral-counts.target.txt")
-  s2 <- make_sc_file(tmp, "s2.spectral-counts.target.txt")
+  s1 <- make_sc_file(tmp, "s1_dNSAF.spectral-counts.target.txt")
+  s2 <- make_sc_file(tmp, "s2_dNSAF.spectral-counts.target.txt")
   result <- mergeResults(list(
     s1=loadSpectralCounts(s1, ref, cont),
     s2=loadSpectralCounts(s2, ref, cont)
@@ -106,7 +106,7 @@ test_that("mergeResults preserves proteinId and proteinAnnotation columns", {
   ref  <- loadRefInfo(make_ref_info(tmp))
   cont <- loadContInfo(make_cont_csv(tmp))
   result <- mergeResults(list(
-    s1=loadSpectralCounts(make_sc_file(tmp, "s1.spectral-counts.target.txt"), ref, cont)
+    s1=loadSpectralCounts(make_sc_file(tmp, "s1_dNSAF.spectral-counts.target.txt"), ref, cont)
   ))
   expect_true(all(c("proteinId", "proteinAnnotation") %in% colnames(result)))
 })
@@ -114,13 +114,13 @@ test_that("mergeResults preserves proteinId and proteinAnnotation columns", {
 test_that("mergeResults fills absent proteins with 0 rather than NA", {
   ref <- loadRefInfo(make_ref_info(tmp))
   cont <- loadContInfo(make_cont_csv(tmp))
-  s2_path <- file.path(tmp, "s2_partial.spectral-counts.target.txt")
+  s2_path <- file.path(tmp, "s2.partial_dNSAF.spectral-counts.target.txt")
   write_tsv(tibble(
-    proteinId = "Mtrun001",
-    dNSAF = 1.0
+    `protein id` = "Mtrun001",
+    `dNSAF` = 1.0
   ), s2_path)
   result <- mergeResults(list(
-    s1=loadSpectralCounts(make_sc_file(tmp, "s1.spectral-counts.target.txt"), ref, cont),
+    s1=loadSpectralCounts(make_sc_file(tmp, "s1_dNSAF.spectral-counts.target.txt"), ref, cont),
     s2=loadSpectralCounts(s2_path, ref, cont)
   ))
   mtrun002_s2 <- result[result$proteinId == "Mtrun002", "dNSAF_s2"][[1]]
