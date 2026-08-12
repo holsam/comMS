@@ -1,0 +1,203 @@
+name: Pull Request CI Report
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  python-tests:
+    name: Python ${{ matrix.python-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: OS version (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          . /etc/os-release
+          echo "OS_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "OS_VER=$VERSION_ID" >> "$GITHUB_ENV"
+
+      - name: OS version (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "OS_NAME=macOS" >> "$GITHUB_ENV"
+          echo "OS_VER=$(sw_vers -productVersion)" >> "$GITHUB_ENV"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Run pytest
+        id: pytest
+        continue-on-error: true
+        run: uv run pytest
+
+      - name: Build package
+        id: build
+        continue-on-error: true
+        run: uv build
+
+      - name: Add venv bin to PATH
+        shell: bash
+        run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Check CLI entry point
+        id: cli
+        continue-on-error: true
+        run: comms --help
+
+      - name: Write result file
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p result
+          cat > result/result.json <<EOF
+          {
+            "os_name": "${{ env.OS_NAME }}",
+            "os_ver": "${{ env.OS_VER }}",
+            "python_version": "${{ matrix.python-version }}",
+            "tests": "${{ steps.pytest.outcome == 'success' && 'pass' || 'fail' }}",
+            "build": "${{ steps.build.outcome == 'success' && 'pass' || 'fail' }}",
+            "cli": "${{ steps.cli.outcome == 'success' && 'pass' || 'fail' }}"
+          }
+          EOF
+
+      - name: Upload result artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-result-${{ matrix.os }}-${{ matrix.python-version }}
+          path: result/result.json
+
+      - name: Fail if any check failed
+        if: always() && (steps.pytest.outcome == 'failure' || steps.build.outcome == 'failure' || steps.cli.outcome == 'failure')
+        run: exit 1
+
+  r-tests:
+      name: R ${{ matrix.r-version }} (${{ matrix.os }})
+      runs-on: ${{ matrix.os }}
+      if: github.event.pull_request.head.repo.full_name == github.repository
+      strategy:
+        fail-fast: false
+        matrix:
+          os: [ubuntu-latest, macos-latest]
+          r-version: ["4.3.0", "4.4.3", "4.5.3", "4.6.1"]
+      steps:
+        - uses: actions/checkout@v7
+
+        - name: OS version (Linux)
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            . /etc/os-release
+            echo "OS_NAME=$NAME" >> "$GITHUB_ENV"
+            echo "OS_VER=$VERSION_ID" >> "$GITHUB_ENV"
+            echo "USE_BUNDLED_LIBUV=1" >> "$GITHUB_ENV"
+
+        - name: OS version (macOS)
+          if: runner.os == 'macOS'
+          shell: bash
+          run: |
+            echo "OS_NAME=macOS" >> "$GITHUB_ENV"
+            echo "OS_VER=$(sw_vers -productVersion)" >> "$GITHUB_ENV"
+
+        - name: Set up R
+          uses: r-lib/actions/setup-r@v2
+          with:
+            r-version: ${{ matrix.r-version }}
+            use-public-rspm: true
+
+        - name: Install R dependencies
+          run: Rscript src/comms/r/install_deps.R
+
+        - name: Run R tests
+          id: rtests
+          continue-on-error: true
+          run: Rscript -e 'testthat::test_dir("tests/r")'
+
+        - name: Write result file
+          if: always()
+          shell: bash
+          run: |
+            mkdir -p result
+            cat > result/result.json <<EOF
+            {
+              "os_name": "${{ env.OS_NAME }}",
+              "os_ver": "${{ env.OS_VER }}",
+              "r_version": "${{ matrix.r-version }}",
+              "tests": "${{ steps.rtests.outcome == 'success' && 'pass' || 'fail' }}"
+            }
+            EOF
+
+        - name: Upload result artifact
+          if: always()
+          uses: actions/upload-artifact@v7
+          with:
+            name: r-result-${{ matrix.os }}-${{ matrix.r-version }}
+            path: result/result.json
+
+        - name: Fail if R tests failed
+          if: always() && steps.rtests.outcome == 'failure'
+          run: exit 1
+
+  all-checks-passed:
+    name: All checks passed
+    needs: [python-tests, r-tests]
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        run: |
+          if [ "${{ needs.python-tests.result }}" != "success" ] || \
+             [ "${{ needs.r-tests.result }}" != "success" ]; then
+            echo "One or more required checks failed."
+            exit 1
+          fi
+          echo "All required checks passed."
+
+  summary:
+    name: Post pull request CI report
+    needs: [python-tests, r-tests]
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Python results
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: python-result-*
+          path: results/python
+
+      - name: Download R results
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: r-result-*
+          path: results/r
+
+      - name: Build summary
+        id: build
+        shell: bash
+        run: python3 .github/workflows/pr_ci_report.py
+
+      - name: Comment on pull request
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: pull-request-ci-report
+          path: pr_ci_report.md
