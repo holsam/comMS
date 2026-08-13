@@ -5,9 +5,17 @@ Unit tests for helper functions in src/comms/commands/rescore.py
 # -- Import external dependencies
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 # -- Import functions under test
-from comms.commands.rescore import _parseOrganismTags, _classifyPsmRow, _splitPsmsByOrganism
+from comms.commands.rescore import (
+    _classifyPsmRow,
+    _findProteinIdsIndex,
+    _parseOrganismTags,
+    _run_combined_percolator_round,
+    _run_per_organism_percolator_round,
+    _splitPsmsByOrganism,
+)
 
 # -- Define constants
 PSM_HEADER = 'scan\tcharge\tspectrum precursor m/z\tpeptide\tflanking aa\tprotein id\n'
@@ -94,6 +102,15 @@ class TestClassifyPsmRow:
         assert isinstance(result, list)
         assert len(result) == 2
         assert 'EUK' in result and 'ALSO' in result
+
+class TestFindProteinIdsIndex:
+    def test_returns_correct_index(self):
+        header = 'scan\tcharge\tprotein id\tpeptide\n'
+        assert _findProteinIdsIndex(header, 'protein id') == 2
+
+    def test_first_column_returns_zero(self):
+        header = 'protein id\tpeptide\n'
+        assert _findProteinIdsIndex(header, 'protein id') == 0
 
 # -- Define tests for _splitPsmsByOrganism helper function
 class TestSplitPsmsByOrganism:
@@ -202,3 +219,39 @@ class TestSplitPsmsByOrganism:
             f = tmp_path / label / f'synthetic.{label}.tide-search.target.txt'
             if f.exists():
                 assert 'TESTEUK_TESTPRO' in f.read_text()
+
+class TestRunCombinedPercolatorRound:
+    def test_returns_sorted_output_files(self, tmp_path):
+        target_files = [tmp_path / 'a.tide-search.target.txt', tmp_path / 'b.tide-search.target.txt']
+        for f in target_files:
+            f.write_text('header\n')
+
+        def _mock_percolator(**kwargs):
+            fileroot = kwargs['fileroot']
+            (kwargs['out_dir'] / f'{fileroot}.percolator.target.psms.txt').write_text('x')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator):
+            result = _run_combined_percolator_round('crux_bin', target_files, 'db.fasta', tmp_path, {})
+        assert result == sorted(tmp_path.glob('*.percolator.target.psms.txt'))
+
+    def test_empty_input_returns_empty_list(self, tmp_path):
+        result = _run_combined_percolator_round('crux_bin', [], 'db.fasta', tmp_path, {})
+        assert result == []
+
+    def test_failed_file_does_not_stop_the_rest(self, tmp_path):
+        target_files = [tmp_path / 'a.tide-search.target.txt', tmp_path / 'b.tide-search.target.txt']
+        for f in target_files:
+            f.write_text('header\n')
+        call_count = {'n': 0}
+
+        def _mock_percolator(**kwargs):
+            call_count['n'] += 1
+            if call_count['n'] == 1:
+                return False   # first file fails
+            (kwargs['out_dir'] / f"{kwargs['fileroot']}.percolator.target.psms.txt").write_text('x')
+            return True
+
+        with patch('comms.commands.rescore.cruxutil.percolator', side_effect=_mock_percolator):
+            result = _run_combined_percolator_round('crux_bin', target_files, 'db.fasta', tmp_path, {})
+        assert len(result) == 1

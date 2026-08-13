@@ -11,204 +11,23 @@ from pathlib import Path
 from rich import print
 from rich.console import Console
 from rich.table import Table
-from typing import Annotated
 
 # -- Import internal functions
+from comms.utils.context import _normalise_dirs
 from comms.utils.log import logMsg
-from comms.utils.settings import loadDefaultConfig, globalConfigPath
+from comms.utils.modspec import apply_custom_mod, apply_organism, apply_protocol_flags, parse_organism_arg
+from comms.utils.settings import loadDefaultConfig, globalConfigPath, _writeConfigTo
 
-# -- Define modification constants
-CARBAMIDOMETHYL_MOD = 'C+57.0215'    # static carbamidomethylation of Cys
-MET_OX_MOD = '1M+15.9949'    # variable Met oxidation
-PHOSPHO_MOD = '1STY+79.966331'    # variable STY phosphorylation
-NCYC_MOD = '1Q-17.027'    # N-terminal Gln cyclisation
-NACE_MOD = '1X+42.011'    # N-terminal protein acetylation
-MANAGED_MOD_PATTERNS: dict[str, str] = {
-    r'^\d*C[+\-]': '--iodo / --no-iodo',
-    r'^\d*M\+15\.9949': '--ox / --no-ox',
-    r'^\d*STY\+79\.966331': '--phos / --no-phos',
-}    # mods that --custom is not allowed to duplicate (maps the residue/pattern that identifies each managed mod to its flag name)
-
-# -- Define resolution constants
-MZ_BIN_WIDTH_HIGH_RES = 0.02    # high-resolution instruments (default)
-MZ_BIN_WIDTH_LOW_RES = 1.0005079    # low-resolution instruments
-SCORE_FUNC_HIGH_RES = 'xcorr'    # high-resolution instruments (default)
-SCORE_FUNC_LOW_RES = 'combined-p-value'    # low-resolution instruments
-
-
-# ========================= #
-# DEFINE CONFIG SUBCOMMANDS #
-# ========================= #
-# -- config_init: creates a config file with default settings in the OS config directory
-def config_init(config_path: Path | None = None):
-    logMsg('config')
-    config_path = config_path or globalConfigPath()
-    logMsg.debug(f'Checking config path: {config_path}')
-    if not _configCheck(config_path, exists=False):
-        raise SystemExit(1)
-    try:
-        logMsg.progress(f'Writing default config to {config_path}')
-        _writeConfigTo(loadDefaultConfig(), config_path)
-        logMsg.info(f'Config file written to {config_path}')
-    except Exception as e:
-        logMsg.error(f'Failed to write config: {e}')
-        raise SystemExit(1)
-
-# -- config_exists: reports whether a config file exists and prints its path
-def config_exists(config_path: Path | None = None):
-    logMsg('config')
-    config_path = config_path or globalConfigPath()
-    logMsg.debug(f'Checking for config at {config_path}')
-    if config_path.exists():
-        logMsg.info(f'Config file found at {config_path}')
-    else:
-        logMsg.error(f'No config file at {config_path}')
-        raise SystemExit(1)
-
-# -- config_list: prints current config values, highlighting differences from bundled defaults
-def config_list(config_path: Path | None = None):
-    logMsg('config')
-    logMsg.debug(f'Listing config values')
-    config_path = config_path or globalConfigPath()
-    default_config = _flatten(loadDefaultConfig())
-    if _configCheck(config_path, exists=True):
-        print(f'[bold blue]Current config:[/bold blue] [cyan]{config_path}[/cyan]\n')
-        current_config = _flatten(_loadConfigFile(config_path))
-    else:
-        print(f'[bold blue]Current config:[/bold blue] built-in defaults\n')
-        current_config = default_config
-    _printTable(current_config, default_config)
-    print()
-
-# -- config_verify: checks that all expected keys are present in the config file
-def config_verify(config_path: Path | None = None):
-    logMsg('config')
-    config_path = config_path or globalConfigPath()
-    logMsg.debug(f'Verifying config keys at {config_path}')
-    if not _configCheck(config_path, exists=True):
-        logMsg.error(f'No config to verify at {config_path}')
-        raise SystemExit(1)
-    user_config = _flatten(_loadConfigFile(config_path))
-    default_config = _flatten(loadDefaultConfig())
-    missing = [k for k in default_config if k not in user_config]
-    unexpected = [k for k in user_config if k not in default_config]
-    if not missing and not unexpected:
-        logMsg.info(f'User config {config_path} is valid')
-        return
-    logMsg.error(f'User config invalid: {len(missing)} missing, {len(unexpected)} unexpected key(s)')
-    if missing:
-        logMsg.warn(f'Missing keys in config: {missing}')
-        print(f'[bold red]ERROR:[/bold red] {len(missing)} missing key(s):')
-        for k in sorted(missing):
-            print(f'\t[red]✗[/red] {k} [dim](expected: {default_config[k]})[/dim]')
-    if unexpected:
-        logMsg.warn(f'Unexpected keys in config: {unexpected}')
-        print(f'[bold red]ERROR:[/bold red] {len(unexpected)} unexpected key(s):')
-        for k in sorted(unexpected):
-            print(f'\t[red]?[/red] {k}: {user_config[k]}')
-    print(f'Run [bold]comms config reset[/bold] to restore defaults.\n')
-    raise SystemExit(1)
-
-# -- config_reset: overwrites the config file with comMS built-in defaults
-def config_reset(config_path: Path | None = None, force: bool = False):
-    logMsg('config')
-    config_path = config_path or globalConfigPath()
-    if not force:
-        logMsg.warn(f'This will overwrite {config_path} with comMS defaults.')
-        if not typer.confirm('All custom settings will be lost. Continue?'):
-            logMsg.debug(f'Reset cancelled')
-            raise SystemExit(0)
-    try:
-        _writeConfigTo(loadDefaultConfig(), config_path)
-        logMsg.info(f'{config_path} reset to comMS defaults')
-    except Exception as e:
-        logMsg.error(f'Failed to reset config: {e}')
-        raise SystemExit(1)
-
-# -- config_set: apply named flags to the config
-def config_set(
-    config_path: Path | None = None,
-    iodo: bool | None = None,
-    low_res: bool | None = None,
-    organism: list[str] | None = None,
-    ox: bool | None = None,
-    phos: bool | None = None,
-    n_cyc: bool | None = None,
-    n_ace: bool | None = None,
-    custom: str | None = None,
-    clip_met: bool | None = None,
-) -> None:
-    # Set up logger
-    logMsg('config')
-    logMsg.debug(f'Applying set flags: iodo={iodo}; ox={ox}; phos={phos}; n_cyc={n_cyc}; n_ace={n_ace}; low_res={low_res}; organism={organism}; custom={custom!r}; clip_met={clip_met}')
-    # Check at least one flag set
-    if all(v is None for v in (iodo, ox, phos, n_cyc, n_ace, low_res, organism, custom, clip_met)):
-        logMsg.error(f'No flags supplied to config set')
-        raise SystemExit(1)
-    # Check if  config exists
-    config_path = config_path or globalConfigPath()
-    if not config_path.exists():
-        logMsg.debug(f'No config found, creating from defaults at {config_path}')
-        _writeConfigTo(loadDefaultConfig(), path=config_path)
-    # Load config
-    try:
-        cfg = _loadConfigFile(config_path)
-    except Exception as e:
-        logMsg.error(f'Failed to read config file: {e}')
-        raise SystemExit(1)
-    # Apply any passed flags
-    cfg = _apply_protocol_flags(
-        cfg,
-        iodo=iodo,
-        ox=ox,
-        phos=phos,
-        n_cyc=n_cyc,
-        n_ace=n_ace,
-        low_res=low_res,
-        clip_met=clip_met
-    )
-    if organism is not None:
-        cfg = _apply_organism(cfg, _parse_organism_arg(organism))
-    if custom is not None:
-        current = cfg.get('index', {}).get('custom_mods', '')
-        cfg.setdefault('index', {})['custom_mods'] = _apply_custom_mod(current, custom)
-    # Write updated config
-    try:
-        _writeConfigTo(cfg, config_path)
-    except Exception as e:
-        logMsg.error(f'Failed to write config file: {e}')
-        raise SystemExit(1)
-    # Print summary
-    _printSetSummary(iodo=iodo, ox=ox, phos=phos, n_cyc=n_cyc, n_ace=n_ace, low_res=low_res, organism=organism, custom=custom, clip_met=clip_met)
-    print()
-
-
-# ======================= #
-# DEFINE INTERNAL HELPERS #
-# ======================= #
-# -- _resolveConfigTarget: returns the Path to edit (global user config or a local file)
-def _resolveConfigTarget(target: str | None) -> Path:
-    if target is None or target.upper() == 'GLOBAL':
-        return globalConfigPath()
-    return Path(target)
+# -- _confirm: yes/no prompt via logMsg.input, returned as a bool
+def _confirm(msg: str, default: bool) -> bool:
+    msg = f'{msg} [dim]({"Y/n" if default else "y/N"})[/dim]'
+    answer = logMsg.input(msg, choices=['y', 'n'], default='y' if default else 'n', case_sensitive=False, show_choices=False, show_default=False)
+    return str(answer).strip().lower() == 'y'
 
 # -- _loadConfigFile: returns the config as a dict
-def _loadConfigFile(config_path: Path | None = None) -> dict:
-    config_path = config_path or globalConfigPath()
-    if not config_path.exists():
-        raise FileNotFoundError(f'No config found at {config_path}.')
+def _loadConfigFile(config_path: Path) -> dict:
     with config_path.open('rb') as f:
         return tomllib.load(f)
-
-# -- _writeConfigTo: writes a config dict to a given path
-def _writeConfigTo(config: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open('wb') as f:
-        tomli_w.dump(config, f)
-
-# -- _writeConfig: writes config dict to the global config path
-def _writeConfig(config: dict):
-    _writeConfigTo(config, globalConfigPath())
 
 # -- _flatten: returns a flat dict from a nested dict, with dot-separated keys
 def _flatten(d: dict, prefix: str = '') -> dict:
@@ -221,21 +40,8 @@ def _flatten(d: dict, prefix: str = '') -> dict:
             out[key] = v
     return out
 
-# -- _configCheck: returns True if the config file existence matches the expected state
-def _configCheck(config_path: Path, exists: bool) -> bool:
-    if exists:
-        if config_path.exists():
-            return True
-        print(f'\n[bold yellow]WARNING:[/bold yellow] No config at [cyan]{config_path}[/cyan]\nRun [bold]comms config init[/bold] to create one.\n')
-        return False
-    else:
-        if config_path.exists():
-            print(f'\n[bold yellow]WARNING:[/bold yellow] Config already exists at [cyan]{config_path}[/cyan]\nRun [bold]comms config reset[/bold] to reset to defaults.\n')
-            return False
-        return True
-
 # -- _printTable: prints a Rich table comparing current and default config values
-def _printTable(user_config: dict, default_config: dict):
+def _printTable(user_config: dict, default_config: dict) -> None:
     console = Console()
     table = Table(title='comMS configuration', show_header=True, header_style='bold', show_lines=False)
     table.add_column('Key', style='cyan', no_wrap=True)
@@ -251,213 +57,158 @@ def _printTable(user_config: dict, default_config: dict):
         table.add_row(key, user_str, str(default_val), status)
     console.print(table)
 
-
-# ========================= #
-# DEFINE CONFIG SET HELPERS #
-# ========================= #
-# -- _apply_protocol_flags: returns dictionary of config options
-def _apply_protocol_flags(
-    cfg: dict,
-    *,
-    iodo: bool | None = None,
-    ox: bool | None = None,
-    phos: bool | None = None,
-    n_cyc: bool | None = None,
-    n_ace: bool | None = None,
-    clip_met: bool | None = None,
-    low_res: bool | None = None,
-) -> dict:
-    '''
-    Apply protocol flags to a config dictionary and return it
-        iodo — owns the Cys slot in index.fixed_mods exclusivel
-        ox — adds/removes 1M+15.9949 in index.mods_spec
-        phos — adds/removes 1STY+79.966331 in index.mods_spec
-        n_cyc — adds/removes 1Q-17.027 in index.nterm_peptide_mods_spec
-        n_ace — adds/removes 1X+42.011 in index.nterm_protein_mod_spec
-        low_res — sets search.mz_bin_width and index.score_function
-    '''
-    cfg.setdefault('search', {})
-    cfg['index'].setdefault('fixed_mods', '')
-    cfg['index'].setdefault('nterm_peptide_mods_spec', '')
-    cfg['index'].setdefault('nterm_protein_mods_spec', '')
-    if iodo is not None:
-        cfg['index']['fixed_mods'] = _apply_iodo(cfg['index'].get('fixed_mods', ''), iodo=iodo)
-        logMsg.debug(f'{'--iodo' if iodo else '--no-iodo'} applied: fixed_mods updated to {cfg['index']['fixed_mods']}')
-    if ox is not None:
-        spec = cfg['index'].get('mods_spec', '')
-        if ox:
-            cfg['index']['mods_spec'] = _apply_mod(spec, mod=MET_OX_MOD)
-        else:
-            cfg['index']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*M\+15\.9949')
-        logMsg.debug(f'{'--ox' if ox else '--no-ox'} applied: mods_spec updated to {cfg['index']['mods_spec']}')
-    if phos is not None:
-        spec = cfg['index'].get('mods_spec', '')
-        if phos:
-            cfg['index']['mods_spec'] = _apply_mod(spec, mod=PHOSPHO_MOD)
-        else:
-            cfg['index']['mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*STY\+79\.966331')
-        logMsg.debug(f'{'--phos' if phos else '--no-phos'} applied: mods_spec updated to {cfg['index']['mods_spec']}')
-    if n_cyc is not None:
-        spec = cfg['index'].get('nterm_peptide_mods_spec', '')
-        if n_cyc:
-            cfg['index']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod=NCYC_MOD)
-        else:
-            cfg['index']['nterm_peptide_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*Q\-17\.027')
-        logMsg.debug(f'{'--n-cyc' if n_cyc else '--no-n-cyc'} applied: nterm_peptide_mods_spec updated to {cfg['index']['nterm_peptide_mods_spec']}')
-    if n_ace is not None:
-        spec = cfg['index'].get('nterm_protein_mods_spec', '')
-        if n_ace:
-            cfg['index']['nterm_protein_mods_spec'] = _apply_mod(spec, mod=NACE_MOD)
-        else:
-            cfg['index']['nterm_protein_mods_spec'] = _apply_mod(spec, mod='', exclusive_pattern=r'^\d*X\+42\.011')
-        logMsg.debug(f'{'--n-ace' if n_ace else '--no-n-ace'} applied: nterm_protein_mods_spec updated to {cfg['index']['nterm_protein_mods_spec']}')
-    if low_res is not None:
-        if low_res:
-            cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_LOW_RES
-            cfg['search']['score_function'] = SCORE_FUNC_LOW_RES
-            logMsg.debug(f'--low-res applied: mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
-        else:
-            cfg['search']['mz_bin_width']   = MZ_BIN_WIDTH_HIGH_RES
-            cfg['search']['score_function'] = SCORE_FUNC_HIGH_RES
-            logMsg.debug(f'--high-res applied: mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
-        logMsg.debug(f'{'--low-res' if low_res else '--high-res'} applied: mz_bin_width: {cfg["search"]["mz_bin_width"]}, score_function: {cfg["search"]["score_function"]}')
-    if clip_met is not None:
-        cfg.setdefault('index', {})
-        cfg['index']['clip_n_met'] = 'true' if clip_met else 'false'
-        logMsg.debug(f'{'--clip-met' if clip_met else '--no-clip-met'} applied: {cfg['index']['clip_n_met']}')
-    return cfg
-
-# -- _apply_mod: returns mod_spec string
-def _apply_mod(mods_spec: str, mod: str, exclusive_pattern: str | None = None) -> str:
-    '''
-    Add or remove a mod entry in a Tide mods_spec string.
-    '''
-    # Split on commas, discard empty strings from a blank mods_spec
-    entries = [e.strip() for e in mods_spec.split(',') if e.strip()]
-    if exclusive_pattern:
-        pattern = re.compile(exclusive_pattern, re.IGNORECASE)
-        entries = [e for e in entries if not pattern.match(e)]
-    elif mod == '':
-        pass
-    else:
-        entries = [e for e in entries if e != mod]
-    if mod:
-        entries = [mod] + entries
-    return ','.join(entries)
-
-# -- _apply-iodo: returns fixed_mods string
-def _apply_iodo(fixed_mods: str, iodo: bool) -> str:
-    '''
-    Add or remove the carbamidomethylation Cys mod in a Tide fixed_mods string
-    '''
-    # Split on commas, discard empty strings from a blank mods_spec
-    entries = [e.strip() for e in fixed_mods.split(',') if e.strip()]
-    entries = [e for e in entries if e != CARBAMIDOMETHYL_MOD and e != 'C+0']
-    if iodo:
-        entries = [CARBAMIDOMETHYL_MOD] + entries
-    else:
-        entries = ['C+0'] + entries    # Crux automatically adds cysteine carbamidomethylation unless this string present
-    result = ','.join(entries)
-    return result
-
-def _apply_custom_mod(custom_mods: str, new_entry: str) -> str:
-    '''
-    Add a custom mod entry to the custom_mods string, or clear all custom mods if new_entry is an empty string
-    '''
-    if new_entry == '':
-        return ''
-    # Check against managed mod patterns
-    for pattern, flag_name in MANAGED_MOD_PATTERNS.items():
-        if re.match(pattern, new_entry, re.IGNORECASE):
-            logMsg.warn(f'{new_entry} is managed by the {flag_name} flag, ignoring')
-            return custom_mods
-    # Split on commas, discard empty strings from a blank mods_spec
-    entries = [e.strip() for e in custom_mods.split(',') if e.strip()]
-    if new_entry not in entries:
-        entries.append(new_entry)
-    out_str = ','.join(entries)
-    logMsg.debug(f'custom_mods updated: {out_str}')
-    return out_str
-
-# -- _apply_organism: returns config dict with organism section replaced
-def _apply_organism(cfg: dict, organism: dict[str, str]) -> dict:
-    '''
-    Replace the [organism] section of the user config with the supplied dictionary.
-    '''
-    cfg['organism'] = organism
-    logMsg.debug(f'organism section set to {organism}')
-    return cfg
-
-# -- _parse_organism_arg: returns dict parsed from list of 'Key=Pattern' strings
-def _parse_organism_arg(pairs: list[str]) -> dict[str, str]:
-    '''
-    Parse a list of 'Label=Pattern' strings into a dict.
-    '''
-    result = {}
-    for item in pairs:
-        if '=' not in item:
-            logMsg.error(f'Invalid organism argument {item} (expected format: Organism=Pattern)')
-            raise SystemExit(1)
-        key, _, pattern = item.partition('=')
-        key = ''.join(key.split())
-        pattern = ''.join(pattern.split())
-        if not key:
-            logMsg.error(f'Empty label in organism argument: {item}')
-            raise SystemExit(1)
-        if not pattern:
-            logMsg.error(f'Empty pattern in organism argument: {item}')
-            raise SystemExit(1)
-        result[key] = pattern
-    return result
-
-# _mod_summary_line: prints a s
-def _mod_summary_line(flag: bool | None, mod: str, key: str):
-    '''
-    Print a single ✓ line for a boolean mod flag, or nothing if flag is None
-    '''
-    if flag is None:
+# -- _print_diff_summary: prints only the keys that changed between two flattened config dicts
+def _print_diff_summary(before: dict, after: dict) -> None:
+    changed = {k: (before.get(k), v) for k, v in after.items() if before.get(k) != v}
+    if not changed:
+        print('\n[dim]No changes made.[/dim]\n')
         return
-    print(f'[bold green]✓[/bold green] [dim]{key}[/dim] → [cyan]{mod}[/cyan]')
+    print()
+    for key, (old, new) in sorted(changed.items()):
+        print(f'[bold green]✓[/bold green] [dim]{key}[/dim]: [dim]{old}[/dim] → [cyan]{new}[/cyan]')
+    print()
 
-# _print_set_summary: prints a summary of changes made
-def _printSetSummary(
-    *,
-    iodo: bool | None,
-    ox: bool | None,
-    phos: bool | None,
-    n_cyc: bool | None,
-    n_ace: bool | None,
-    low_res: bool | None,
-    organism: list[str] | None,
-    custom: str | None,
-    clip_met: bool | None,
-) -> None:
+# -- _resolve_or_create: returns the Path to edit, creating it from defaults first if needed
+def _resolve_or_create(path: Path | None, use_global: bool) -> Path:
     '''
-    Print a summary of what config_set changed
+    Resolve the config.toml target and make sure it exists, creating it from bundled defaults if not
     '''
-    print()
-    _mod_summary_line(iodo, CARBAMIDOMETHYL_MOD, f'index.{'fixed_mods'}')
-    _mod_summary_line(ox, MET_OX_MOD, 'index.mods_spec')
-    _mod_summary_line(phos, PHOSPHO_MOD, 'index.mods_spec')
-    if custom is not None:
-        if custom == '':
-            print(f'[bold green]✓[/bold green] Custom mods cleared: [dim]index.custom_mods[/dim] → [cyan](empty)[/cyan]')
+    if use_global:
+        target = globalConfigPath()
+    elif path is not None:
+        _, comms_dir = _normalise_dirs(path)
+        target = comms_dir / 'config.toml'
+    else:
+        bare, nested = Path.cwd() / 'config.toml', Path.cwd() / 'comms' / 'config.toml'
+        if bare.exists() and nested.exists():
+            logMsg.error(f'Both {bare} and {nested} exist in the current directory. Remove one before running comms config here.')
+            raise SystemExit(1)
+        if bare.exists():
+            target = bare
+        elif nested.exists():
+            target = nested
         else:
-            print(f'[bold green]✓[/bold green] Custom mod added: [dim]index.custom_mods[/dim] → [cyan]{custom}[/cyan]')
-    _mod_summary_line(n_cyc, NCYC_MOD, f'index.{'nterm_peptide_mods_spec'}')
-    _mod_summary_line(n_ace, NACE_MOD, f'index.{'nterm_protein_mods_spec'}')
-    if clip_met is not None:
-        value = 'true' if clip_met else 'false'
-        print(f'[bold green]✓[/bold green] Clipped N-terminal methionine set: [dim]index.clip_n_met[/dim] → to [cyan]{value}[/cyan]')
-    if low_res is not None:
-        if low_res:
-            print(f'[bold green]✓[/bold green] Low-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_LOW_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_LOW_RES}[/cyan]')
-        else:
-            print(f'[bold green]✓[/bold green] High-resolution mode set: [dim]search.mz_bin_width[/dim] → [cyan]{MZ_BIN_WIDTH_HIGH_RES}[/cyan], [dim]search.score_function[/dim] → [cyan]{SCORE_FUNC_HIGH_RES}[/cyan]')
-    if organism is not None:
-        for item in organism:
-            key, _, pattern = item.partition('=')
-            key = ''.join(key.split())
-            pattern = ''.join(pattern.split())
-            print(f'[bold green]✓[/bold green] Organism pattern set: [dim]organism[/dim] → [cyan]{key}[/cyan]: [cyan]{pattern}[/cyan]')
+            logMsg.warn(f'No local config found in the current directory. Did you mean to use [bold]--global[/bold]?')
+            create_answer = _confirm(msg=f'Create default config at {nested}', default=True)
+            if not create_answer:
+                raise SystemExit(0)
+            target = nested
+    if not target.exists():
+        logMsg.debug(f'Creating default config at {target}')
+        _writeConfigTo(loadDefaultConfig(), target)
+    return target
+
+# -- config_list: prints current config values, highlighting differences from bundled defaults
+def config_list(path, global_) -> None:
+    logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
+    logMsg.debug(f'Listing config values')
+    default_config = _flatten(loadDefaultConfig())
+    print(f'\n[bold blue]Current config:[/bold blue] [cyan]{config_path}[/cyan]\n')
+    current_config = _flatten(_loadConfigFile(config_path))
+    _printTable(current_config, default_config)
     print()
+
+# -- config_verify: checks that all expected keys are present in the config file
+def config_verify(path, global_) -> None:
+    logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
+    logMsg.debug(f'Verifying config keys at {config_path}')
+    user_config = _flatten(_loadConfigFile(config_path))
+    default_config = _flatten(loadDefaultConfig())
+    missing = [k for k in default_config if k not in user_config]
+    unexpected = [k for k in user_config if k not in default_config]
+    if not missing and not unexpected:
+        logMsg.info(f'Config {config_path} is valid')
+        return
+    logMsg.error(f'Config invalid: {len(missing)} missing, {len(unexpected)} unexpected key(s)')
+    if missing:
+        print(f'[bold red]ERROR:[/bold red] {len(missing)} missing key(s):')
+        for k in sorted(missing):
+            print(f'\t[red]✗[/red] {k} [dim](expected: {default_config[k]})[/dim]')
+    if unexpected:
+        print(f'[bold red]ERROR:[/bold red] {len(unexpected)} unexpected key(s):')
+        for k in sorted(unexpected):
+            print(f'\t[red]?[/red] {k}: {user_config[k]}')
+    print(f'Run [bold]comms config --reset[/bold] to restore defaults.\n')
+    raise SystemExit(1)
+
+# -- config_reset: overwrites the config file with comMS built-in defaults
+def config_reset(path, global_, force: bool = False) -> None:
+    logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
+    if not force:
+        logMsg.warn(f'This will overwrite {config_path} with comMS defaults.')
+        if not _confirm('Continue with reset'):
+            logMsg.debug('Reset cancelled')
+            raise SystemExit(0)
+    try:
+        _writeConfigTo(loadDefaultConfig(), config_path)
+        logMsg.info(f'{config_path} reset to comMS defaults')
+    except Exception as e:
+        logMsg.error(f'Failed to reset config: {e}')
+        raise SystemExit(1)
+
+# -- config_set: apply any given flags to the config file; returns True if anything changed
+def config_set(path, global_, **flags) -> bool:
+    logMsg('config')
+    logMsg.debug(f'Resolving configuration file')
+    config_path = _resolve_or_create(path, global_)
+    logMsg.debug(f'Applying flags: {flags}')
+    if all(v is None for v in flags.values()):
+        return False
+    try:
+        cfg = _loadConfigFile(config_path)
+    except Exception as e:
+        logMsg.error(f'Failed to read config file: {e}')
+        raise SystemExit(1)
+    before = _flatten(cfg).copy()
+    cfg = apply_protocol_flags(
+        cfg,
+        iodo=flags.get('iodo'),
+        ox=flags.get('ox'),
+        phos=flags.get('phos'),
+        n_cyc=flags.get('n_cyc'),
+        n_ace=flags.get('n_ace'),
+        clip_met=flags.get('clip_met'),
+        low_res=flags.get('low_res'),
+        missed_cleavages=flags.get('missed_cleavages'),
+    )
+    if flags.get('organism') is not None:
+        cfg = apply_organism(cfg, parse_organism_arg(flags['organism']))
+    if flags.get('custom') is not None:
+        current = cfg.get('index', {}).get('custom_mods', '')
+        cfg.setdefault('index', {})['custom_mods'] = apply_custom_mod(current, flags['custom'])
+    direct = {
+        ('convert', 'gzip'): flags.get('gzip'),
+        ('convert', 'format'): flags.get('format'),
+        ('convert', 'metadata'): flags.get('metadata'),
+        ('search', 'score_function'): flags.get('score_function'),
+        ('search', 'min_peaks'): flags.get('min_peaks'),
+        ('search', 'precursor_tolerance_ppm'): flags.get('precursor_tolerance_ppm'),
+        ('search', 'mz_bin_width'): flags.get('mz_bin_width'),
+        ('search', 'threads'): flags.get('threads'),
+        ('rescore', 'protein_enzyme'): flags.get('protein_enzyme'),
+        ('rescore', 'picked_protein'): flags.get('picked_protein'),
+        ('rescore', 'shared_psm'): flags.get('shared_psm'),
+        ('quantify', 'measure'): flags.get('measure'),
+        ('quantify', 'qvalue_threshold'): flags.get('qvalue_threshold'),
+        ('quantify', 'unique_mapping'): flags.get('unique_mapping'),
+        ('report', 'min_reps'): flags.get('min_reps'),
+        ('report', 'lfc_threshold'): flags.get('lfc_threshold'),
+        ('report', 'fdr_threshold'): flags.get('fdr_threshold'),
+        ('report', 'top_n_proteins'): flags.get('top_n'),
+    }
+    for (section, key), value in direct.items():
+        if value is not None:
+            cfg.setdefault(section, {})[key] = value
+    try:
+        _writeConfigTo(cfg, config_path)
+    except Exception as e:
+        logMsg.error(f'Failed to write config file: {e}')
+        raise SystemExit(1)
+    _print_diff_summary(before, _flatten(cfg))
+    return True

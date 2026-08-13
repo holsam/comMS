@@ -17,6 +17,7 @@ from comms.gui.status import PanelStateTracker
 # -- Define class ExperimentPanel to collect experiment name and base output directory
 class ExperimentPanel(QWidget):
     changed = Signal()
+    binDirChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -59,6 +60,7 @@ class ExperimentPanel(QWidget):
         self._bin.setMinimumWidth(360)
         self._bin.setPlaceholderText('optional: directory containing Crux / ThermoRawFileParser')
         self._bin.textChanged.connect(self.changed)
+        self._bin.editingFinished.connect(self.binDirChanged)
         bin_browse = QPushButton('Select directory')
         bin_browse.clicked.connect(self._browse_bin)
         bin_row = QWidget()
@@ -117,6 +119,12 @@ class ExperimentPanel(QWidget):
         text = self._bin.text().strip()
         return Path(text) if text else None
 
+    # -- set_bin_dir: write a chosen bin directory into the field and mark the panel changed
+    def set_bin_dir(self, path: Path) -> None:
+        self._bin.setText(str(path))
+        self.changed.emit()
+        self.binDirChanged.emit()
+
     def database_path(self) -> Path | None:
         text = self._database.text().strip()
         return Path(text) if text else None
@@ -147,6 +155,20 @@ class ExperimentPanel(QWidget):
         with path.open('wb') as f:
             tomli_w.dump(meta, f)
         return path
+
+    # -- load_from_metadata: populate fields from a loaded experiment.toml + resolved base_dir
+    def load_from_metadata(self, base_dir: Path, metadata: dict) -> None:
+        self._name.setText(metadata.get('experiment', {}).get('name', ''))
+        self._dir.setText(str(base_dir))
+        database = metadata.get('files', {}).get('database', '')
+        if database:
+            self._database.setText(str(database))
+        bin_dir = metadata.get('experiment', {}).get('bin_dir', '')
+        if bin_dir:
+            self._bin.setText(str(bin_dir))
+        self.changed.emit()
+        if bin_dir:
+            self.binDirChanged.emit()
 
     def is_valid(self) -> bool:
         return bool(self.experiment_name()) and self.base_dir() is not None and self.database_path() is not None

@@ -716,22 +716,22 @@ class TestRunRescoreSingleSpecies:
 # LFQ
 # ===========================================================================
 class TestRunLfqOutputDirectories:
-    def test_lfq_root_directory_is_created(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
+    def test_lfq_root_directory_is_created(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert (tmp_path / 'comms' / 'results' / 'lfq').exists()
 
-    def test_single_fraction_creates_one_output_directory(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, tmp_path, experiment_ctx):
+    def test_single_fraction_creates_one_output_directory(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
-                rescore_dir=single_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1']),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_single_fraction,
+                sample_sheet=sample_sheet_factory(['WCL']),
                 ctx=experiment_ctx,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
@@ -739,12 +739,12 @@ class TestRunLfqOutputDirectories:
         assert len(subdirs) == 1
         assert subdirs[0].name == 'WCL'
 
-    def test_creates_per_fraction_output_directories(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
+    def test_creates_per_fraction_output_directories(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, tmp_path, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         lfq_root = tmp_path / 'comms' / 'results' / 'lfq'
@@ -753,64 +753,64 @@ class TestRunLfqOutputDirectories:
         assert (lfq_root / 'PUR').exists()
 
 class TestRunLfqCruxCalls:
-    def test_lfq_called_once_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
+    def test_lfq_called_once_per_fraction(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
-    def test_lfq_called_with_correct_fraction_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
+    def test_lfq_called_with_correct_fraction_psm_files(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         all_psm_files = [c.kwargs['psm_files'] for c in mock_lfq.call_args_list]
         for files in all_psm_files:
             assert len(files) == 2
 
-    def test_lfq_not_called_for_unmatched_psm_files(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
-        orphan = multi_fraction_psm_dir / 'orphan_file.percolator.target.psms.txt'
+    def test_lfq_not_called_for_unmatched_psm_files(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
+        orphan = psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]) / 'orphan_file.percolator.target.psms.txt'
         orphan.touch()
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
-    def test_lfq_receives_correct_fileroot_per_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
+    def test_lfq_receives_correct_fileroot_per_fraction(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True) as mock_lfq:
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         fileroots = {c.kwargs['fileroot'] for c in mock_lfq.call_args_list}
         assert fileroots == {'WCL', 'ECF', 'PUR'}
 
 class TestRunLfqEarlyExit:
-    def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
+    def test_raises_system_exit_when_no_psm_files(self, crux_bin, synthetic_mzml, sample_sheet_factory, tmp_path, experiment_ctx):
         empty_rescore_dir = tmp_path / 'empty_rescore'
         empty_rescore_dir.mkdir()
         with pytest.raises(SystemExit):
             run_lfq(
                 rescore_dir=empty_rescore_dir,
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
 
-    def test_lfq_called_per_fraction_even_when_no_mzml_matches(self, crux_bin, multi_fraction_psm_dir, valid_sample_sheet_multiple_fractions, tmp_path, experiment_ctx):
+    def test_lfq_called_per_fraction_even_when_no_mzml_matches(self, crux_bin, psm_dir_factory, sample_sheet_factory, tmp_path, experiment_ctx):
         '''
         cruxutil.lfq is called for each fraction even when the supplied mzML file does not match any PSM file stem (the mock returns False for each call)
         '''
@@ -818,45 +818,45 @@ class TestRunLfqEarlyExit:
         dummy_mzml.touch()
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False) as mock_lfq:
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[dummy_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert mock_lfq.call_count == 3
 
 class TestRunLfqWarnings:
-    def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx, caplog):
+    def test_logs_warning_when_lfq_fails_for_fraction(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx, caplog):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=False), caplog.at_level(logging.WARNING):
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert 'LFQ failed' in caplog.text or 'failed' in caplog.text.lower()
 
-    def test_completes_remaining_fractions_even_if_one_fails(self, crux_bin, multi_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_multiple_fractions, experiment_ctx):
+    def test_completes_remaining_fractions_even_if_one_fails(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
         call_count = {'n': 0}
         def _mock_lfq(**kwargs):
             call_count['n'] += 1
             return call_count['n'] != 1
         with patch('comms.commands.lfq.cruxutil.lfq', side_effect=_mock_lfq):
             run_lfq(
-                rescore_dir=multi_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1', 'sample_mock_ecf_1', 'sample_treat_ecf_1', 'sample_mock_pur_1', 'sample_treat_pur_1',]),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_multiple_fractions,
+                sample_sheet=sample_sheet_factory(['WCL', 'ECF', 'PUR']),
                 ctx=experiment_ctx,
             )
         assert call_count['n'] == 3
 
 class TestRunLfqLogger:
-    def test_logger_is_named_lfq(self, crux_bin, single_fraction_psm_dir, synthetic_mzml, valid_sample_sheet_single_fraction, experiment_ctx):
+    def test_logger_is_named_lfq(self, crux_bin, psm_dir_factory, synthetic_mzml, sample_sheet_factory, experiment_ctx):
         with patch('comms.commands.lfq.cruxutil.lfq', return_value=True):
             run_lfq(
-                rescore_dir=single_fraction_psm_dir,
+                rescore_dir=psm_dir_factory(['sample_mock_wcl_1', 'sample_treat_wcl_1']),
                 data_files=[synthetic_mzml],
-                sample_sheet=valid_sample_sheet_single_fraction,
+                sample_sheet=sample_sheet_factory(['WCL']),
                 ctx=experiment_ctx,
             )
         assert logMsg._instance.logger.name == 'lfq'
@@ -910,11 +910,11 @@ class TestQuantifyFlatOutput:
 # Pipeline (end-to-end)
 # ===========================================================================
 class TestRunPipeline:
-    def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, valid_sample_sheet, experiment_ctx):
+    def test_pipeline_completes_without_raising(self, crux_bin, synthetic_fixtures, sample_sheet_factory, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
-                sample_sheet=valid_sample_sheet,
+                sample_sheet=sample_sheet_factory(['WCL']),
                 database=fasta,
                 data=[mzml],
                 ctx=experiment_ctx,
@@ -932,11 +932,11 @@ class TestRunPipeline:
                 'Check that synthetic fixtures are valid and Crux is working.'
             )
 
-    def test_pipeline_creates_results_tree(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path, experiment_ctx):
+    def test_pipeline_creates_results_tree(self, crux_bin, synthetic_fixtures, sample_sheet_factory, tmp_path, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
-                sample_sheet=valid_sample_sheet,
+                sample_sheet=sample_sheet_factory(['WCL']),
                 database=fasta,
                 data=[mzml],
                 ctx=experiment_ctx,
@@ -956,11 +956,11 @@ class TestRunPipeline:
             stage_dir = results_root / stage
             assert stage_dir.exists(), f'Expected results directory for stage: {stage}'
 
-    def test_comms_logger_is_pipeline(self, crux_bin, synthetic_fixtures, valid_sample_sheet, tmp_path, experiment_ctx):
+    def test_comms_logger_is_pipeline(self, crux_bin, synthetic_fixtures, sample_sheet_factory, tmp_path, experiment_ctx):
         fasta, mzml = synthetic_fixtures
         try:
             run_pipeline(
-                sample_sheet=valid_sample_sheet,
+                sample_sheet=sample_sheet_factory(['WCL']),
                 database=fasta,
                 data=[mzml],
                 ctx=experiment_ctx,

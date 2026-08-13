@@ -7,7 +7,7 @@ import pytest, tomllib
 from pathlib import Path
 
 # -- Import internal functions
-from comms.utils.settings import loadDefaultConfig, globalConfigPath, resolveConfig, resolvedModifications
+from comms.utils.settings import globalConfigPath, initComms, loadDefaultConfig, resolve_config_value, resolveConfig, resolvedModifications
 
 # -- Define tests for validating user config path
 class TestUserConfigPath:
@@ -46,42 +46,64 @@ class TestResolveConfig:
         assert isinstance(cfg, dict) and 'search' in cfg
         assert 'default' in source
 
-    def test_global_used_when_present(self, isolated_config_dir):
-        from comms.commands.config import config_init
-        config_init()
-        cfg, source = resolveConfig(None)
+    def test_default_when_nothing_present(self, isolated_config_dir, tmp_path):
+        cfg, source = resolveConfig(tmp_path / 'comms')
+        assert isinstance(cfg, dict) and 'search' in cfg
+        assert 'default' in source
+
+    def test_local_preferred_when_present(self, isolated_config_dir, tmp_path):
+        comms_dir = tmp_path / 'comms'
+        comms_dir.mkdir()
+        local_cfg = loadDefaultConfig()
+        local_cfg['search']['threads'] = 99
+        with (comms_dir / 'config.toml').open('wb') as f:
+            import tomli_w
+            tomli_w.dump(local_cfg, f)
+        cfg, source = resolveConfig(comms_dir)
+        assert cfg['search']['threads'] == 99
+        assert source.startswith('local')
+
+    def test_global_used_when_no_local(self, isolated_config_dir, tmp_path):
+        import tomli_w
+        global_cfg = loadDefaultConfig()
+        global_cfg['search']['threads'] = 77
+        with (isolated_config_dir / 'config.toml').open('wb') as f:
+            tomli_w.dump(global_cfg, f)
+        cfg, source = resolveConfig(tmp_path / 'comms')
+        assert cfg['search']['threads'] == 77
         assert source.startswith('global')
 
-    def test_local_preferred_over_global(self, isolated_config_dir, tmp_path):
-        from comms.commands.config import config_init
-        from comms.utils.settings import loadDefaultConfig
-        import tomli_w
-        config_init()                                   # global exists
-        comms = tmp_path / 'comms'; comms.mkdir(parents=True)
-        local = loadDefaultConfig(); local['search']['threads'] = 7
-        with (comms / 'config.toml').open('wb') as f:
-            tomli_w.dump(local, f)
-        cfg, source = resolveConfig(comms)
-        assert cfg['search']['threads'] == 7
-        assert source.startswith('local')
+# -- Define tests for resolving a config value
+class TestResolveConfigValue:
+    def test_override_returned_when_given(self):
+        assert resolve_config_value({'search': {'threads': 4}}, 'search', 'threads', 8) == 8
+
+    def test_falls_back_to_config_value(self):
+        assert resolve_config_value({'search': {'threads': 4}}, 'search', 'threads', None) == 4
+
+    def test_raises_keyerror_when_absent_from_both(self):
+        with pytest.raises(KeyError):
+            resolve_config_value({}, 'search', 'threads', None)
+
 # -- Define tests for falling back to default configuration
 class TestConfigFallback:
-    def test_falls_back_to_defaults_when_no_user_config(self, isolated_config_dir, monkeypatch):
-        '''
-        When globalConfigPath() returns a path that does not exist, the module
-        should load bundled defaults.  We simulate this by importing settings
-        with a patched path pointing to a non-existent file.
-        '''
-        import importlib
-        import comms.utils.settings as settings_mod
+    def test_resolve_config_falls_back_to_defaults(self, isolated_config_dir, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            'comms.utils.settings.globalConfigPath',
+            lambda: tmp_path / '_nonexistent_config.toml',
+        )
+        cfg, source = resolveConfig(tmp_path / 'comms_that_does_not_exist')
+        assert cfg == loadDefaultConfig()
+        assert 'bundled' in source or 'default' in source
 
-        monkeypatch.setattr(settings_mod, 'globalConfigPath', Path('/nonexistent/config.toml'))
+# -- Define tests for initComms function
+class TestInitComms:
+    def test_runs_without_raising(self, capsys):
+        initComms()
 
-        # Reload to re-run the module-level config loading logic
-        # (We test the function directly since reloading modules is fragile in pytest)
-        defaults = loadDefaultConfig()
-        assert isinstance(defaults, dict)
-        assert 'search' in defaults
+    def test_prints_comms_name(self, capsys):
+        initComms()
+        assert 'comMS' in capsys.readouterr().out
 
 # -- Define tests for resolvedModifications function
 class TestResolvedModsSpec:

@@ -10,9 +10,16 @@ from unittest.mock import MagicMock
 # -- Import functions under test
 from comms.utils.context import (
     ExperimentContext,
-    _check_files, _choose, _normalise_dirs,
-    resolve_data_files, resolve_database, resolve_mzml_files,
-    resolve_organism_prefix, resolve_sample_sheet,
+    _check_files,
+    _choose,
+    _normalise_dirs,
+    resolve_data_files,
+    resolve_database,
+    resolve_mzml_files,
+    resolve_organism_prefix,
+    resolve_report,
+    resolve_results_input,
+    resolve_sample_sheet,
     results_dir,
 )
 from comms.utils.settings import loadDefaultConfig
@@ -96,6 +103,57 @@ class TestResolve:
         _write_experiment(comms, bin_dir='/opt/comms/bin')
         ctx = ExperimentContext.resolve(tmp_path)
         assert ctx.bin_dir == Path('/opt/comms/bin')
+
+class TestResolveResultsInput:
+    def test_delegates_to_results_dir(self, tmp_path):
+        ctx = MagicMock(spec=ExperimentContext, root=tmp_path)
+        result = resolve_results_input(ctx, 'search', override=None, must_exist=False)
+        assert result == tmp_path / 'comms' / 'results' / 'search'
+
+    def test_must_exist_false_suppresses_existence_check(self, tmp_path):
+        ctx = MagicMock(spec=ExperimentContext, root=tmp_path)
+        # should not raise even though the directory doesn't exist
+        resolve_results_input(ctx, 'search', override=None, must_exist=False)
+
+    def test_override_wins(self, tmp_path):
+        override_dir = tmp_path / 'custom_search'
+        override_dir.mkdir()
+        ctx = MagicMock(spec=ExperimentContext, root=tmp_path)
+        result = resolve_results_input(ctx, 'search', override=override_dir)
+        assert result == override_dir
+
+class TestResolveReport:
+    def test_no_override_enabled_true_means_do_not_skip(self):
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=True)
+        assert resolve_report(ctx, override=None) is False
+
+    def test_no_override_enabled_false_means_skip(self):
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=False)
+        assert resolve_report(ctx, override=None) is True
+
+    def test_no_override_unset_defaults_to_do_not_skip(self):
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=None)
+        assert resolve_report(ctx, override=None) is False
+
+    def test_override_agreeing_with_context_no_warning(self, caplog):
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=True)   # ctx_skip = False
+        caplog.clear()
+        resolve_report(ctx, override=False)
+        assert 'overrides' not in caplog.text.lower()
+
+    def test_override_disagreeing_with_context_warns_and_wins(self, caplog):
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=True)   # ctx_skip = False
+        caplog.clear()
+        result = resolve_report(ctx, override=True)                   # override disagrees
+        assert result is True
+        assert 'overrides' in caplog.text.lower()
+
+    def test_return_value_is_always_skip_polarity(self):
+        '''resolve_report must return "skip", never "enabled" — pin the polarity explicitly.'''
+        ctx = MagicMock(spec=ExperimentContext, report_enabled=True)
+        assert resolve_report(ctx, override=None) is False   # enabled=True -> skip=False
+        ctx2 = MagicMock(spec=ExperimentContext, report_enabled=False)
+        assert resolve_report(ctx2, override=None) is True    # enabled=False -> skip=True
 
 # ===========================================================================
 # ExperimentContext stored-input properties (data_files, database, sample_sheet, organism_prefix, ref_info, cont_csv)
@@ -185,6 +243,18 @@ class TestExperimentContextProperties:
     def test_cont_csv_returns_none_when_absent(self, tmp_path):
         ctx = _make_ctx(tmp_path)
         assert ctx.cont_csv is None
+
+    def test_report_enabled_true(self, tmp_path):
+        ctx = _make_ctx(tmp_path, metadata={'report': {'enabled': True}})
+        assert ctx.report_enabled is True
+
+    def test_report_enabled_false(self, tmp_path):
+        ctx = _make_ctx(tmp_path, metadata={'report': {'enabled': False}})
+        assert ctx.report_enabled is False
+
+    def test_report_enabled_none_when_absent(self, tmp_path):
+        ctx = _make_ctx(tmp_path)
+        assert ctx.report_enabled is None
 
 # ===========================================================================
 # results_dir

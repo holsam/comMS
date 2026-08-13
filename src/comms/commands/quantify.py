@@ -11,14 +11,22 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.context import ExperimentContext, resolve_database, resolve_results_input
+from comms.utils.settings import resolve_config_value, _writeConfigTo
 from comms.utils.validate import validate
 from comms.utils import crux as cruxutil
 from comms.utils import paths as pathutil
 
-# -- run_quantify: runs dNSAF spectral counting on rescored PSM files (discovering single/multi-species results) and writes results to output
-def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool = False):
-    if not in_pipeline:
-        logMsg('quantify')
+# -- run_quantify: run spectral counting on rescored PSM files (discovering single/multi-species results) and writes results to output
+def run_quantify(
+    input_dir,
+    database,
+    ctx: ExperimentContext,
+    measure=None,
+    qvalue_threshold=None,
+    unique_mapping=None,
+    in_pipeline: bool = False,
+):
+    logMsg('quantify')
     logMsg.debug('Started command: quantify')
     crux_bin, _ = validate(check_crux=True, bin_dir=ctx.bin_dir)
     input_dir = resolve_results_input(ctx, 'rescore', input_dir)
@@ -40,6 +48,21 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
     log_path = out_dir / 'quantify.log'
     configureFileLogging(log_path)
     logMsg.debug(f'Output log file: {log_path}')
+
+    # Build config for this run only if any override was given
+    overrides_given = any(v is not None for v in (measure, qvalue_threshold, unique_mapping))
+    if overrides_given:
+        logMsg.debug('Using run-specific configuration parameters')
+        run_config = {**ctx.config, 'quantify': dict(ctx.config.get('quantify', {}))}
+        run_config['quantify']['measure'] = resolve_config_value(ctx.config, 'quantify', 'measure', measure)
+        run_config['quantify']['qvalue_threshold'] = resolve_config_value(ctx.config, 'quantify', 'qvalue_threshold', qvalue_threshold)
+        run_config['quantify']['unique_mapping'] = resolve_config_value(ctx.config, 'quantify', 'unique_mapping', unique_mapping)
+        logMsg.info('Command-line overrides detected - run configuration file will be saved to output folder as "quantify.config.toml"')
+        _writeConfigTo(run_config, path=Path(out_dir, 'quantify.config.toml'))
+    else:
+        logMsg.debug('Using contextual configuration parameters')
+        run_config = ctx.config
+
     n_ok, n_fail = 0, 0
     with logging_redirect_tqdm():
         for psm_file in tqdm(psm_files, desc='Files quantified'):
@@ -51,7 +74,7 @@ def run_quantify(input_dir, database, ctx: ExperimentContext, in_pipeline: bool 
                 database=database,
                 out_dir=out_dir,
                 fileroot=fileroot,
-                config=ctx.config,
+                config=run_config,
             )
             if ok:
                 n_ok += 1

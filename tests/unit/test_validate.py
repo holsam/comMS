@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, call, patch
 
 # -- Import functions under test
 from comms.utils.validate import (
+    probe_crux,
+    probe_trfp,
     validate,
     _parse_version,
     _find_all_crux,
@@ -646,3 +648,26 @@ class TestValidateBinDirForwarding:
                    return_value='/usr/bin/mono'):
             validate(check_trfp=True, bin_dir=exp_bin)
         mock_find.assert_called_once_with(exp_bin)
+
+class TestProbeCrux:
+    def test_returns_path_when_found(self, tmp_path, monkeypatch):
+        crux_path = tmp_path / 'crux-4.1.linux' / 'bin' / 'crux'
+        crux_path.parent.mkdir(parents=True)
+        crux_path.touch()
+        monkeypatch.setattr('comms.utils.validate._get_crux_version', lambda p: (4, 1, 0))
+        assert probe_crux(tmp_path) == crux_path
+
+    def test_returns_none_without_raising_when_not_found(self, tmp_path):
+        assert probe_crux(tmp_path) is None
+
+
+class TestProbeTrfp:
+    def test_returns_path_when_found(self, tmp_path, monkeypatch):
+        trfp_path = tmp_path / 'trfp-1.4' / 'ThermoRawFileParser'
+        trfp_path.parent.mkdir(parents=True)
+        trfp_path.touch()
+        monkeypatch.setattr('comms.utils.validate._get_trfp_version', lambda p: (1, 4, 0))
+        assert probe_trfp(tmp_path) == trfp_path
+
+    def test_returns_none_without_raising_when_not_found(self, tmp_path):
+        assert probe_trfp(tmp_path) is None

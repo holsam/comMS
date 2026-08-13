@@ -21,6 +21,7 @@ script_dir <- local({
 # Import utility functions
 source(file.path(script_dir, "..", "..", "utils", "import.R"))
 source(file.path(script_dir, "..", "..", "utils", "normalise.R"))
+source(file.path(script_dir, "..", "..", "utils", "state.R"))
 source(file.path(script_dir, "..", "..", "utils", "theme.R"))
 
 # Load libraries
@@ -56,94 +57,107 @@ categorise_marker <- function(annotation) {
 
 organisms <- unique(sample_meta$organism)
 all_marker_tables <- list()
+status <- new_status_tracker("ev-markers")
 
 for (org in organisms) {
-  org_meta <- filter(sample_meta, organism == org)
-  org_cols <- org_meta$dnsaf_col
-  # EV markers are only meaningful for the primary organism: skip any organism whose dNSAF columns contain no primary-organism proteins
-  primary_check <- results_wide %>%
-    filter(startsWith(proteinId, organism_prefix)) %>%
-    filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
+  tryCatch({
+    org_meta <- filter(sample_meta, organism == org)
+    org_cols <- org_meta$dnsaf_col
 
-  if (nrow(primary_check) == 0) {
-    message(sprintf("EV markers: no primary organism proteins in %s columns — skipping", org))
-    next
-  }
+    primary_check <- results_wide %>%
+      filter(startsWith(proteinId, organism_prefix)) %>%
+      filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
 
-  fractions <- unique(org_meta$fraction)
+    if (nrow(primary_check) == 0) {
+      reason <- "no primary-organism proteins detected in this organism's samples"
+      message(sprintf("EV markers %s: %s — skipping", org, reason))
+      status <<- record_skip(status, org, reason)
+      next
+    }
 
-  org_data <- results_wide %>%
-    filter(startsWith(proteinId, organism_prefix)) %>%
-    filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
+    fractions <- unique(org_meta$fraction)
+    org_data <- results_wide %>%
+      filter(startsWith(proteinId, organism_prefix)) %>%
+      filter(rowSums(select(., all_of(org_cols)) > 0) > 0)
 
-  # Per-fraction mean dNSAF
-  for (frac in fractions) {
-    cols <- intersect(filter(org_meta, fraction == frac)$dnsaf_col, colnames(org_data))
-    org_data[[paste0("avg_", frac)]] <-
-      if (length(cols) > 0) rowMeans(select(org_data, all_of(cols)), na.rm=TRUE) else NA_real_
-  }
+    for (frac in fractions) {
+      cols <- intersect(filter(org_meta, fraction == frac)$dnsaf_col, colnames(org_data))
+      org_data[[paste0("avg_", frac)]] <-
+        if (length(cols) > 0) rowMeans(select(org_data, all_of(cols)), na.rm = TRUE) else NA_real_
+    }
 
-  marker_table <- org_data %>%
-    rowwise() %>%
-    mutate(MISEVCategory=categorise_marker(proteinAnnotation)) %>%
-    ungroup() %>%
-    filter(!is.na(MISEVCategory)) %>%
-    mutate(MISEVCategory=factor(MISEVCategory, levels=MISEV_LEVELS)) %>%
-    arrange(MISEVCategory)
+    marker_table <- org_data %>%
+      rowwise() %>%
+      mutate(MISEVCategory=categorise_marker(proteinAnnotation)) %>%
+      ungroup() %>%
+      filter(!is.na(MISEVCategory)) %>%
+      mutate(MISEVCategory=factor(MISEVCategory, levels=MISEV_LEVELS)) %>%
+      arrange(MISEVCategory)
 
-  if (nrow(marker_table) == 0) {
-    message(sprintf("EV markers %s: no marker proteins found — skipping", org)); next
-  }
+    if (nrow(marker_table) == 0) {
+      reason <- "no marker proteins found"
+      message(sprintf("EV markers %s: %s — skipping", org, reason))
+      status <<- record_skip(status, org, reason)
+      next
+    }
 
-  # Enrichment ratios
-  ev_frac <- fractions[str_detect(tolower(fractions), "ev")][1]
-  wcl_frac <- fractions[str_detect(tolower(fractions), "wcl")][1]
-  awf_frac <- fractions[str_detect(tolower(fractions), "awf|cr")][1]
-  if (!is.na(ev_frac) && !is.na(wcl_frac))
-    marker_table <- mutate(marker_table, log2_EV_vs_WCL=log2((.data[[paste0("avg_", ev_frac)]] + 1e-10) / (.data[[paste0("avg_", wcl_frac)]] + 1e-10))
-  if (!is.na(ev_frac) && !is.na(awf_frac))
-    marker_table <- mutate(marker_table, log2_EV_vs_AWF=log2((.data[[paste0("avg_", ev_frac)]] + 1e-10) / (.data[[paste0("avg_", awf_frac)]] + 1e-10)))
+    ev_frac <- fractions[str_detect(tolower(fractions), "ev")][1]
+    wcl_frac <- fractions[str_detect(tolower(fractions), "wcl")][1]
+    awf_frac <- fractions[str_detect(tolower(fractions), "awf|cr")][1]
+    if (!is.na(ev_frac) && !is.na(wcl_frac))
+      marker_table <- mutate(marker_table, log2_EV_vs_WCL=log2((.data[[paste0("avg_", ev_frac)]] + 1e-10) / (.data[[paste0("avg_", wcl_frac)]] + 1e-10)))
+    if (!is.na(ev_frac) && !is.na(awf_frac))
+      marker_table <- mutate(marker_table, log2_EV_vs_AWF=log2((.data[[paste0("avg_", ev_frac)]] + 1e-10) / (.data[[paste0("avg_", awf_frac)]] + 1e-10)))
 
-  # Per-protein heatmap with category gaps
-  avg_cols <- intersect(paste0("avg_", fractions), colnames(marker_table))
-  heatmap_mat <- marker_table %>%
-    select(proteinAnnotation, all_of(avg_cols)) %>%
-    column_to_rownames("proteinId") %>%
-    as.matrix() %>%
-    logdNSAF()
-  colnames(heatmap_mat) <- str_remove(colnames(heatmap_mat), "avg_")
-  ann_row <- data.frame(Category=as.character(marker_table$MISEVCategory), row.names=marker_table$proteinAnnotation)
-  gaps_row <- marker_table %>%
-    count(MISEVCategory) %>%
-    arrange(MISEVCategory) %>%
-    pull(n) %>%
-    cumsum() %>%
-    head(-1)
-  svglite(file.path(output_dir, sprintf("marker_heatmap_%s.svg", org)), width=12, height=max(6, nrow(heatmap_mat) * 0.35))
-  pheatmap(heatmap_mat, annotation_row=ann_row, gaps_row=gaps_row, cluster_rows=FALSE, colour=colorRampPalette(c("#88CCEE", "white", "#CC6677"))(50), main=sprintf("MISEV2023 markers — log(dNSAF) — %s", org), fontsize_row=8, fontsize_col=10, border_colour=NA)
-  dev.off()
+    avg_cols <- intersect(paste0("avg_", fractions), colnames(marker_table))
+    heatmap_mat <- marker_table %>%
+      select(proteinAnnotation, all_of(avg_cols)) %>%
+      column_to_rownames("proteinId") %>%
+      as.matrix() %>%
+      logdNSAF()
+    colnames(heatmap_mat) <- str_remove(colnames(heatmap_mat), "avg_")
 
-  # Aggregated category heatmap (3 × fraction×treatment)
-  agg_mat <- marker_table %>%
-    select(MISEVCategory, all_of(org_cols)) %>%
-    pivot_longer(-MISEVCategory, names_to="dnsaf_col", values_to="dNSAF") %>%
-    left_join(select(org_meta, dnsaf_col, fraction, treatment), by="dnsaf_col") %>%
-    mutate(log_dNSAF=logdNSAF(dNSAF)) %>%
-    group_by(MISEVCategory, fraction, treatment) %>%
-    summarise(mean_log_dNSAF=mean(log_dNSAF, na.rm=TRUE), .groups="drop") %>%
-    mutate(col_label=paste(fraction, treatment, sep="_")) %>%
-    select(MISEVCategory, col_label, mean_log_dNSAF) %>%
-    pivot_wider(names_from=col_label, values_from=mean_log_dNSAF) %>%
-    arrange(MISEVCategory) %>%
-    column_to_rownames("MISEVCategory") %>%
-    as.matrix()
+    ann_row <- data.frame(Category=as.character(marker_table$MISEVCategory), row.names=marker_table$proteinAnnotation)
+    gaps_row <- marker_table %>%
+      count(MISEVCategory) %>%
+      arrange(MISEVCategory) %>%
+      pull(n) %>%
+      cumsum() %>%
+      head(-1)
 
-  svglite(file.path(output_dir, sprintf("marker_category_heatmap_%s.svg", org)), width=8, height=4)
-  pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, colour=colorRampPalette(c("#88CCEE", "white", "#CC6677"))(50), main=sprintf("Mean log(dNSAF) by MISEV category — %s", org), fontsize=10, border_colour=NA)
-  dev.off()
+    svglite(file.path(output_dir, sprintf("marker_heatmap_%s.svg", org)), width=12, height=max(6, nrow(heatmap_mat) * 0.35))
+    pheatmap(heatmap_mat, annotation_row=ann_row, gaps_row=gaps_row, cluster_rows=FALSE, colour=colorRampPalette(c("#88CCEE", "white", "#CC6677"))(50), main=sprintf("MISEV2023 markers — log(dNSAF) — %s", org), fontsize_row=8, fontsize_col=10, border_colour=NA)
+    dev.off()
 
-  all_marker_tables[[org]] <- marker_table
+    agg_mat <- marker_table %>%
+      select(MISEVCategory, all_of(org_cols)) %>%
+      pivot_longer(-MISEVCategory, names_to="dnsaf_col", values_to="dNSAF") %>%
+      left_join(select(org_meta, dnsaf_col, fraction, treatment), by="dnsaf_col") %>%
+      mutate(log_dNSAF=logdNSAF(dNSAF)) %>%
+      group_by(MISEVCategory, fraction, treatment) %>%
+      summarise(mean_log_dNSAF=mean(log_dNSAF, na.rm=TRUE), .groups="drop") %>%
+      mutate(col_label=paste(fraction, treatment, sep="_")) %>%
+      select(MISEVCategory, col_label, mean_log_dNSAF) %>%
+      pivot_wider(names_from=col_label, values_from=mean_log_dNSAF) %>%
+      arrange(MISEVCategory) %>%
+      column_to_rownames("MISEVCategory") %>%
+      as.matrix()
+
+    svglite(file.path(output_dir, sprintf("marker_category_heatmap_%s.svg", org)), width=8, height=4)
+    pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, colour=colorRampPalette(c("#88CCEE", "white", "#CC6677"))(50), main=sprintf("Mean log(dNSAF) by MISEV category — %s", org), fontsize=10, border_colour=NA)
+    dev.off()
+
+    all_marker_tables[[org]] <- marker_table
+    status <<- record_ok(status, org)
+  }, error = function(e) {
+    while (dev.cur() != 1) dev.off()
+    message(sprintf("EV markers %s: error — %s", org, conditionMessage(e)))
+    status <<- record_fail(status, org, conditionMessage(e))
+  })
 }
+
+write_status(status, output_dir)
+
 # Export .xlsx — one sheet per organism
 wb <- wb_workbook()
 for (org in names(all_marker_tables)) {

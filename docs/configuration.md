@@ -76,14 +76,14 @@ The simplest way to create an experiment directory is the [`experiment` command]
 comMS reads its settings from a TOML file. Three sources can supply that file:
 
 - **Bundled defaults.** A default `config.toml` ships inside the package and provides the baseline values. It is never edited directly.
-- **Global user configuration.** A per-user file created with `comms config init`. It applies to every run unless an experiment provides its own local configuration file. Its location depends on the operating system:
+- **Global user configuration.** A per-user file created with `comms config --global`. It applies to every run unless an experiment provides its own local configuration file. Its location depends on the operating system:
 
     OS | Path
     -- | --
     Linux/macOS | `~/.config/comms/config.toml`
     Windows | `%APPDATA%\comms\config.toml`
 
-- **Local configuration.** A `config.toml` inside an experiment's `comms/` folder. It applies only to that experiment. A local file is written by the [`experiment` command](#creating-an-experiment-the-experiment-command), or created with `comms config init -c <path>`.
+- **Local configuration.** A `config.toml` inside an experiment's `comms/` folder. It applies only to that experiment. A local file is written by the [`experiment` command](#creating-an-experiment-the-experiment-command), or created by pointing `comms config` at the experiment directory (e.g. `comms config <path>`), which creates the file from defaults if it doesn't already exist.
 
 ### Resolution order
 For any given run, comMS uses the first configuration it finds, in this order:
@@ -112,25 +112,40 @@ export COMMS_BIN_DIR=/absolute/path/to/comMS/bin
 ```
 
 ## Editing configuration: the `config` command
-The `config` command edits individual sections of a single configuration file. By default it targets the global user file. Pass `-c` / `--config` with a path to target a local file instead, or `-c global` to be explicit about the global one.
+`config` is a single command, not a set of subcommands: it edits or inspects one configuration file, and which behaviour you get depends on which flags you pass.
 
-Subcommand | Purpose
+```bash
+comms config [PATH] [--global] [--verify | --reset [--force]] [protocol/value flags...]
+```
+
+Argument/flag | Purpose
 ---|---
-`init` | Create a configuration file from the defaults (will not overwrite an existing file)
-`exists` | Report whether the file exists and print its path
-`list` | Print current values, highlighting any that differ from the defaults
-`verify` | Check that all expected keys are present
-`reset` | Overwrite the file with the defaults (prompts unless `--force`)
-`set` | Change values via named flags
+`PATH` (positional, optional) | Experiment directory whose local `config.toml` should be targeted. Defaults to the current directory.
+`--global` | Target the global user config instead of a local one.
+`--verify` | Check that all expected keys are present in the target file (and no unexpected ones), then exit.
+`--reset` | Overwrite the target file with comMS defaults (prompts for confirmation unless `--force` is also given), then exit.
+`--force` | Skip the confirmation prompt when used with `--reset`.
+*(any protocol/value flag, e.g. `--ox`, `--iodo`, `--organism`)* | Apply that value to the target file.
+
+If none of `--verify`, `--reset`, or a value-setting flag is given (or a value-setting flag is given but resolves to no change), `config` falls back to listing the current values against the defaults — this is also what running `comms config` on its own does.
+
+**Resolving which file to edit.** Without `PATH` or `--global`, `config` looks in the current directory for a bare `config.toml` or a `config.toml` nested under `comms/`. If neither exists, it offers to create one at `<cwd>/comms/config.toml`. If a path or `--global` is given and the target file doesn't exist yet, it is created from the bundled defaults first.
 
 For example, to view the global configuration, then enable methionine oxidation and cysteine carbamidomethylation in an experiment's local file:
 
 ```bash
-comms config list
-comms config set -c my_experiment/comms/config.toml --ox --iodo
+comms config --global
+comms config my_experiment --ox --iodo
 ```
 
-The full set of `config set` flags, the modifications they apply, and the default parameters are documented in the [configuration reference][docs-config-ref].
+To check a config file is complete, or reset it to defaults:
+
+```bash
+comms config my_experiment --verify
+comms config my_experiment --reset --force
+```
+
+The full set of value-setting flags, the modifications they apply, and the default parameters are documented in the [configuration reference][docs-config-ref].
 
 ## Creating an experiment: the `experiment` command
 The `experiment` command builds a complete experiment directory, writing the sample sheet, a local `config.toml`, and `experiment.toml` under `<dir>/comms/`. It saves manually writing the sample sheet or running `config` for each value.
@@ -140,7 +155,7 @@ comms experiment            # graphical setup
 comms experiment --headless # terminal prompts only
 ```
 
-Both the GUI and command-line setups walk through naming the experiment and choosing an output directory, defining treatment and fraction groups, importing a directory of `.RAW` / `.mzML` files, assigning each sample to its groups (replicate numbers auto-assign per treatment and fraction and can be overridden), and previewing the sheet before saving. A configuration panel mirrors `comms config set`, so the local `config.toml` it writes uses the same options. The configuration panel also includes a report settings section, where a reference annotation file (TSV/CSV), a contaminant list (CSV), and a primary organism ID prefix can be set. These are written to experiment.toml under [report] and used automatically when comms report is run against the experiment directory.
+Both the GUI and command-line setups walk through naming the experiment and choosing an output directory, defining treatment and fraction groups, importing a directory of `.RAW` / `.mzML` files, assigning each sample to its groups (replicate numbers auto-assign per treatment and fraction and can be overridden), and previewing the sheet before saving. A configuration panel mirrors the `comms config` value-setting flags, so the local `config.toml` it writes uses the same options. The configuration panel also includes a report settings section, where a reference annotation file (TSV/CSV), a contaminant list (CSV), and a primary organism ID prefix can be set. These are written to experiment.toml under [report] and used automatically when comms report is run against the experiment directory.
 
 ## `config` vs `experiment`
 The two commands serve different purposes:

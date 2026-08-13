@@ -9,16 +9,22 @@ from rich import print
 # -- Import internal functions
 from comms.utils.log import configureFileLogging, logMsg
 from comms.utils.context import ExperimentContext, resolve_data_files
+from comms.utils.settings import resolve_config_value, _writeConfigTo
 from comms.utils.validate import validate
 from comms.utils import trfp as trfputil
 from comms.utils import paths as pathutil
 
 # -- run_convert: converts all .RAW files in input_dir to indexed mzML and writes them to output
-def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in_pipeline: bool = False):
-    if not in_pipeline:
-        logMsg('convert')
+def run_convert(
+        data_files,
+        ctx: ExperimentContext,
+        gzip: bool | None = None,
+        format: int | None = None,
+        metadata: int | None = None,
+        in_pipeline: bool = False,
+):
+    logMsg('convert')
     logMsg.debug('Started command: convert')
-    gzip = ctx.config['convert']['gzip'] if gzip is None else gzip
     _, trfp_path = validate(check_trfp=True, bin_dir=ctx.bin_dir)
     data_files = resolve_data_files(ctx, data_files)
     raw_files = [f for f in data_files if f.suffix.lower() == '.raw']
@@ -38,6 +44,19 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
     log_path = out_dir / 'convert.log'
     configureFileLogging(log_path)
     logMsg.debug(f'Output log file: {log_path}')
+    # Build config for this run only if any override was given
+    overrides_given = any(v is not None for v in (gzip, format, metadata))
+    if overrides_given:
+        logMsg.debug('Using run-specific configuration parameters')
+        run_config = {**ctx.config, 'convert': dict(ctx.config.get('convert', {}))}
+        run_config['convert']['gzip'] = resolve_config_value(ctx.config, 'convert', 'gzip', gzip)
+        run_config['convert']['format'] = resolve_config_value(ctx.config, 'convert', 'format', format)
+        run_config['convert']['metadata'] = resolve_config_value(ctx.config, 'convert', 'metadata', metadata)
+        logMsg.info('Command-line overrides detected - run configuration file will be saved to output folder as "convert.config.toml"')
+        _writeConfigTo(run_config, path=Path(out_dir, 'convert.config.toml'))
+    else:
+        logMsg.debug('Using contextual configuration parameters')
+        run_config = ctx.config
     n_ok, n_fail = 0, 0
     for raw_file in raw_files:
         logMsg.progress(f'Converting {raw_file.name}')
@@ -45,8 +64,8 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
             trfp_path=trfp_path,
             raw_file=raw_file,
             out_dir=out_dir,
-            output_format=ctx.config['convert']['format'],
-            metadata=ctx.config['convert']['metadata'],
+            output_format=run_config['convert']['format'],
+            metadata=run_config['convert']['metadata'],
         )
         if ok:
             n_ok += 1
@@ -71,7 +90,7 @@ def run_convert(data_files, ctx: ExperimentContext, gzip: bool | None = None, in
             except:
                 continue
     # If --gzip was provided, gzip TRFP output
-    if gzip:
+    if run_config['convert']['gzip']:
         import gzip, os, shutil
         # Loop through each mzML file in directory
         for file in out_dir.glob('[!.]*.mzML'):

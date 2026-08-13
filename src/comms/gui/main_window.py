@@ -3,6 +3,7 @@ comMS experiment GUI: main window
 '''
 
 # -- Import external dependencies
+from pathlib import Path
 from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget
 
@@ -18,7 +19,7 @@ from comms.utils.log import logMsg
 
 # -- MainWindow: four numbered tabs with per-tab status icons
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, experiment_dir: Path | None = None, parent=None):
         super().__init__(parent)
         self._log = logMsg('experiment')
         self.setWindowTitle('comms experiment setup')
@@ -62,17 +63,39 @@ class MainWindow(QMainWindow):
         self.sample.contentChanged.connect(self.readiness.refresh)
         self.config.changed.connect(self.readiness.refresh)
         self.experiment.changed.connect(self.readiness.refresh)
+        self.experiment.binDirChanged.connect(self.readiness.refresh_dependencies)
 
         # paint the initial (unedited) icons
         self.tabs.setTabIcon(self._sample_index, status_icon(self.sample.tracker.status))
         self.tabs.setTabIcon(self._config_index, status_icon(self.config.tracker.status))
         self.tabs.setTabIcon(self._review_index, status_icon(self.experiment.tracker.status))
         self.save.refresh()
+        
+        # if a directory provided, call _load_existing
+        if experiment_dir is not None:
+            self._load_existing(experiment_dir)
 
     def _on_tab_changed(self, index: int) -> None:
         if index == self._review_index:
             self.save.refresh()
-    
+
+    def _load_existing(self, experiment_dir: Path) -> None:
+        from comms.commands.experiment import _existing_experiment
+        existing = _existing_experiment(experiment_dir)
+        if existing is None:
+            # If no experiment actually saved to directory, only pre-fill save to field
+            self.experiment._dir.setText(str(experiment_dir))
+            return
+        root, comms_dir, metadata, config, rows = existing
+        self.experiment.load_from_metadata(root, metadata)
+        report_meta = metadata.get('report', {})
+        self.config.load_from_config(config, report_meta)
+        treatments = sorted({r.treatment for r in rows if r.treatment})
+        fractions = sorted({r.fraction for r in rows if r.fraction})
+        data_files = metadata.get('files', {}).get('data', [])
+        self.sample.load(rows, treatments, fractions, data_files=data_files)
+        self._log.info(f'Loaded existing experiment from {comms_dir}')
+
     def closeEvent(self, event) -> None:
         self._log.info('Closed experiment setup GUI')
         super().closeEvent(event)

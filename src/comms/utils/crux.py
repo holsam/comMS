@@ -114,20 +114,17 @@ def paramMedic(crux_bin: Path, mzml_file: Path, out_dir: Path) -> bool:
     return runCrux(crux_bin, 'param-medic', args)
 
 # -- tideSearch: returns True if Tide-search completed successfully for the given mzML file, False on failure
-def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict, threads, precursor_tol=None, mz_bin_width=None) -> bool:
+def tideSearch(crux_bin: Path, mzml_file: Path, index_dir: Path, out_dir: Path, fileroot: str, config: dict) -> bool:
     logMsg.debug(f'tide-search: {mzml_file.name}')
-    prec = precursor_tol or config['search']['precursor_tolerance_ppm']
-    bin_width = mz_bin_width  or config['search']['mz_bin_width']
-    logMsg.debug(f'Precursor tolerance {prec} ppm, m/z bin width {bin_width}')
     args = [
         '--verbosity', '40',
-        '--num-threads', threads,
+        '--num-threads', config['search']['threads'],
         '--spectrum-parser', 'pwiz',
-        '--precursor-window', str(prec),
+        '--precursor-window', str(config['search']['precursor_tolerance_ppm']),
         '--precursor-window-type', 'ppm',
-        '--mz-bin-width', str(bin_width),
+        '--mz-bin-width', str(config['search']['mz_bin_width']),
         '--score-function', config['search']['score_function'],
-        '--min-peaks', str(config['search']['min_peaks']),
+        '--min-peaks', str(config['search']['min_peaks'],),
         '--missed-cleavages', str(config['index']['missed_cleavages']),
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
@@ -142,13 +139,13 @@ def percolator(crux_bin: Path, target_psm_file: Path, database: Path, out_dir: P
     logMsg.debug(f'percolator: {target_psm_file.name}')
     args = [
         '--verbosity', '40',
-        '--protein-enzyme', config['percolator']['protein_enzyme'],
+        '--protein-enzyme', config['rescore']['protein_enzyme'],
         '--output-dir', str(out_dir),
         '--fileroot', fileroot,
         '--overwrite', 'T',
         str(target_psm_file),
     ]
-    if config['percolator']['picked_protein']:
+    if config['rescore']['picked_protein']:
         args = ['--picked-protein', str(database)] + args
     return runCrux(crux_bin, 'percolator', args)
 
@@ -230,8 +227,7 @@ def lfq(crux_bin, psm_files, mzml_files, out_dir, fileroot, config) -> bool:
     return ok
 
 # -- _tomlToCrux: helper function returning 'T' if True and 'F' if False
-def _tomlToCrux(val: bool):
-    if val:
-        return 'T' 
-    else:
-        return 'F'
+def _tomlToCrux(val) -> str:
+    if isinstance(val, str):
+        val = val.strip().lower() == 'true'
+    return 'T' if val else 'F'
