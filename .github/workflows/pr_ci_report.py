@@ -36,8 +36,8 @@ def summary_icon(passed, total):
     return ICON_PARTIAL
 
 # load Python and R test results
-py = load('results/python/*/result.json')
-r = load('results/r/*/result.json')
+py = load("results/python/**/result.json")
+r = load("results/r/**/result.json")
 
 # extract all OS keys and sort in descending order
 os_keys = sorted(set(os_key(i) for i in py) | set(os_key(i) for i in r), reverse=True)
