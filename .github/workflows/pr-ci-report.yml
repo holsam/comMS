@@ -235,16 +235,16 @@ jobs:
 
       - name: List all downloaded files
         shell: bash
-        run: find results -type f 2>/dev/null | sort
+        run: ls -a
 
       - name: Debug artifact contents
         shell: bash
         run: |
           echo "=== Python results ==="
-          cat results/python/*/result.json 2>/dev/null || echo "No Python results found"
+          cat results/python/**/result.json 2>/dev/null || echo "No Python results found"
           echo ""
           echo "=== R results ==="
-          cat results/r/*/result.json 2>/dev/null || echo "No R results found"
+          cat results/r/**/result.json 2>/dev/null || echo "No R results found"
 
       - name: Build summary
         id: build
