@@ -59,8 +59,8 @@ jobs:
               sys.exit(1)
 
           if pr <= main:
-              print(f'Version in pyproject.toml ({pr_raw}) is not greater than main ({main_raw}). Versions must strictly increase.'', file=sys.stderr)
+              print(f'Version in pyproject.toml ({pr_raw}) is not greater than main ({main_raw}). Versions must strictly increase.', file=sys.stderr)
               sys.exit(1)
 
-          print(f'OK: {pr_raw} > {main_raw}'')
+          print(f'OK: {pr_raw} > {main_raw}')
           EOF
