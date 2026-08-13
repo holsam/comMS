@@ -1,6 +1,6 @@
 [project]
 name = "comms"
-version = "2.0.2"
+version = "3.0.0"
 description = "A command line tool for comparative analysis of proteomic data"
 readme = "README.md"
 authors = [
