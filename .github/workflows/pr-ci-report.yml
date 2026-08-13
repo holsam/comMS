@@ -216,6 +216,9 @@ jobs:
     if: always() && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout branch for workflow script
+        uses: actions/checkout@v7
+
       - name: Download Python results
         uses: actions/download-artifact@v7
         continue-on-error: true
@@ -230,21 +233,9 @@ jobs:
           pattern: r-result-*
           path: results/r
 
-      - name: Checkout branch for workflow script
-        uses: actions/checkout@v7
-
       - name: List all downloaded files
         shell: bash
         run: ls -a
-
-      - name: Debug artifact contents
-        shell: bash
-        run: |
-          echo "=== Python results ==="
-          cat results/python/**/result.json 2>/dev/null || echo "No Python results found"
-          echo ""
-          echo "=== R results ==="
-          cat results/r/**/result.json 2>/dev/null || echo "No R results found"
 
       - name: Build summary
         id: build
